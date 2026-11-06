@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./data/**)",
+      "Edit(./data/**)",
+      "Read(./artifacts/**)",
+      "Read(./cache/**)",
+      "Read(./features/**)",
+      "Bash(cat data/*)",
+      "Bash(head data/*)",
+      "Bash(tail data/*)",
+      "Bash(less data/*)",
+      "Bash(more data/*)",
+      "Bash(grep * data/*)",
+      "Bash(sed * data/*)",
+      "Bash(awk * data/*)",
+      "Bash(xxd data/*)"
+    ]
+  }
+}
