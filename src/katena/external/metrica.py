@@ -13,7 +13,6 @@ Speed is derived from positions by central differences.
 from __future__ import annotations
 
 import json
-import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from katena.external.common import count_speed_blanked, derive_speed, infer_attack_dir, infer_attack_dir_gk, quality_report
-from katena.types import A, D, H, X, Match
+from katena.types import D, X, Match
 
 FPS = 25.0
 PITCH = (105.0, 68.0)

@@ -1,0 +1,278 @@
+# CI for katenaball. What runs, how to run it locally and how to read failures: docs/ci.md.
+#
+# Hosted CI never sees the competition data. The firewall job fails if any of it is in git, and
+# every other job uses published files and synthetic matches only.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+    # No "synchronize": a push to a branch with an open pull request runs through the push trigger
+    # with the full OS matrix, so the same commit is not tested twice.
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
+  workflow_call:          # .github/workflows/release.yml re-runs CI for a submission tag
+
+concurrency:
+  # One run per branch; a newer push cancels the older run. Tag runs are never cancelled.
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+  pull-requests: read     # the plan job looks for an open pull request
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  UV_VERSION: "0.13.1"
+  RUFF_VERSION: "0.17.3"
+  UV_PYTHON: "3.11.17"
+  # torch and the CUDA wheels it pulls on Linux (about 3 GB, uv.lock). The scorer and determinism jobs
+  # never import torch, so they skip these. A stale list only makes those installs slower.
+  NO_TORCH: >-
+    --no-install-package torch --no-install-package triton
+    --no-install-package cuda-bindings --no-install-package cuda-pathfinder --no-install-package cuda-toolkit
+    --no-install-package nvidia-cublas --no-install-package nvidia-cuda-cccl --no-install-package nvidia-cuda-cupti
+    --no-install-package nvidia-cuda-nvrtc --no-install-package nvidia-cuda-runtime --no-install-package nvidia-cudnn-cu13
+    --no-install-package nvidia-cufft --no-install-package nvidia-cufile --no-install-package nvidia-cusolver
+    --no-install-package nvidia-cusparse --no-install-package nvidia-cusparselt-cu13 --no-install-package nvidia-nccl-cu13
+    --no-install-package nvidia-nvjitlink --no-install-package nvidia-nvshmem-cu13 --no-install-package nvidia-nvtx
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      os: ${{ steps.decide.outputs.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Choose the OS matrix
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          full="" reason=""
+          case "$GITHUB_REF" in
+            refs/heads/main) full=1 reason="push to main" ;;
+            refs/tags/*) full=1 reason="tag $GITHUB_REF_NAME" ;;
+          esac
+          if [ -z "$full" ]; then
+            case "$EVENT" in pull_request | workflow_dispatch) full=1 reason="$EVENT" ;; esac
+          fi
+          if [ -z "$full" ] && [ "$EVENT" = push ]; then
+            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --base main --state open \
+              --json number --jq length || echo 0)
+            if [ "${open:-0}" -gt 0 ]; then full=1 reason="branch has an open pull request to main"; fi
+          fi
+          if [ -z "$full" ]; then
+            case "$HEAD_MESSAGE" in *"[ci full]"*) full=1 reason="[ci full] in the commit message" ;; esac
+          fi
+          if [ -z "$full" ] && [ "$EVENT" = push ]; then
+            base="$BEFORE"
+            if ! git cat-file -e "${base:-none}^{commit}" 2>/dev/null; then
+              base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+            fi
+            changed=$(git diff --name-only "${base:-HEAD}" HEAD)
+            if grep -qE '^(\.github/|uv\.lock$|pyproject\.toml$|\.python-version$|\.gitattributes$|scripts/synthetic_e2e\.py$)' <<<"$changed"; then
+              full=1 reason="CI or environment files changed"
+            fi
+          fi
+          if [ -n "$full" ]; then
+            os='["ubuntu-24.04","windows-2025","macos-15"]'
+          else
+            os='["ubuntu-24.04"]' reason="plain branch push"
+          fi
+          echo "os=$os" >> "$GITHUB_OUTPUT"
+          echo "OS matrix $os: $reason" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  firewall:
+    name: firewall
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Data firewall on tracked files and history
+        env:
+          # Every ref on main, pull requests and tags; the branch's own history on other pushes.
+          SCOPE: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) && 'HEAD' || 'all' }}
+        run: python3 scripts/firewall_check.py --history "$SCOPE"
+
+  lint:
+    name: lint
+    needs: firewall
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Ruff, real errors only (pyflakes F, syntax E9)
+        run: uvx "ruff@$RUFF_VERSION" check --select F,E9 --output-format github .
+      - name: uv.lock is up to date with pyproject.toml
+        run: uv lock --check
+      - name: Text files opened without an explicit encoding (report only, docs/ci.md)
+        run: |
+          uvx "ruff@$RUFF_VERSION" check --preview --select PLW1514 --exit-zero --output-format github src scripts \
+            | sed 's/^::error /::warning /'
+
+  test:
+    name: test (${{ matrix.os }})
+    needs: [plan, firewall]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: full
+          prune-cache: ${{ runner.os == 'Linux' }}   # Linux wheels are too big to cache (CUDA)
+      - name: Install the locked environment
+        run: uv sync --frozen
+      - name: Tests (Python's default text encoding, no PYTHONUTF8)
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            # LightGBM needs libomp; use the copy bundled with the locked scikit-learn (gbdt.ensure_openmp).
+            export DYLD_FALLBACK_LIBRARY_PATH="$PWD/.venv/lib/python3.11/site-packages/sklearn/.dylibs"
+            ls /opt/homebrew/opt/libomp/lib/libomp.dylib >/dev/null 2>&1 \
+              && echo "Homebrew libomp is installed" || echo "no Homebrew libomp: LightGBM uses scikit-learn's copy"
+          fi
+          uv run --frozen --no-sync python -c "import lightgbm; print('lightgbm', lightgbm.__version__, 'loads')"
+          uv run --frozen --no-sync python -c "import locale, sys; print('text encoding', locale.getpreferredencoding(False), 'utf8_mode', sys.flags.utf8_mode)"
+          uv run --frozen --no-sync pytest -q -rs
+
+  scorer:
+    name: scorer (${{ matrix.os }})
+    needs: [plan, firewall]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: lite
+          prune-cache: ${{ runner.os == 'Linux' }}
+      - name: Install the locked environment without torch
+        run: uv sync --frozen --no-dev --no-install-project $NO_TORCH
+      - name: Official scorer on published files; validator on synthetic files
+        run: uv run --frozen --no-sync python scripts/check_scorer.py
+
+  determinism:
+    name: determinism (${{ matrix.os }})
+    needs: [plan, firewall]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: lite
+          prune-cache: ${{ runner.os == 'Linux' }}
+      - name: Install the locked environment without torch (the synthetic run never imports it)
+        run: uv sync --frozen --no-dev $NO_TORCH
+      - name: Synthetic end to end, twice, in separate processes
+        env:
+          LABEL: ${{ matrix.os }}
+        run: |
+          for i in 1 2; do
+            PYTHONHASHSEED=$i uv run --frozen --no-sync python scripts/synthetic_e2e.py run \
+              --out "$RUNNER_TEMP/e2e-$i" --label "$LABEL"
+          done
+      - name: Both runs are byte-identical
+        run: |
+          uv run --frozen --no-sync python scripts/synthetic_e2e.py compare \
+            "$RUNNER_TEMP/e2e-1/hashes.json" "$RUNNER_TEMP/e2e-2/hashes.json"
+      - name: The synthetic submission passes the official validator
+        run: uv run --frozen --no-sync python evaluation/validate_submission.py "$RUNNER_TEMP/e2e-1/submission.csv"
+      - name: Keep the hashes for the cross-OS comparison (synthetic, no CSV)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: determinism-${{ matrix.os }}
+          path: ${{ runner.temp }}/e2e-1/hashes.json
+          retention-days: 30
+
+  determinism-cross-os:
+    name: determinism across OSes (non-blocking)
+    needs: determinism
+    if: ${{ !cancelled() && needs.determinism.result != 'skipped' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: determinism-*
+          path: ${{ runner.temp }}/hashes
+      - name: Compare the OSes (warns, never fails), and dry-run the release note
+        run: |
+          shopt -s nullglob
+          files=("$RUNNER_TEMP"/hashes/*/hashes.json)
+          if [ ${#files[@]} -eq 0 ]; then echo "no hashes to compare"; exit 0; fi
+          python3 scripts/synthetic_e2e.py compare --report --summary "$GITHUB_STEP_SUMMARY" "${files[@]}"
+          {
+            printf '<details><summary>Release note a submission-* tag on this commit would publish</summary>\n\n'
+            python3 scripts/release_notes.py --tag "dry run" --commit "$GITHUB_SHA" "${files[@]}"
+            printf '\n</details>\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ci-ok:
+    # The one check for branch protection: it fails unless every job above (except the non-blocking
+    # cross-OS comparison) succeeded, whatever the matrix was.
+    name: ci-ok
+    if: ${{ always() }}
+    needs: [plan, firewall, lint, test, scorer, determinism]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every required job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          [ "$(jq '[.[] | select(.result != "success")] | length' <<<"$NEEDS")" = 0 ]

@@ -1,0 +1,39 @@
+# Line endings: LF in the repository and in every checkout, on every OS.
+#
+# Git for Windows defaults to core.autocrlf=true, which checks text files out with CRLF. Then the
+# working tree differs byte for byte between Windows and macOS: anything that hashes or copies repo
+# files (scripts/build_external.py hashes its own sources) disagrees across machines, and shell
+# scripts such as .githooks/* stop running. eol=lf overrides core.autocrlf.
+#
+# After pulling this file into an existing Windows clone, files already checked out keep CRLF until
+# they are rewritten. On a clean tree (commit or stash first): git rm -r -q --cached . && git reset --hard
+* text=auto eol=lf
+
+# Must be LF whatever a local setting says: sh refuses "#!/bin/sh\r".
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+# Never convert, never diff as text. Most of these must not be committed at all (see
+# scripts/firewall_check.py); marking them binary keeps an accidental add from being rewritten.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.gzip binary
+*.7z binary
+*.npz binary
+*.npy binary
+*.parquet binary
+*.pkl binary
+*.pickle binary
+*.joblib binary
+*.pt binary
+*.pth binary
+*.onnx binary
+*.safetensors binary
+*.mp4 binary
+*.pl3container binary
