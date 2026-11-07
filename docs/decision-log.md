@@ -80,9 +80,13 @@ majority window) at 5 Hz, scored at T = 2 on the 6 IDSSE development matches
   eight published numbers, always slightly above them. It also gets the published order of the windows:
   macroF1 peaks at smooth25 and spellF1 at smooth50. The independent world peaks spellF1 at smooth125.
 - **Caveats.** This is consistent with the real ATD dropping the ball through stoppages, but it is not a
-  measurement. It also depends on the target's label convention, its dead share, and 5 Hz against
-  25 Hz. On Metrica's two development games every world already looks like this (smooth50 about
-  0.72 / 0.30), because their own ball loss is coupled.
+  measurement.
+  - It is not a label-convention effect. MacroF1 barely moves with T: at smooth50 the independent world
+    gives 0.386 to 0.389 and `target_cpl100` 0.694 to 0.699, for evaluation T = 0, 2 and 5. SpellF1 does
+    move with T.
+  - It still depends on the target's dead share, and on 5 Hz against 25 Hz.
+  - On Metrica's two development games every world already looks like this (smooth50 about 0.72 / 0.30),
+    because their own ball loss is coupled.
 - `target` and `target_dead15` reproduce bake-off Table 4 exactly.
 
 **The worlds as realised**, means over development matches, from each feature file's degrader record.
