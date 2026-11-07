@@ -206,8 +206,56 @@ def main() -> int:
               f"{row['duel_changed_winner']:.2f} (n={row['n_duel_changed']}) | {row['clearance_out_flip']:.2f} "
               f"(n={row['n_clearance_out']}) |")
 
+    # 5. model-free distance between conventions: perfect labels of one scored against another ----
+    print("\n## spellF1 of one convention's labels (row) scored against another's (column), IDSSE dev mean\n")
+    print("| labels \\ truth | " + " | ".join(names) + " |")
+    print("|---|" + "---|" * len(names))
+    labs = []
+    for d in ids:
+        lab = {n: convention(d["y"], d["fps"], n) for n in CONVENTIONS}
+        lab["E"] = np.load(out_dir / f"idsse_{d['name']}__E.npz")["y"]
+        labs.append(lab)
+    summary["convention_distance"] = {}
+    for p_name in names:
+        row = [float(np.mean([pm.evaluate(lab[t_name], lab[p_name])["spell_f1_mean"] for lab in labs]))
+               for t_name in names]
+        summary["convention_distance"][p_name] = dict(zip(names, row))
+        print(f"| {p_name} | " + " | ".join(f"{v:.3f}" for v in row) + " |")
+
+    # 6. the other datasets: spell statistics per convention, and SkillCorner's X boundaries -------
+    others = [r for r in P.split(P.all_refs())[0] if r.dataset in ("metrica", "skillcorner")]
+    summary["other_datasets"] = {}
+    for ds in ("metrica", "skillcorner"):
+        refs_ds = [r for r in others if r.dataset == ds]
+        if not refs_ds:
+            continue
+        st = {n: [] for n in CONVENTIONS}
+        n_sp = n_x = n_short = n_short_x = 0
+        for r in refs_ds:
+            m = load_match(r.path)
+            for n in CONVENTIONS:
+                st[n].append(spell_stats(convention(m.y, m.fps, n), m.fps))
+            for s0, s1, _, _ in ce.spell_kinds(m.y):
+                touches_x = (s0 == 0 or m.y[s0 - 1] == 3) or (s1 >= m.n or m.y[s1] == 3)
+                n_sp += 1
+                n_x += touches_x
+                if (s1 - s0) < 2 * m.fps:
+                    n_short += 1
+                    n_short_x += touches_x
+        print(f"\n## {ds} development matches ({len(refs_ds)}): spell statistics per convention\n")
+        print("| convention | spells/match | mean s | median s | < 2 s |")
+        print("|---|---|---|---|---|")
+        rows_ds = {}
+        for n, v in st.items():
+            rows_ds[n] = {k: float(np.mean([s[k] for s in v])) for k in v[0]}
+            print(f"| {n} | {rows_ds[n]['n']:.0f} | {rows_ds[n]['mean_s']:.1f} | {rows_ds[n]['median_s']:.1f} | "
+                  f"{rows_ds[n]['lt2']:.1%} |")
+        print(f"raw spells next to an X frame: {n_x / n_sp:.1%} (spells under 2 s: {n_short_x / max(n_short, 1):.1%})")
+        summary["other_datasets"][ds] = {"conventions": rows_ds, "share_next_to_x": n_x / n_sp,
+                                         "share_next_to_x_lt2": n_short_x / max(n_short, 1)}
+
     if a.metrica:
-        mts =[metrica_match(r) for r in dev if r.dataset == "metrica"]
+        mts = [metrica_match(r) for r in dev if r.dataset == "metrica"]
         mev = evidence(mts, ("return", "to_dead"))["derived"]
         print("\n## Metrica development games (labels derived from the same events: circular)\n")
         print(fmt_bins(mev["by_bin"]))
