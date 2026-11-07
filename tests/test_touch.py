@@ -147,3 +147,21 @@ def test_gate_build_lines_up_with_the_corpus_cache(tmp_path, monkeypatch):
     assert len(tp["A"]) == len(base["X"]) and np.array_equal(tp["o"], base["o"])
     f, X0, X1 = TG.features(ref, "target")
     assert X0.shape[1] == f["X0"].shape[1] + len(tp["names"]) and X0.shape[0] == len(f["idx"])
+
+
+def test_ten_hz_source_lifts_and_featurizes():
+    """SkillCorner-like 10 fps input: two native frames per work-grid sample."""
+    m, _ = _passing_match(seed=3, sigma=0.0)
+    m10 = dataclasses.replace(m, P=m.P[::5][:, :, :].repeat(2, 0)[:2 * (m.n // 5)], ball=m.ball[::5].repeat(2, 0)[:2 * (m.n // 5)],
+                              speed=np.zeros((2 * (m.n // 5), 4), np.float32), y=np.zeros(2 * (m.n // 5), np.int8),
+                              half_blocks=[(1, 0, 2 * (m.n // 5) - 1)], fps=10.0)
+    m10.ball[1::2] = 0.5 * (m10.ball[0:-1:2] + np.concatenate([m10.ball[2::2], m10.ball[-1:]]))   # midpoints
+    m5 = downsample(m10)
+    mc = dg.corrupt(m5, dg.TARGET, 2)
+    lift = T.lift_ball(m10.ball, m5.ball, mc.ball, 2, dg.TARGET.sigma_ball, 5)
+    np.testing.assert_array_equal(lift[::2], mc.ball)
+    X, names, idx = T.touch_features(mc, T.NativeBall(lift, 10.0, 2))
+    assert X[0].shape == (len(idx), len(names)) and np.array_equal(idx, featurize(mc, 0).idx)
+    Xc, _, _ = T.touch_features(m5, T.native_ball(m10))
+    col = names.index("t_nf_2s")
+    assert np.nansum(Xc[0][:, col] + Xc[1][:, col]) > 0                  # touches found at 10 fps
