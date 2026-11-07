@@ -71,12 +71,23 @@ def _ball(kind: str, m, m5, mc, lifted) -> TF.NativeBall:
     return TF.NativeBall(lifted, m.fps, int(m5.meta["step"]))
 
 
+def _config(cond: str):
+    """(degrader config, seed condition) of a condition: the corpus ones, this module's evaluation world,
+    or a D2 world (``katena.sim.worlds``, on ``origin/david/d2-degrader``; seeded as D2 seeds it)."""
+    if cond in EXTRA_EVAL:
+        return EXTRA_EVAL[cond]
+    if cond in C.CONFIG:
+        return C.CONFIG[cond], cond
+    from katena.sim import worlds as W
+    return W.config(cond), cond
+
+
 def corrupted(ref: P.Ref, m, m5, cond: str):
     """(corrupted 5 Hz match, lifted native ball) for one condition, with the corpus seeds."""
     step = int(m5.meta["step"])
     if cond == "native":
         return m5, np.asarray(m.ball, dtype=np.float32)
-    cfg, seed_cond = EXTRA_EVAL[cond] if cond in EXTRA_EVAL else (C.CONFIG[cond], cond)
+    cfg, seed_cond = _config(cond)
     mc = dg.corrupt(m5, cfg, P.seed_for(ref.id, seed_cond))
     lifted = TF.lift_ball(m.ball, m5.ball, mc.ball, step, cfg.sigma_ball, P.seed_for(ref.id, seed_cond + "|native"))
     return mc, lifted

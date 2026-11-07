@@ -49,7 +49,7 @@ class _Priors:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stages", nargs="+", choices=("build", "check", "screen", "gate", "rate"))
+    ap.add_argument("stages", nargs="+", choices=("build", "check", "screen", "gate", "rate", "worlds"))
     ap.add_argument("--workers", type=int, default=1)
     a = ap.parse_args()
     for stage in a.stages:
@@ -82,6 +82,26 @@ def run(stage: str, workers: int) -> None:
               flush=True)
         print(f"== {sm}: 5 Hz touch vs M2 refit ==\n" + TG.summary(res, "M2T5_t2", "M2r_t2", f8, conds=(sm,)), flush=True)
         Lm.timed("rate done", t0)
+        return
+    if stage == "worlds":
+        # Robustness read in D2's evaluation worlds (needs katena.sim.worlds from origin/david/d2-degrader):
+        # ball loss coupled to dead ball at half and full Metrica strength, and SkillCorner-matched jitter.
+        # Evaluation only, 8 IDSSE + Metrica folds; heads refit per fold exactly as in the gate.
+        f8 = S.FOLDS8(dev)
+        worlds = ["target_cpl50", "target_cpl100", "target_smooth"]
+        for r in f8:
+            for w in worlds:
+                TG.build_extra(r, w)
+        Lm.timed("D2-world features", t0)
+        pools = TG.TouchPools(dev)
+        TG.stage_lomo(pools, f8, variant="touch_w", conds=worlds)
+        TG.stage_lomo(pools, f8, variant="m2refit_w", drop=(TG.TF.GROUP,), conds=worlds)
+        del pools
+        TG.decode_fixed(res, _Priors(dev), f8, "touch_w", "M2T_w", tuple(worlds))
+        TG.decode_fixed(res, _Priors(dev), f8, "m2refit_w", "M2r_w", tuple(worlds))
+        print("== D2 worlds, 8 IDSSE + Metrica folds, evaluation only ==")
+        print(TG.summary(res, "M2T_w", "M2r_w", f8, conds=tuple(worlds)), flush=True)
+        Lm.timed("worlds done", t0)
         return
     if stage == "check":
         r = S.FOLDS8(dev)[0]
