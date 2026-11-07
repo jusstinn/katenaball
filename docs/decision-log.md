@@ -497,6 +497,123 @@ from the copies and compared with `work-d2/pool_d2j`. The first match of each da
 worlds and compared byte for byte. A file that fails a check is rebuilt in `work-final` with the current code, never
 dropped.
 
+### Final candidate F: result
+
+Everything below was computed after the pre-registration commit `3921643`, with the code at `ae509cd`
+(`scripts/run_final.py seed touch pools`, `gbdt`, `tcn`, `score gate`, `det`). Nothing was changed or tuned after a
+score. External development matches only.
+
+**Checks.**
+
+- **Copied inputs.** All 308 (match, world) feature files were recovered: identical in-play rows, M0 predictions and
+  degrader statistics. Nothing was rebuilt.
+- **Re-featurization.** All 41 worlds of the first IDSSE, Metrica and SkillCorner match were re-featurized, and all 41
+  are byte-identical to the copies.
+- **Pools.** The 28 `d2j` pools rebuilt here equal `work-d2/pool_d2j` byte for byte.
+- **The incumbent.** Re-decoding M2 with this code at tau 2 gives the stored M2's spellF1, spell counts and bootstrap
+  flags on all 84 (fold, condition) pairs, for both `work-base/oof/full` and D2's `cur`. Their probabilities are
+  byte-identical on all 84.
+- **Deviation from the registered wording.** The registered check said "equal on every fold and condition", and it
+  does not hold for the frame-level metrics. MacroF1, alive/dead F1 and team accuracy differ, by at most 2.4e-5, on 6
+  IDSSE + Metrica folds per condition. The stored M2 was scored by `8537084`, which predates D5's block-edge fix
+  (`5f72876`), and that fix moves only frame-level metrics. The gate reads spellF1 and the flags only, so it is
+  unaffected. The 8-fold macroF1 of M2 moves by 2e-6 (target 0.867747 stored, 0.867749 re-decoded).
+
+**Gate** (28 development folds, fixed tau 2, paired 95% bootstrap over possessions, 2000 draws).
+
+| comparison | folds | noise | F | M2 | diff | 95% paired CI | wins | rule |
+|---|---|---|---|---|---|---|---|---|
+| F vs M2 | 28 | target | 0.6019 | 0.5861 | +0.0158 | [+0.0111, +0.0205] | 22/28 (79%) | **pass** |
+| F vs M2 | 28 | severe | 0.5696 | 0.5475 | +0.0221 | [+0.0173, +0.0271] | 26/28 (93%) | not worse (passes the full rule too) |
+| F vs M2 | 8 IDSSE + Metrica | target | 0.5991 | 0.5689 | +0.0302 | [+0.0218, +0.0388] | 7/8 | pass |
+| F vs M2 | 8 IDSSE + Metrica | severe | 0.5426 | 0.5149 | +0.0277 | [+0.0186, +0.0366] | 8/8 | pass |
+
+| noise | dataset | folds | F | M2 | diff | wins |
+|---|---|---|---|---|---|---|
+| target | IDSSE | 6 | 0.5670 | 0.5441 | +0.0229 | 5/6 |
+| target | Metrica | 2 | 0.6955 | 0.6434 | +0.0521 | 2/2 |
+| target | SkillCorner | 20 | 0.6030 | 0.5930 | +0.0100 | 15/20 |
+| severe | IDSSE | 6 | 0.5107 | 0.4916 | +0.0191 | 6/6 |
+| severe | Metrica | 2 | 0.6382 | 0.5849 | +0.0533 | 2/2 |
+| severe | SkillCorner | 20 | 0.5804 | 0.5605 | +0.0199 | 18/20 |
+
+At target-like, 5 of the 6 losing folds are SkillCorner. The worst loss is -0.0181, the median fold gains +0.0174.
+At severe, the two losses (both SkillCorner) are at most -0.0018.
+
+**Information only (none of it changes F).**
+
+- **The members alone, 28 folds.**
+  - LightGBM `FG` (touch + `d2j`): +0.0073 [+0.0024, +0.0122], 17/28 at target-like; +0.0068 [+0.0021, +0.0116],
+    16/28 at severe.
+  - TCN `FT` (`d2j`): +0.0100 [+0.0046, +0.0158], 17/28 at target-like; +0.0233 [+0.0174, +0.0291], 25/28 at severe.
+  - Neither member passes at target-like on its own. The blend does, as D3 found: the members err on different folds.
+  - On the 8 folds: `FG` +0.0150 (6/8) at target-like and +0.0072 (5/8, CI includes 0) at severe; `FT` +0.0280 (7/8)
+    and +0.0328 (7/8).
+  - The gains add up roughly. D1 alone (+0.0069), D3's ensemble (+0.0065) and `d2j` (+0.0019) sum to +0.0153;
+    F gains +0.0158.
+  - The TCN gains most from `d2j`: `FT` +0.0100 against D3's TCN alone at +0.0036. Part of that may be the heavier
+    weight on dead-labelled matches recorded in the pre-registration. That part was not isolated.
+- **D2's evaluation worlds.** F against M2's heads in the same world:
+
+| world | folds | M2 | F | diff [95% CI] | wins | FG diff | FT diff |
+|---|---|---|---|---|---|---|---|
+| `mild` | 28 | 0.6116 | 0.6236 | +0.0121 [+0.0078, +0.0164] | 24/28 | +0.0100 | +0.0073 |
+| `target` | 28 | 0.5861 | 0.6019 | +0.0158 [+0.0111, +0.0205] | 22/28 | +0.0073 | +0.0100 |
+| `severe` | 28 | 0.5475 | 0.5696 | +0.0221 [+0.0173, +0.0271] | 26/28 | +0.0068 | +0.0233 |
+| `target_ids` | 28 | 0.5844 | 0.6037 | +0.0194 [+0.0147, +0.0241] | 26/28 | +0.0075 | +0.0143 |
+| `target_smooth` | 28 | 0.5796 | 0.6000 | +0.0204 [+0.0155, +0.0255] | 24/28 | +0.0145 | +0.0119 |
+| `target_cpl50` | 8 | 0.5873 | 0.6240 | +0.0367 [+0.0271, +0.0460] | 8/8 | +0.0290 | +0.0298 |
+| `target_cpl100` | 8 | 0.5951 | 0.6300 | +0.0349 [+0.0263, +0.0432] | 8/8 | +0.0330 | +0.0341 |
+| `target_cpl100_ids` (never trained on) | 8 | 0.5900 | 0.6325 | +0.0424 [+0.0335, +0.0511] | 8/8 | +0.0359 | +0.0394 |
+
+- **What the table shows.** F passes the adoption rule in every world. The independent target-like world, the one
+  that decides, is its smallest gain.
+- **macroF1, 8 IDSSE + Metrica folds.** At target-like: F 0.8781, FG 0.8721, FT 0.8754, M2 0.8677. At severe: F
+  0.8549, FG 0.8493, FT 0.8486, M2 0.8432.
+- **Spell counts.** Predicted possessions per true one, target-like, 28 folds: F 0.738 against M2 0.737. At severe:
+  F 0.723 against M2 0.747.
+
+**CPU** (i7-7700, 4 cores / 8 threads; LightGBM 8 threads, torch 4).
+
+| stage | wall | CPU | peak memory |
+|---|---|---|---|
+| copy reused inputs (364 files, 11.2 GB) | 3.5 min | 0.1 min | 0.2 GB |
+| touch columns, 308 (match, world) pairs, 2 workers, with all checks | 7.5 min | 14.1 min | 0.5 GB per process |
+| `d2j` pools and touch pools | 2.3 min | 0.5 min | 0.3 GB |
+| LightGBM member, 28 folds (fit 18-25 s per fold) | 13.2 min | 52.5 min | 2.0 GB |
+| TCN member, 28 folds (300 sequences, 2.6 GB in float16; training 150-398 s per fold, median 206 s) | 104.1 min | 316.6 min | 3.7 GB |
+| decode and score (F, FG, FT, M2 checks) | 1.1 min | 1.0 min | 0.2 GB |
+| gate tables (bootstrap) | 2.6 min | 2.6 min | 0.2 GB |
+| **pipeline total** | **134 min** | **387 min** | **3.7 GB** |
+| determinism, one fold, per fresh process (x2) | 9.3 min | 13-17 min | 3.5 GB |
+
+The TCN stage shared the CPU with the LightGBM stage and the determinism runs for its first 32 minutes, so its wall
+time is pessimistic. The cache `D:/katena/work-final` is 16 GB, 11 GB of it the copied features.
+
+**Determinism.** Two fresh processes trained both members on the 27 training matches of fold `DFL-MAT-J03WMX` and
+decoded the fold. They gave byte-identical results for the LightGBM models, the TCN weights, both members' and the
+blended probabilities, and the decoded labels at `target` and `severe`. The target-like blend hashes to
+`ab47d2e6...` and its labels to `81adaa9b...`. Both processes also reproduce the LOMO run's LightGBM model, TCN
+weights and probabilities for that fold byte for byte. This covers one machine only: Windows 10, i7-7700 (AVX2),
+torch 2.15.0+cpu, LightGBM 4.7.0. D3's cross-machine outlook still applies: expect identical labels, not identical
+probability bytes.
+
+**Decision: adopt F.** At target-like on 28 folds it wins on 22 (79%), and the paired interval lies above 0
+(+0.0158 [+0.0111, +0.0205]). At severe it is not worse: +0.0221 [+0.0173, +0.0271], 26/28. So it passes the
+pre-registered rule, and it also passes on the 8 IDSSE + Metrica folds and in every D2 world. M2 is replaced as the
+baseline by F.
+
+**Not done, or not verified.**
+
+- **The final training run.** It must train both members on all development matches plus the two benches. That needs
+  the D2 worlds and touch columns for the benches, which nobody has built yet (D2's note). It also needs
+  `katena.eval.final` turned into a training and inference entry point. The locked benches were not built, trained on
+  or scored here.
+- **The real match.** Inference there uses its real 25 Hz ball for the touch group, which no development world
+  reproduces exactly (D1's jitter caveat). It is for the human-run alarm (`scripts/check_touch_target.py`).
+- **Other machines.** Byte identity across machines is untested.
+- **The pooled calibration (D2 review note).** It still applies to the coupled and smooth training worlds.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
