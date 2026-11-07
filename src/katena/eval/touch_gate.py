@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 
 import possession_metrics as pm
+from katena.decode import hmm
 from katena.eval import bakeoff as B
 from katena.eval import corpus as C
 from katena.eval import lomo as Lm
@@ -212,6 +213,38 @@ def stage_lomo(pools: TouchPools, folds: list, variant: str = VARIANT, drop=(), 
             continue
         run_fold(pools, r, cols, variant, T, conds=list(conds) if conds else C.conds_for(r) + list(extra))
         Lm.timed(f"{variant} fold {r.key}", t0)
+
+
+# ---------------------------------------------------------------------------------------------
+# decoding at a fixed temperature
+
+TAU = 2.0     # fixed, as the D5 audit recommends: per-fold tau selection uses folds whose models saw the
+              # held-out match. The bake-off's selection picked 2.0 for all 28 M2 folds anyway.
+
+
+def _rows_meta(ref: P.Ref, cond: str) -> dict:
+    with np.load(C.paths(ref)["feat"](cond)) as z:          # lazy: only the two small arrays
+        return {"idx": z["idx"], "half": z["half"]}
+
+
+def decode_fixed(res: Lm.Results, pools, refs: list, variant: str, name: str, conds: tuple,
+                 T: int = P.T_MAIN, tau: float = TAU, kind: str = "viterbi") -> None:
+    """Decode the stored out-of-fold probabilities of ``variant`` at a fixed ``tau`` with M2's priors
+    (fit on the label sequences of the other development matches) and score every listed condition the
+    fold has. ``pools`` only needs ``label_seqs``."""
+    t0 = time.time()
+    for r in refs:
+        oof = Lm.load_oof(variant, T, r)
+        pri = B.priors_for(pools, {r.key}, T)
+        g = C.load_gt(r, T)
+        for c in conds:
+            if f"pa_{c}" not in oof:
+                continue
+            f = _rows_meta(r, c)
+            rows = hmm.decode(oof[f"pa_{c}"], oof[f"ph_{c}"], f["half"], pri, tau, kind)
+            res.put((name, T, c, r.key), Lm.score_rows(r, T, c, rows, f["idx"], g))
+    res.save()
+    Lm.timed(f"decode {name} (tau {tau:g}, {len(refs)} folds)", t0)
 
 
 # ---------------------------------------------------------------------------------------------

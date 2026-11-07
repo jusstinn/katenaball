@@ -39,7 +39,7 @@ T = P.T_MAIN
 
 
 class _Priors:
-    """What decode_and_score needs from a pool: the label sequences for the decoder priors."""
+    """What the decoders need from a pool: the label sequences for the decoder priors."""
 
     def __init__(self, refs):
         self.refs = refs
@@ -89,20 +89,30 @@ def run(stage: str, workers: int) -> None:
     else:
         TG.stage_lomo(pools, folds)
     del pools
+    # Decoding at a fixed tau = 2 (D5 audit): per-fold tau selection would use folds whose models saw the
+    # held-out match. With a fixed tau every fold decodes on its own, so the 8-fold numbers are a subset of
+    # the 28-fold ones.
     pri = _Priors(dev)
-    conds = B.ALL_CONDS
+    conds = B.ALL_CONDS + tuple(C.EXTRA_CONDS)
+    TG.decode_fixed(res, pri, folds, "full", "M2_t2", conds)
+    same = all(res.get(("M2_t2", T, c, r.key))["spell_f1"] == res.get(("M2", T, c, r.key))["spell_f1"]
+               for r in folds for c in ("target", "severe") if res.get(("M2", T, c, r.key)))
+    print(f"M2 at fixed tau 2 equals the cached M2 (tau selected per fold) on these folds: {same}", flush=True)
+    TG.decode_fixed(res, pri, folds, TG.VARIANT, "M2T_t2", conds + (sm,))
+    f8 = S.FOLDS8(dev)
     if stage == "screen":
-        B.decode_and_score(res, pri, folds, "full", T, "viterbi", "M2_f8")
-        B.decode_and_score(res, pri, folds, TG.VARIANT, T, "viterbi", "M2T_f8", conds=conds + (sm,))
-        B.decode_and_score(res, pri, folds, "m2refit", T, "viterbi", "M2r_f8", conds=("target", sm))
-        same = all(res.get(("M2r_f8", T, "target", r.key))["spell_f1"] == res.get(("M2_f8", T, "target", r.key))["spell_f1"]
+        TG.decode_fixed(res, pri, folds, "m2refit", "M2r_t2", ("target", sm))
+        same = all(res.get(("M2r_t2", T, "target", r.key))["spell_f1"] == res.get(("M2_t2", T, "target", r.key))["spell_f1"]
                    for r in folds)
         print(f"M2 refit from the joined pool reproduces the cached M2 on all {len(folds)} folds: {same}", flush=True)
-        print(TG.summary(res, "M2T_f8", "M2_f8", folds), flush=True)
-        print(TG.summary(res, "M2T_f8", "M2r_f8", folds, conds=(sm,)), flush=True)
+        print("== 8 IDSSE + Metrica folds ==\n" + TG.summary(res, "M2T_t2", "M2_t2", f8), flush=True)
+        print(f"== smooth-ball world ({sm}, evaluation only) ==\n" + TG.summary(res, "M2T_t2", "M2r_t2", f8, conds=(sm,)),
+              flush=True)
     else:
-        B.decode_and_score(res, pri, folds, TG.VARIANT, T, "viterbi", TG.MODEL, extra_conds=tuple(C.EXTRA_CONDS))
-        print(TG.summary(res, TG.MODEL, "M2", folds), flush=True)
+        print(f"== all {len(folds)} development folds ==\n" + TG.summary(res, "M2T_t2", "M2_t2", folds), flush=True)
+        print("== 8 IDSSE + Metrica folds ==\n" + TG.summary(res, "M2T_t2", "M2_t2", f8), flush=True)
+        print("== IDSSE extra worlds (6 folds) ==\n" + TG.summary(res, "M2T_t2", "M2_t2", [r for r in f8 if r.dataset == "idsse"],
+                                                                 conds=tuple(C.EXTRA_CONDS)), flush=True)
     Lm.timed(f"{stage} done", t0)
 
 
