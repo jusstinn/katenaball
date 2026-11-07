@@ -185,7 +185,52 @@ S2 closer to `E` (0.709 to 0.764) than any change of T does.
 
 ## 5. Training across T
 
-TBD.
+**Setup** (`katena.eval.tmix`, `scripts/label_tmix.py`). Conventions only swap H and A, never D or X, so
+the alive head is the same at every T: its M2 out-of-fold probabilities are reused, and only the team
+head is refitted, on M2's rows in M2's order with M2's parameters and seed. Checks: the refitted T = 2
+team head equals M2's cached one (and so do both heads refitted together); the re-score of M2 equals
+`results.pkl` on all 28 folds (largest difference 0); pooled labels rebuilt from the native ground
+truth equal the cache.
+
+| Scheme | Team-head training labels |
+|---|---|
+| S0, S1, S3, S5 | One sandwich convention (references for regret) |
+| **S2 = M2** | The incumbent, T = 2 |
+| **MIX** | Each pooled row takes the label of one T drawn uniformly from {0, 1, 2, 3, 5}, fixed seed |
+| **AUG** | Every row carries all five T at once: target = share of the five at which the focal team owns the ball (weighted 0/1 copies, same binary objective) |
+| H3.5 | David's convention (tail flips merged, shortest first, 3.5 s) |
+| S2tail | T = 2 plus the tail option |
+| MR | T = 2, Metrica dead ball from restarts (both heads refitted; section 8) |
+
+Decoding is M2's Viterbi with priors from the training labels' own convention (pooled over T for MIX
+and AUG) and **tau fixed at 2** (D5 audit A2). Gate: at target-like noise against S2 ground truth,
+wins on at least 70% of folds and the paired bootstrap interval excludes zero. Regret: for each
+evaluation convention, the best scheme's mean minus this scheme's mean; worst case over S0-S5. Every
+table is shown for all folds and for the 8 IDSSE + Metrica folds (D5 audit A18), because SkillCorner
+has no dead ball and splits spells at X.
+
+**Decoder priors alone do nothing.** M2's heads decoded with the priors of S5 or H3.5 move every score
+by less than 0.004 (28 folds), so a known target convention would have to be matched through the
+training labels, not the decoder.
+
+### Results: 8 IDSSE + Metrica folds (screen), target-like, tau = 2
+
+Mean spellF1; rows are the training scheme, columns the evaluation convention (E: 6 IDSSE folds).
+
+| Train \ eval | S0 | S1 | S2 | S3 | S5 | S2tail | H3.5 | E |
+|---|---|---|---|---|---|---|---|---|
+| S0 | 0.468 | 0.508 | 0.573 | 0.618 | 0.629 | 0.607 | 0.673 | 0.686 |
+| S1 | **0.468** | **0.509** | **0.574** | 0.619 | 0.628 | **0.608** | 0.675 | 0.683 |
+| **S2 = M2** | 0.463 | 0.504 | 0.569 | 0.619 | 0.633 | 0.603 | 0.676 | 0.686 |
+| S3 | 0.451 | 0.490 | 0.557 | 0.613 | 0.636 | 0.591 | 0.669 | 0.679 |
+| S5 | 0.422 | 0.460 | 0.530 | 0.591 | **0.638** | 0.564 | 0.652 | 0.659 |
+| MIX | 0.457 | 0.497 | 0.563 | 0.616 | **0.638** | 0.597 | 0.672 | 0.680 |
+| AUG | 0.452 | 0.492 | 0.558 | 0.612 | 0.636 | 0.591 | 0.669 | 0.678 |
+| H3.5 | 0.445 | 0.484 | 0.553 | 0.607 | **0.638** | 0.588 | 0.670 | 0.678 |
+| S2tail | 0.461 | 0.502 | 0.570 | **0.622** | 0.637 | 0.604 | **0.680** | **0.692** |
+| MR | 0.462 | 0.503 | 0.567 | 0.619 | 0.634 | 0.602 | 0.673 | 0.691 |
+
+TBD: 28 folds, gate and regret tables.
 
 ## 6. Recommendation
 

@@ -64,7 +64,11 @@ def main() -> int:
     ap.add_argument("--stage", choices=("fit", "score", "all"), default="all")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--tau-select", action="store_true", help="choose tau per fold as the bake-off did")
+    ap.add_argument("--summary", action="store_true", help="print the doc tables from saved scores and exit")
     a = ap.parse_args()
+    if a.summary:
+        summary()
+        return 0
     t0 = time.time()
     dev, locked = P.split(P.all_refs())
     lk = {r.key for r in locked}
@@ -111,6 +115,56 @@ def main() -> int:
     report(scores, folds, [m for m in a.models if m in TM.MODELS])
     print(f"done in {time.time() - t0:.0f}s")
     return 0
+
+
+def summary() -> None:
+    """Compact tables for docs/label-convention.md from the saved 8- and 28-fold score files."""
+    dev, _ = P.split(P.all_refs())
+    runs = {}
+    for n in (8, 28):
+        path = TM.TMIX_DIR / f"scores_{n}.pkl"
+        if path.exists():
+            runs[n] = pickle.load(open(path, "rb"))
+    k8 = [r.key for r in S.FOLDS8(dev)]
+    k28 = [r.key for r in dev]
+    have = lambda sc, keys, m: all((m, "target", "S2", k) in sc for k in keys)   # noqa: E731
+    if 28 in runs and not have(runs[28], k28, "S0"):
+        runs.pop(28)                                     # a partial score file (e.g. decoder-only variants)
+    pools = {"8": (runs.get(8) or runs.get(28), k8)}
+    if 28 in runs:
+        pools["28"] = (runs[28], k28)
+        pools["20 SC"] = (runs[28], [r.key for r in dev if r.is_sc])
+    models = [m for m in DEFAULT_MODELS if all(have(sc, keys, m) for sc, keys in pools.values())]
+    schemes = [m for m in models if m in T_SCHEMES]
+    evals = TM.EVAL_MAIN + ("S2tail", "H3.5", "E")
+    if 28 in runs:
+        print("\n28 folds, target-like: mean spellF1 (E: 6 IDSSE folds)\n")
+        print("| Train \\ eval | " + " | ".join(evals) + " |")
+        print("|---|" + "---|" * len(evals))
+        for m in models:
+            print(f"| {m} | " + " | ".join(f"{_mean(runs[28], m, 'target', e, k28)[0]:.3f}" for e in evals) + " |")
+    print("\nGate against M2 at T = 2 ground truth (MR: at S2R), target-like, paired bootstrap 2000 draws\n")
+    print("| Candidate | " + " | ".join(f"{p}: mean diff [95% CI], wins" for p in pools) + " | Passes |")
+    print("|---|" + "---|" * (len(pools) + 1))
+    for m in [x for x in models if x != "S2"]:
+        e = "S2R" if m == "MR" else "S2"
+        cells, passes = [], []
+        for p, (sc, keys) in pools.items():
+            res = paired_bootstrap([sc[(m, "target", e, k)] for k in keys], [sc[("S2", "target", e, k)] for k in keys])
+            cells.append(f"{res['mean_diff']:+.4f} [{res['lo']:+.4f}, {res['hi']:+.4f}], {res['win_rate']:.0%}")
+            passes.append(f"{p} {'yes' if adopted(res) else 'no'}")
+        print(f"| {m} | " + " | ".join(cells) + " | " + ", ".join(passes) + " |")
+    print("\nWorst-case regret over S0-S5 (convention where it happens)\n")
+    cols = [(p, c) for p in pools for c in TM.CONDS]
+    print("| Scheme | " + " | ".join(f"{p} {c}" for p, c in cols) + " |")
+    print("|---|" + "---|" * len(cols))
+    rgs = {}
+    for p, c in cols:
+        sc, keys = pools[p]
+        means = {(m, e): _mean(sc, m, c, e, keys)[0] for m in schemes for e in TM.EVAL_MAIN}
+        rgs[(p, c)] = TM.regret(means, schemes, TM.EVAL_MAIN)
+    for m in schemes:
+        print(f"| {m} | " + " | ".join(f"{rgs[pc][m][0]:.3f} ({rgs[pc][m][1]})" for pc in cols) + " |")
 
 
 def _mean(scores, m, cond, e, keys):
