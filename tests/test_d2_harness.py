@@ -3,6 +3,7 @@ the simulated official baseline, and the registered keep rule."""
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 import numpy as np
@@ -135,6 +136,20 @@ def test_score_stage_end_to_end_on_a_fake_cache(tmp_path, monkeypatch):
         assert all(c["n"] == 3 and c["mean_diff"] > 0 for c in cmp.values())
         v = d2.keep_verdict(cmp, d2.compare_worlds(res, d2.dead_label_subset(refs), a=cand))
         assert v["keep"] and not v["worse"] and not v["missing"]
+
+
+def test_jitter_statistic():
+    from test_d2_degrader import crossing_match
+    m = crossing_match()                                    # straight lines at constant speed
+    rng = np.random.default_rng(0)
+    p0, b0 = d2.jitter_stats(m)
+    assert p0 < 1e-4 and b0 < 1e-4
+    sigma = 0.1
+    noisy = dataclasses.replace(m, P=(m.P + rng.normal(0, sigma, m.P.shape)).astype(np.float32),
+                                ball=(m.ball + rng.normal(0, sigma, m.ball.shape)).astype(np.float32))
+    p1, b1 = d2.jitter_stats(noisy)
+    want = np.sqrt(6) * sigma * np.sqrt(np.pi / 2)          # mean of a Rayleigh(sqrt(6) sigma)
+    assert abs(p1 - want) < 0.03 and abs(b1 - np.sqrt(6) * sigma * np.sqrt(2 * np.log(2))) < 0.05   # ball: median
 
 
 def _cmp(mean_diff, lo, hi, win_rate=0.5):
