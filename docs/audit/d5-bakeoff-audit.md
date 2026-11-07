@@ -327,5 +327,7 @@ KATENA_EXTERNAL=D:/katena/external_data uv run python scripts/check_domain_gap.p
 ```
 
 `check_domain_gap.py --target` loads the target, downsamples it to 5 Hz and compares it with three degraded IDSSE
-development matches; it writes nothing and fits nothing. Its output is an alarm, never a reason to change the
+development matches. It writes nothing. It does fit real-versus-simulated classifiers on the target's window
+statistics, and it prints only one alarm bit and a runtime: no AUC per severity, no statistic names, no medians, and
+`--detail` is refused. Its output is an alarm, never a reason to change the
 degrader or to choose between versions (PLAN.md, "Validating blind", step 5).

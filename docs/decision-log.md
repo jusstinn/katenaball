@@ -25,7 +25,7 @@ match, but all 28 folds chose tau = 2, so the effect is nil. Full findings: [aud
 | Submission written with LF line ends; final model trained and hashed on one reference machine | Byte identity across macOS and Windows | J2, J3 |
 
 **Reconcile ([reconcile.md](reconcile.md)).** Ported the domain-gap alarm (`katena.diag.domain_gap`,
-`scripts/check_domain_gap.py`; aggregates only, fits nothing) and a brute-force Viterbi test. Not ported: `fit_noise_cfg`
+`scripts/check_domain_gap.py`; on the target it prints one alarm bit) and a brute-force Viterbi test. Not ported: `fit_noise_cfg`
 and `noise_fit_target.py`, which fit the degrader to the target. Everything else is superseded by main or is a candidate
 for its owner (D1 features, D2 identity-switch noise, D4 harmonisation and control evidence).
 

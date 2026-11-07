@@ -11,8 +11,12 @@ The simulated side is exactly the bake-off's corruption: katena.sim.degrade unde
 and severe, with the protocol seeds, applied to a few clean IDSSE development matches on the 5 Hz
 work grid. The real side is downsampled to the same grid. For each severity the script prints a
 cross-validated AUC (0.5 = indistinguishable) and the names of the window statistics that give the
-simulator away. That is all it prints, unless --detail adds the medians of those statistics on each
-side.
+simulator away; --detail adds the medians of those statistics on each side.
+
+On the target it prints one alarm bit and a runtime, nothing else: no AUC per severity (that would rank
+the degrader settings by closeness to the target), no statistic names and no medians (the moments a
+degrader fit would match), and --detail is refused. To compute that bit the script does fit
+real-versus-simulated classifiers on the target's window statistics, cross-validated.
 
 This is an alarm (docs/PLAN.md, "Validating blind", step 5). It never selects between versions and
 is never used to tune the degrader: fitting the degrader to the target is out until the organisers
@@ -30,6 +34,10 @@ ROOT = Path(__file__).resolve().parents[1]
 for path in (ROOT, ROOT / "src", ROOT / "evaluation"):
     sys.path.insert(0, str(path))
 
+from katena.models import gbdt  # noqa: E402
+
+gbdt.ensure_openmp()                      # may re-exec once (LightGBM needs libomp)
+
 import numpy as np  # noqa: E402
 
 from katena.diag.domain_gap import domain_gap, window_features  # noqa: E402
@@ -41,6 +49,7 @@ from katena.types import Match, load_match  # noqa: E402
 
 CLEAN_DEFAULT = ("idsse/DFL-MAT-J03WMX", "idsse/DFL-MAT-J03WN1", "idsse/DFL-MAT-J03WOH")   # development matches
 SEVERITIES = ("mild", "target", "severe")
+ALARM_MARGIN = 0.10     # fixed a priori: AUC above the match-vs-match reference that counts as a gap
 
 
 def synthetic_clean(seed: int, half_s: float = 360.0, fps: float = 5.0) -> Match:
@@ -72,16 +81,23 @@ def simulated(cleans: list, severity: str) -> list:
     return [corrupt(m, CONFIG[severity], P.seed_for(m.name, severity)) for m in cleans]
 
 
-def report(real: Match, cleans: list, detail: bool, top_k: int = 5) -> None:
+def report(real: Match, cleans: list, detail: bool, top_k: int = 5, alarm_only: bool = False) -> bool:
     """Per severity: AUC of real versus the degraded clean matches, and the reference AUC of one
     degraded clean match versus the others (same world, different match). Window statistics also
     differ between matches for tactical reasons, so only an AUC well above the reference says the
-    noise differs."""
+    noise differs. Returns the alarm: in every severity the AUC exceeds its reference by more than
+    ``ALARM_MARGIN``. With ``alarm_only`` (the target) it prints that bit and nothing per severity."""
+    if alarm_only and detail:
+        raise SystemExit("--detail is refused on the target")
+    gaps = []
     for sev in SEVERITIES:
         t = time.time()
         sims = simulated(cleans, sev)
         r = domain_gap(real, sims, top_k=top_k)
         ref = domain_gap(sims[0], sims[1:], top_k=top_k)
+        gaps.append(r["auc"] - ref["auc"])
+        if alarm_only:
+            continue
         print(f"{sev:7s} AUC {r['auc']:.3f} +- {r['auc_std']:.3f} (reference, match vs match in the same world: "
               f"{ref['auc']:.3f})  windows real {r['n_real_windows']}, sim {r['n_sim_windows']}  "
               f"({time.time() - t:.0f}s)")
@@ -92,6 +108,10 @@ def report(real: Match, cleans: list, detail: bool, top_k: int = 5) -> None:
             for a, _ in r["top_features"]:
                 j = names.index(a)
                 print(f"        {a:24s} median real {np.nanmedian(Xr[:, j]):.3g}  sim {np.nanmedian(Xs[:, j]):.3g}")
+    alarm = min(gaps) > ALARM_MARGIN
+    print(f"alarm: {'ON' if alarm else 'off'}  (ON = in every severity the real side is easier to tell from the "
+          f"simulator than one simulated match from another, by more than {ALARM_MARGIN:g} AUC)")
+    return alarm
 
 
 def main() -> int:
@@ -103,16 +123,21 @@ def main() -> int:
     ap.add_argument("--clean", nargs="+", default=list(CLEAN_DEFAULT), help="clean IDSSE matches to degrade")
     ap.add_argument("--detail", action="store_true", help="also print medians of the top statistics")
     a = ap.parse_args()
+    if a.target and a.detail:
+        raise SystemExit("--detail is refused on the target: it prints the statistics a degrader fit would match")
     t0 = time.time()
     if a.synthetic:
         print("synthetic smoke test")
         real = corrupt(synthetic_clean(99), CONFIG["target"], seed=7)
         report(real, [synthetic_clean(1), synthetic_clean(2), synthetic_clean(3)], a.detail)
         return 0
+    locked = {("idsse", P.LOCKED_IDSSE), ("metrica", P.LOCKED_METRICA)}
+    if a.real and tuple(a.real.split("/", 1)) in locked:
+        raise SystemExit("the locked benches are spent: use development matches")
     cleans = []
     for key in a.clean:
         ds, mid = key.split("/", 1)
-        if (ds, mid) == ("idsse", P.LOCKED_IDSSE) or (ds, mid) == ("metrica", P.LOCKED_METRICA):
+        if (ds, mid) in locked:
             raise SystemExit("the locked benches are spent: use development matches")
         cleans.append(downsample(load_match(P.CANON / ds / f"{mid}.npz")))
     if a.real:
@@ -120,12 +145,12 @@ def main() -> int:
         print(f"real side: external {a.real} (5 Hz)")
         report(downsample(load_match(P.CANON / ds / f"{mid}.npz")), cleans, a.detail)
         return 0
-    print("Output holds aggregates only (AUC, window counts, statistic names). Safe to paste.\n")
+    print("Output holds one alarm bit and a runtime. Safe to paste.\n")
     try:
         from katena.target.atd import load_target
         real = downsample(load_target())
         print(f"real side: target, {real.n} samples at {real.fps:g} Hz, {len(real.half_blocks)} halves")
-        report(real, cleans, a.detail)
+        report(real, cleans, False, alarm_only=True)
     except Exception as error:  # noqa: BLE001  the type alone, as messages can quote the file
         print(f"raised {type(error).__name__}")
         return 1

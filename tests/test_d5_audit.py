@@ -165,10 +165,17 @@ def _gap_fixture():
     return cdg, dg, clean
 
 
+def _need_lightgbm():
+    from katena.models import gbdt
+    if gbdt.lgb is None:
+        __import__("pytest").skip("LightGBM cannot load (libomp missing)")
+
+
 def test_domain_gap_separates_worlds_and_not_seeds():
     import dataclasses
 
     from katena.diag import domain_gap as gapmod
+    _need_lightgbm()
     cdg, dg, clean = _gap_fixture()
     real = dg.corrupt(clean[0], dg.TARGET, seed=5)
     same = [dg.corrupt(clean[0], dg.TARGET, seed=6)]               # same match and world, other seed
@@ -184,7 +191,19 @@ def test_domain_gap_separates_worlds_and_not_seeds():
     assert gapmod.domain_gap(dataclasses.replace(real, y=None), clean_side) == r_far
 
 
-def test_domain_gap_module_fits_nothing_to_its_input():
+def test_target_output_is_one_alarm_bit(capsys):
+    _need_lightgbm()
+    cdg, dg, clean = _gap_fixture()
+    real = dg.corrupt(clean[0], dg.TARGET, seed=5)
+    with __import__("pytest").raises(SystemExit):
+        cdg.report(real, clean[1:], True, alarm_only=True)
+    capsys.readouterr()
+    cdg.report(real, clean[1:], False, alarm_only=True)
+    out = capsys.readouterr().out.strip().splitlines()
+    assert len(out) == 1 and out[0].startswith("alarm: ")
+
+
+def test_domain_gap_module_exports_only_the_alarm_and_checks_grids():
     from katena.diag import domain_gap as gapmod
     public = [n for n in dir(gapmod) if not n.startswith("_") and callable(getattr(gapmod, n))]
     assert set(public) <= {"domain_gap", "window_features", "Match", "annotations"}

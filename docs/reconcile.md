@@ -71,7 +71,7 @@ folds and decoder: neither number says anything about the other.
 | `scripts/external_corpus.py` | `scripts/build_external.py` | superseded | |
 | `scripts/feature_bench.py`, `feature_smoke.py` | none | superseded | Synthetic benchmarks of the old feature store. |
 | `scripts/model_cache.py`, `model_lomo.py` | `scripts/run_bakeoff.py`, `scripts/run_m2.py` | superseded | |
-| `scripts/noise_fit_target.py` | none | **do not port** | Fits the degrader to the target. Its domain-gap step lives on in `scripts/check_domain_gap.py --target`, which fits nothing. |
+| `scripts/noise_fit_target.py` | none | **do not port** | Fits the degrader to the target. Its domain-gap step lives on in `scripts/check_domain_gap.py --target`, which fits no degrader parameter and prints one alarm bit. |
 | `scripts/train_model.py`, `predict_target.py` | J2 (not on main yet) | superseded | Justin owns the final pipeline. `predict_target.py` printed only aggregates and a file hash, a good pattern for J2. |
 | `docs/external_data.md`, `docs/model.md` | `docs/external-data.md`, `docs/bakeoff.md` | superseded | Findings worth keeping are listed below. |
 | `tests/test_external_*`, `test_io`, `test_match` | `tests/test_external.py`, `tests/test_target.py` | superseded | Loader behaviour is cross-checked on real external files instead (below). |

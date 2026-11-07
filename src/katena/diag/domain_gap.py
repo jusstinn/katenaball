@@ -16,7 +16,8 @@ Rules (docs/PLAN.md, "Validating blind", step 5): this is an alarm. It returns a
 window counts, feature names and importances), it is never used to select between versions, and it
 is never used to tune the degrader: fitting the degrader to the target is out until the organisers
 confirm. ``domain_gap`` returns no configuration, model or per-window value, so there is nothing to
-feed back. The labels of either side are never read.
+feed back. The labels of either side are never read. It does fit classifiers on both sides' window
+statistics, so on the target ``scripts/check_domain_gap.py`` prints only one alarm bit.
 """
 
 from __future__ import annotations
