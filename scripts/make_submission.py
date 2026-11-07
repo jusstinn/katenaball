@@ -44,6 +44,11 @@ def main(argv=None) -> int:
                     help="a finished bake-off cache to copy the corpus files from (default: build them)")
     ap.add_argument("--workers", type=int, default=1, help="processes for the corpus and worlds stages")
     ap.add_argument("--data-dir", type=Path, default=None, help="the data bundle (default: data/)")
+    chk = ap.add_argument_group("dressed-match check only (scripts/dressed_check.py), never for the submission")
+    chk.add_argument("--hold-out", action="append", default=[], metavar="KEY",
+                     help="train / predict with the model that leaves this external match out (model_without_*/)")
+    chk.add_argument("--timeline", type=Path, default=None,
+                     help="predict: the exported match's timeline JSON in place of games.py's")
     a = ap.parse_args(argv)
     t0 = time.time()
     PL.log(f"cache {P.WORK}; env {json.dumps(PL.env_report(), sort_keys=True)}")
@@ -54,10 +59,14 @@ def main(argv=None) -> int:
         st = PL.stage_worlds(refs, a.workers)
         PL.log(f"worlds: {len(st)} matches, {sum(s['touch_built'] for s in st)} touch files built")
     if a.stage in ("all", "train"):
-        PL.log(f"train {json.dumps(PL.stage_train(refs), sort_keys=True)}")
+        PL.log(f"train {json.dumps(PL.stage_train(refs, hold_out=a.hold_out), sort_keys=True)}")
     if a.stage in ("all", "predict"):
         try:
-            rep = PL.stage_predict(a.out, a.data_dir)
+            timeline = None
+            if a.timeline is not None:
+                from katena.target.atd import Timeline
+                timeline = Timeline.from_json(json.loads(a.timeline.read_text(encoding="utf-8")))
+            rep = PL.stage_predict(a.out, a.data_dir, hold_out=a.hold_out, timeline=timeline)
         except Exception as e:     # an exception message can quote the match file: type and code lines only
             import traceback
             where = [f"{Path(f.filename).name}:{f.lineno} {f.name}" for f in traceback.extract_tb(e.__traceback__)]

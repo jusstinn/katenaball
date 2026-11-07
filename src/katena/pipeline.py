@@ -49,8 +49,12 @@ BUNDLE = "bundle.pkl"
 MANIFEST = "manifest.json"
 
 
-def model_dir() -> Path:
-    return P.WORK / MODEL_DIR
+def model_dir(hold_out=()) -> Path:
+    """``model/`` for the submission model. A model with matches held out (a check, never the submission) lives
+    in its own ``model_without_<keys>/``, so it can never be mistaken for the submission model."""
+    if not hold_out:
+        return P.WORK / MODEL_DIR
+    return P.WORK / (MODEL_DIR + "_without_" + "+".join(sorted(k.replace("/", "_") for k in hold_out)))
 
 
 def training_refs() -> list:
@@ -205,47 +209,57 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def stage_train(refs: list, threads: int | None = None, steps: int | None = None) -> dict:
-    """Fit both members on every row of every match (nothing held out) and save ``model/bundle.pkl``."""
+def stage_train(refs: list, threads: int | None = None, steps: int | None = None, hold_out=()) -> dict:
+    """Fit both members on every row of every match (nothing held out) and save ``model/bundle.pkl``.
+
+    ``hold_out`` (match keys, for the dressed-match check only) leaves those matches out of the LightGBM rows,
+    the TCN sequences and scaler, and the priors, exactly as a gate fold does, and saves to ``model_dir(hold_out)``."""
     from katena.eval import bakeoff as B
     from katena.models import ensemble as E
+    exclude = set(hold_out)
+    if not exclude <= {r.key for r in refs}:
+        raise ValueError(f"cannot hold out {sorted(exclude - {r.key for r in refs})}: not an external match")
     threads = threads or E.TCN_THREADS
     E.set_deterministic(threads)
     t0 = time.time()
     pools = F.FinalPools(refs)
     log(f"pool: {pools.X.shape[0]} rows x {pools.X.shape[1]} columns ({pools.n_base} base)")
-    heads = pools.fit(set(), T, pools.cols())
+    heads = pools.fit(exclude, T, pools.cols())
     t1 = time.time()
     log(f"LightGBM member: {t1 - t0:.0f}s")
     seqs = F.tcn_seqs(refs, T, SEED)
-    net, sc = F.fit_tcn(pools, seqs, set(), SEED, threads, steps)
+    net, sc = F.fit_tcn(pools, seqs, exclude, SEED, threads, steps)
     del seqs
     t2 = time.time()
     log(f"TCN member: {t2 - t1:.0f}s")
-    pri = B.priors_for(F.PriorSource(refs), set(), T)
+    pri = B.priors_for(F.PriorSource(refs), exclude, T)
     model = Model(gbdt_alive=heads.alive.model_to_string(), gbdt_team=heads.team.model_to_string(),
                   gbdt_cols=np.asarray(heads.cols), names=list(pools.names), n_base=int(pools.n_base),
                   tcn_state={k: v.detach().cpu().numpy().copy() for k, v in net.state_dict().items()},
                   tcn_n_in=int(pools.n_base), scaler_mu=np.asarray(sc.mu), scaler_sd=np.asarray(sc.sd),
                   priors=pri, touch_src=TG.SRC)
-    out = model_dir()
+    out = model_dir(hold_out)
     out.mkdir(parents=True, exist_ok=True)
     tmp = out / (BUNDLE + ".tmp")
     with open(tmp, "wb") as fh:
         pickle.dump(model, fh, protocol=4)
     tmp.replace(out / BUNDLE)
     manifest = {
-        "matches": [r.key for r in refs], "rows": int(pools.X.shape[0]), "columns": int(pools.X.shape[1]),
+        "matches": [r.key for r in refs if r.key not in exclude], "rows": int(pools.X.shape[0]),
+        "columns": int(pools.X.shape[1]),
         "mix": F.MIX, "T": T, "tau": TAU, "w_tcn": W_TCN, "seed": SEED, "tcn_threads": threads,
         "sha256": {"gbdt": F.gbdt_hash(heads), "tcn": E.model_hash(net), BUNDLE: sha256_file(out / BUNDLE)},
         "seconds": {"gbdt": round(t1 - t0, 1), "tcn": round(t2 - t1, 1)},
     }
+    if exclude:
+        manifest["held_out"] = sorted(exclude)
+        manifest["rows_used"] = int((~np.isin(pools.keys, list(exclude))).sum())
     (out / MANIFEST).write_bytes((json.dumps(manifest, indent=1, sort_keys=True) + "\n").encode("ascii"))
     return manifest
 
 
-def load_model() -> Model:
-    with open(model_dir() / BUNDLE, "rb") as fh:
+def load_model(hold_out=()) -> Model:
+    with open(model_dir(hold_out) / BUNDLE, "rb") as fh:
         return pickle.load(fh)
 
 
@@ -332,18 +346,27 @@ def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
     return {"path": str(path), "rows": int(len(codes)), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None = None) -> dict:
-    """Label the real match and write the submission. Prints aggregates only."""
-    from katena.target.atd import load_target
-    m = load_target(data_dir)
+def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None = None, hold_out=(),
+                  timeline=None) -> dict:
+    """Label the real match and write the submission. Prints aggregates only.
+
+    ``hold_out`` and ``timeline`` are for the dressed-match check only (an external match exported in the ATD
+    format, ``scripts/dressed_check.py``): the held-out model, and the exported match's own frame count, half
+    blocks, pitch and frame rate in place of ``games.py``'s."""
+    from katena.target.atd import _games, load_target
+    if hold_out or timeline is not None:
+        competition = {Path(_games().DATA_DIR).resolve(), (P.REPO / "data").resolve()}
+        if data_dir is None or Path(data_dir).resolve() in competition:
+            raise ValueError("hold_out and timeline are for an exported external match, never the competition data")
+    m = load_target(data_dir, timeline=timeline)
     rep = m.meta.get("read_report", {})
-    model = load_model()
+    model = load_model(hold_out)
     codes, report = label_match(model, m, threads)
     sub = write_submission(codes, out, m.n)
     report["read"] = {k: rep.get(k) for k in ("n_lines", "n_malformed", "n_out_of_range", "n_duplicate",
                                               "n_frames_present", "contiguous_from_one")}
     report["submission"] = sub
-    report["model_sha256"] = sha256_file(model_dir() / BUNDLE)
+    report["model_sha256"] = sha256_file(model_dir(hold_out) / BUNDLE)
     return report
 
 
