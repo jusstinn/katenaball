@@ -163,7 +163,7 @@ results that depend on a narrow parameter band.
 |---|---|
 | D0-D5 | Done and merged (PRs 1-7). F (touch + ensemble + `d2j`) passes the gate, +0.016, 22/28 wins: PR 8, open |
 | J2 | Done on branch `j2-final-pipeline`, built on PR 8: `make submit`, trains F on all 30 matches, `tests/test_pipeline.py` |
-| J3 | Started: `docs/REPRODUCE.md`, `docs/technical-document.md` draft. Two-machine hash test not done |
+| J3 | Started: `docs/REPRODUCE.md`. Technical document drafted by David in PR 9. A from-scratch rebuild on one Mac is byte-identical; the two-machine hash test is not done |
 | J1 | **Blocked: the data bundle is not on any of our machines.** Nothing has run on the real match |
 | J4-J6 | Not started |
 
