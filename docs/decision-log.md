@@ -26,7 +26,8 @@ at 25 Hz and then downsampling was rejected: the degrader is not frame-rate inva
 false-ball rate and length and the minimum fragment length are all per sample), and it would move M2 off the cached world,
 so the comparison would no longer be paired.
 
-**Hypothesis test first** (6 IDSSE folds, IDSSE-only training, tau 2, `scripts/probe_touch.py`, first feature version).
+**Hypothesis test first** (6 IDSSE folds, IDSSE-only training, tau 2, `scripts/probe_touch.py` and the first feature
+version as of commit f0a5925; the later probe script adds smooth-ball and mixed-jitter settings that were not run).
 
 | setting | touch group vs base | same features from the 5 Hz ball vs base | native vs 5 Hz |
 |---|---|---|---|
