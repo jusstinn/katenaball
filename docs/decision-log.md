@@ -59,6 +59,32 @@ on `david/d5-audit`: A2, A18, A20), relayed by the coordinator.
 - **Alarm.** There is no D2 alarm. D5 ported David's domain-gap alarm (`katena.diag.domain_gap`), so the
   D2 one was removed unused.
 
+**Result 1: the official-baseline gap.** This is a report only, and it chooses nothing. The kappa levels
+were fixed above before it was run. It is the starter algorithm (nearest player, ball missing = D,
+majority window) at 5 Hz, scored at T = 2 on the 6 IDSSE development matches
+(`scripts/d2_worlds.py m0`). Cells are macroF1 / spellF1.
+
+| World | P(miss \| dead) / P(miss \| alive) | raw | smooth25 | smooth50 | smooth125 |
+|---|---|---|---|---|---|
+| `target` (independent) | 0.35 / 0.47 | 0.369 / 0.025 | 0.394 / 0.112 | 0.389 / 0.173 | 0.366 / 0.206 |
+| `target_dead15` (bake-off) | 0.64 / 0.22 | 0.577 / 0.042 | 0.522 / 0.156 | 0.463 / 0.199 | 0.378 / 0.201 |
+| `target_cpl50` | 0.60 / 0.25 | 0.552 / 0.046 | 0.599 / 0.184 | 0.614 / 0.228 | 0.582 / 0.212 |
+| `target_cpl100` (Metrica-like) | 0.79 / 0.09 | 0.686 / 0.058 | 0.705 / 0.226 | 0.699 / 0.259 | 0.645 / 0.229 |
+| `target_ids` | 0.33 / 0.48 | 0.355 / 0.026 | 0.380 / 0.112 | 0.378 / 0.165 | 0.356 / 0.184 |
+| `target_smooth` | 0.34 / 0.47 | 0.371 / 0.039 | 0.397 / 0.127 | 0.392 / 0.178 | 0.363 / 0.211 |
+| **Published, real target** | 0.407 overall | 0.653 / 0.049 | 0.675 / 0.200 | 0.672 / 0.243 | 0.636 / 0.224 |
+
+- **Coupling closes the gap; identity and jitter do not.** The independent world misses the published
+  smooth50 macroF1 by 0.28. `target_cpl50` misses it by 0.06 and `target_cpl100` by 0.03, the other way.
+- **The Metrica-like world matches the whole fingerprint.** `target_cpl100` comes within 0.03 to 0.04 on
+  all eight published numbers. It also gets the published order of the windows: macroF1 peaks at
+  smooth25 and spellF1 at smooth50. The independent world peaks spellF1 at smooth125.
+- **Caveats.** This is consistent with the real ATD dropping the ball through stoppages, but it is not a
+  measurement. It also depends on the target's label convention, its dead share, and 5 Hz against
+  25 Hz. On Metrica's two development games every world already looks like this (smooth50 about
+  0.72 / 0.30), because their own ball loss is coupled.
+- `target` and `target_dead15` reproduce bake-off Table 4 exactly.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
