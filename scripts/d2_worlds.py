@@ -75,7 +75,31 @@ def _fmt_m0(tab: dict) -> str:
     return "\n".join(lines)
 
 
-STAGES = ("build", "pools", "lomo", "score", "m0")
+STAGES = ("build", "pools", "lomo", "score", "gate", "m0")
+
+
+def score_and_report(fr: list, dev: list, variants: tuple, tag: str) -> dict:
+    """Score ``variants`` on folds ``fr``, print the gate tables (and the IDSSE + Metrica subset when the
+    folds include SkillCorner), write gate_<tag>.json, and return {candidate: verdict}."""
+    res = d2.score_folds(fr, dev, variants=variants)
+    d2.save(res, f"scores_{tag}.pkl")
+    fr8 = d2.dead_label_subset(fr)
+    out = {"folds": [r.key for r in fr], "tau": d2.TAU, "candidates": {}}
+    verdicts = {}
+    for cand in (v for v in variants if v != "cur"):
+        cmp = d2.compare_worlds(res, fr, a=cand)
+        cmp8 = d2.compare_worlds(res, fr8, a=cand) if len(fr8) < len(fr) else None
+        verdicts[cand] = d2.keep_verdict(cmp, cmp8)
+        print(f"\n### {cand} vs cur, {len(fr)} folds, tau {d2.TAU:g}")
+        print(_fmt_gate(cmp, verdicts[cand], cand))
+        if cmp8 is not None:
+            print(f"\n### {cand} vs cur, the {len(fr8)} IDSSE + Metrica folds of the same run")
+            print(_fmt_gate(cmp8, d2.keep_verdict(cmp8), cand))
+        out["candidates"][cand] = {"verdict": verdicts[cand], "compare": cmp, "compare_8": cmp8}
+    p = d2.root() / f"gate_{tag}.json"
+    p.write_text(json.dumps(out, indent=1, default=float))
+    print("wrote", p, flush=True)
+    return verdicts
 
 
 def main() -> None:
@@ -107,25 +131,20 @@ def run_stage(stage: str, a) -> None:
     elif a.stage == "lomo":
         d2.run_lomo(d2.folds(a.folds, dev), dev, variants=tuple(a.variants.split(",")))
     elif a.stage == "score":
-        fr = d2.folds(a.folds, dev)
+        score_and_report(d2.folds(a.folds, dev), dev, tuple(a.variants.split(",")), a.folds)
+    elif a.stage == "gate":
+        # Screen on the 8 IDSSE + Metrica folds. A candidate that is already worse there fails the rule
+        # (amendment A1: worse on either set), so only the survivors go on to all 28 folds.
         variants = tuple(a.variants.split(","))
-        res = d2.score_folds(fr, dev, variants=variants)
-        d2.save(res, f"scores_{a.folds}.pkl")
-        fr8 = d2.dead_label_subset(fr)
-        out = {"folds": [r.key for r in fr], "tau": d2.TAU, "candidates": {}}
-        for cand in (v for v in variants if v != "cur"):
-            cmp = d2.compare_worlds(res, fr, a=cand)
-            cmp8 = d2.compare_worlds(res, fr8, a=cand) if len(fr8) < len(fr) else None
-            verdict = d2.keep_verdict(cmp, cmp8)
-            print(f"\n### {cand} vs cur, {len(fr)} folds, tau {d2.TAU:g}")
-            print(_fmt_gate(cmp, verdict, cand))
-            if cmp8 is not None:
-                print(f"\n### {cand} vs cur, the {len(fr8)} IDSSE + Metrica folds of the same run")
-                print(_fmt_gate(cmp8, d2.keep_verdict(cmp8), cand))
-            out["candidates"][cand] = {"verdict": verdict, "compare": cmp, "compare_8": cmp8}
-        p = d2.root() / f"gate_{a.folds}.json"
-        p.write_text(json.dumps(out, indent=1, default=float))
-        print("wrote", p)
+        f8 = d2.folds("8", dev)
+        d2.run_lomo(f8, dev, variants=variants)
+        verdicts = score_and_report(f8, dev, variants, "8")
+        alive = tuple(c for c, v in verdicts.items() if v["keep"])
+        print(f"[d2] screen: going on to 28 folds with {alive or 'no candidate'}", flush=True)
+        if alive:
+            f28 = d2.folds("28", dev)
+            d2.run_lomo(f28, dev, variants=("cur",) + alive)
+            score_and_report(f28, dev, ("cur",) + alive, "28")
     elif a.stage == "m0":
         tab = d2.m0_table(dev)
         d2.save(tab, "m0.pkl")
