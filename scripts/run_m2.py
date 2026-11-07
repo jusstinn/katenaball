@@ -107,7 +107,9 @@ def main() -> int:
     P.WORK.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     T = P.T_MAIN
-    print(f"corpus {P.CANON} | work {P.WORK} | commit {git('rev-parse', 'HEAD')}", flush=True)
+    # provenance is the code that ran: capture it now, since the checkout may move during a long run
+    commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain"))
+    print(f"corpus {P.CANON} | work {P.WORK} | commit {commit}{' (dirty)' if dirty else ''}", flush=True)
 
     dev, locked = B.dev_and_locked()
     check_split(dev, locked)                              # before anything is written
@@ -132,7 +134,8 @@ def main() -> int:
         "diff_vs_reference": (round(summary["m2_spell_f1_mean"] - REFERENCE["spell_f1"], 4)
                               if summary["m2_spell_f1_mean"] is not None else None),
         "stages": stages, "runtime_s": round(time.time() - t0, 1),
-        "git_commit": git("rev-parse", "HEAD"), "git_dirty": bool(git("status", "--porcelain")),
+        "git_commit": commit, "git_dirty": dirty,
+        "git_commit_changed_during_run": git("rev-parse", "HEAD") != commit,
         "corpus": str(P.EXTERNAL), "work": str(P.WORK),
         "platform": platform.platform(), "python": platform.python_version(),
         "lightgbm_num_threads": gbdt.PARAMS["num_threads"],
