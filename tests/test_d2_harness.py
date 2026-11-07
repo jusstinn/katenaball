@@ -125,7 +125,7 @@ def test_score_stage_end_to_end_on_a_fake_cache(tmp_path, monkeypatch):
             assert res[("d2", w, r.key)]["spell_f1"] >= res[("cur", w, r.key)]["spell_f1"]
         assert res[("tau", "d2", r.key)] in P.TAUS
     cmp = d2.compare_worlds(res, refs)
-    assert set(cmp) == set(W.EVAL_WORLDS) | set(d2.SECONDARY)
+    assert set(cmp) == set(W.EVAL_WORLDS) | set(d2.SECONDARY) | set(d2.SECONDARY_IDSSE)
     assert all(c["n"] == 3 and c["mean_diff"] > 0 for c in cmp.values())
     v = d2.keep_verdict(cmp)
     assert v["keep"] and not v["worse"] and not v["missing"]

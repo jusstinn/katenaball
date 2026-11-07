@@ -68,16 +68,21 @@ def mix_for(dataset: str) -> dict:
     return W.TRAIN_MIX["dead_labels" if dataset in W.DEAD_LABEL_DATASETS else "no_dead_labels"]
 
 
+# The bake-off's own dead-coupled worlds (IDSSE only, already in the base cache): scored as secondary too.
+SECONDARY_IDSSE = ("target_dead3", "target_dead15")
+
+
 def eval_worlds(ref: P.Ref) -> list:
     """Worlds a fold is scored in: the decision worlds, then the secondary ones."""
-    return [w for w in W.EVAL_WORLDS + SECONDARY if W.applies(w, ref.dataset)]
+    extra = SECONDARY_IDSSE if ref.dataset == "idsse" else ()
+    return [w for w in W.EVAL_WORLDS + SECONDARY if W.applies(w, ref.dataset)] + list(extra)
 
 
 def new_worlds(ref: P.Ref) -> list:
     """D2 worlds to build for ``ref``: everything in its training mix or evaluation list that the base
     cache does not already hold."""
     names = {w for ws in mix_for(ref.dataset).values() for w in ws} | set(eval_worlds(ref))
-    return sorted(n for n in names if n not in dg.CONFIGS)
+    return sorted(n for n in names if n not in dg.CONFIGS and n not in C.CONFIG)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -323,7 +328,7 @@ def score_folds(fold_refs: list, dev: list, variants=VARIANTS) -> dict:
 def compare_worlds(res: dict, fold_refs: list, worlds=None, a: str = "d2", b: str = "cur") -> dict:
     """Per world: paired bootstrap of a - b over the folds where both were scored, and the verdict."""
     out = {}
-    worlds = worlds or (W.EVAL_WORLDS + SECONDARY)
+    worlds = worlds or (W.EVAL_WORLDS + SECONDARY + SECONDARY_IDSSE)
     for w in worlds:
         rr = [r for r in fold_refs if (a, w, r.key) in res and (b, w, r.key) in res]
         if not rr:
