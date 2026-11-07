@@ -142,15 +142,16 @@ from the same events, so its evidence is circular (pooled 3.1 s, Game 1 4.2, Gam
 
 - **3.5 s estimates a convention:** where DFL flips become more likely than not to carry a deliberate
   action, if "controlled" means "made a pass, shot or claim". The stricter reading (completed actions)
-  moves it to about 4.7 s, and "more than two consecutive passes" would move it further. In David's rule
+  moves it to 4.6-4.8 s, and "more than two consecutive passes" would move it further. In David's rule
   (merging flips into dead ball too, shortest first) 3.5 s gives labels about as smooth as sandwich
   T = 5 by spell count (231 against 230 per match), with far fewer short spells (3.7% under 2 s against
   16%). The two scales are not comparable.
 - **T = 2 is a training choice:** the bake-off trained at each T and evaluated at each T, and T = 2 had
   the smallest worst-case regret (0.017). It assumes nothing about where the target sits in 0-5 s.
 - **They do not conflict.** A 3.5 s convention is a candidate truth; T = 2 is what to train on when the
-  truth is uncertain. Section 5 checks training against David's convention (`H3.5`) and the
-  event-defined one (`E`) directly.
+  truth is uncertain. Section 5 tests it directly: trained on H3.5 labels, the model loses at T = 2
+  (-0.008, 28 folds) and gains at most 0.004 against H3.5 ground truth itself; against `E`, M2 is better
+  (0.686 against 0.678). As a training convention, T = 2 is the better supported of the two.
 
 Spell statistics per convention, IDSSE development matches (`E`: every flip without an action removed,
 no duration threshold, capped at 10 s):
@@ -189,9 +190,9 @@ S2 closer to `E` (0.709 to 0.764) than any change of T does.
 | Can identify | Cannot identify |
 |---|---|
 | How a provider's owner field behaves against its own event annotations (DFL: touch-level, flips at duels) | What the target's corrected tracking means by owning: touch-level, a time threshold, event-based control, or a manual call |
-| Where DFL flips start to look controlled under an event definition (3.5 s; 4.7 s strict) | Whether the target merges a touch that goes straight out of play |
+| Where DFL flips start to look controlled under an event definition (3.5 s; 4.6-4.8 s strict) | Whether the target merges a touch that goes straight out of play |
 | How much each training choice loses when the evaluation convention differs (regret) | Which T, if any, the target uses, so which column of the regret table applies |
-| That the ranking of models is stable across conventions | The absolute score level, which the convention alone moves by about 0.1 |
+| That the ranking of models is stable across conventions | The absolute score level, which the convention alone moves by about 0.15 |
 
 ## 5. Training across T
 
@@ -380,21 +381,26 @@ so the share of D frames with the ball missing measures how clean a D label is:
 
 On Game 3 this reproduces the audit (David's own loader: 0.992; the 7,215 frames that only the default
 calls dead have the ball present 77% of the time). On Game 1 the dead side improves too, but some
-frames the restart rule calls alive have no ball (0.992 to 0.963): a stoppage with no marker starts
-when the last action ends, which can be late. The two rules agree on 90.5% (Game 1) and 93.9% (Game 3)
+frames the restart rule calls alive have no ball (0.992 to 0.963), probably because a stoppage with no
+marker (18 in Game 1) starts only when the last action ends. The two rules agree on 90.5% (Game 1) and 93.9% (Game 3)
 of frames and on the team on 99.9-100% of frames both call alive. Scored against each other at T = 2
 they reach only 0.83 and 0.89 spellF1, so the choice moves every Metrica number. Metrica is 2 of 28
 development folds but about a quarter of the alive head's training rows.
 
-The gate for this candidate (`MR`: both heads refitted on the restart-rule labels) is in section 5.
-IDSSE and SkillCorner folds keep their ground truth, so they are the clean test; Metrica folds are
-scored against both rules.
+**Gate (`MR`, both heads refitted on the restart-rule labels): neutral.** +0.0026 [-0.0035, +0.0083] on
+the 8 folds against its own Metrica labels (62% wins), +0.0010 [-0.0021, +0.0043] on 28 (57%). On the 6
+IDSSE folds, whose ground truth does not change, +0.0016 (3 of 6). Against the default Metrica labels the
+two Metrica folds lose 0.010, as expected when the two label sets disagree. Cleaner labels, no measurable
+score change: see recommendation 5.
 
 ## Reproduce
 
 ```bash
 export KATENA_EXTERNAL=D:/katena/external_data KATENA_WORK=D:/katena/work-d4
-uv run python scripts/label_evidence.py --metrica      # sections 2-4, about 1 min
-uv run python scripts/label_tmix.py --folds 8 --check  # section 5 screen (needs the bake-off cache)
-uv run python scripts/label_tmix.py --folds 28
+uv run python scripts/label_evidence.py --metrica      # sections 2-4 and 8; writes the E and Metrica R labels; ~2 min
+uv run python scripts/label_tmix.py --folds 8 --check  # section 5 screen, ~20 min in a heavy slot (needs the bake-off cache)
+uv run python scripts/label_tmix.py --folds 28 --check # all 28 folds, ~40 more min (the 8 screened folds are cached)
+uv run python scripts/label_tmix.py --summary          # the section 5 tables from the saved scores
 ```
+
+Real match: nothing here needs to run on it. No D4 number used `data/`, `evaluation/gt/` or the public window.
