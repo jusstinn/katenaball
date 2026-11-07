@@ -256,6 +256,8 @@ possessions, 2000 draws. Passing needs wins on at least 70% of folds and an inte
 | S0 (reference) | +0.0042 [-0.0007, +0.0092], 75% | +0.0019 [-0.0010, +0.0046], 54% | +0.0010 [-0.0026, +0.0046], 45% | no |
 | S3 (reference) | -0.0114 [-0.0168, -0.0059], 0% | -0.0023 [-0.0055, +0.0010], 25% | +0.0014 [-0.0026, +0.0052], 35% | no |
 
+**Correction (review, after the gate).** The S2tail and H3.5 numbers above were computed with `tail=True` treating every end of a graded run as "touched, then out". On SkillCorner a run also ends at every X gap inside a half (camera cutaways), after which the same team may still have the ball, so those labels merged some flips they should have kept. `relabel`, `tmix.conv_labels` and `label_evidence` now pass the half blocks, and only the end of the last graded run of each half counts as out (`katena.labels.run_ends_out`; IDSSE and Metrica are unaffected). Neither convention is adopted, so the gate was not re-run; re-run it before adopting either.
+
 **Worst-case regret over S0-S5** (best scheme's mean minus this scheme's, at the worst convention):
 
 | Scheme | 8, target | 8, severe | 28, target | 28, severe |

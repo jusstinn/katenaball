@@ -39,7 +39,7 @@ from katena.eval import corpus as C
 from katena.eval import lomo as Lm
 from katena.eval import protocol as P
 from katena.eval.score import to_native_codes
-from katena.labels import sandwich
+from katena.labels import run_ends_out, sandwich
 from katena.types import D, X
 
 CONV = {f"S{T}": dict(T=T) for T in P.T_SWEEP}
@@ -58,8 +58,12 @@ TAU = 2.0
 TMIX_DIR = P.WORK / "tmix"
 
 
-def conv_labels(y: np.ndarray, fps: float, name: str) -> np.ndarray:
+def conv_labels(y: np.ndarray, fps: float, name: str, blocks=None) -> np.ndarray:
+    """``y`` under convention ``name``. ``blocks``: the half blocks, so that a tail convention treats
+    only the end of a half as out, not an X gap inside it (``katena.labels.run_ends_out``)."""
     kw = dict(CONV[name])
+    if kw.get("tail") and blocks is not None:
+        kw["out_at"] = run_ends_out(y, blocks)
     return sandwich(y, pm.valid_runs(y), fps, kw.pop("T"), **kw)
 
 
@@ -79,7 +83,7 @@ class Labels:
                 if set(CONV[name]) == {"T"} and T in P.T_SWEEP:
                     ys[name] = C.load_gt(r, T)["y"]         # the cached sandwich labels
                 else:
-                    ys[name] = conv_labels(g["y"], g["fps"], name)
+                    ys[name] = conv_labels(g["y"], g["fps"], name, g["blocks"])
             e = e_dir / f"{r.dataset}_{r.id}__E.npz"
             if e.exists():
                 with np.load(e) as z:
@@ -88,7 +92,7 @@ class Labels:
                 ys["S2R"] = ys["S2"]
             elif (e_dir / f"metrica_{r.id}__R.npz").exists():
                 with np.load(e_dir / f"metrica_{r.id}__R.npz") as z:
-                    ys["S2R"] = conv_labels(z["y"], g["fps"], "S2")
+                    ys["S2R"] = conv_labels(z["y"], g["fps"], "S2", g["blocks"])
             self.y[r.key] = ys
 
     def gt(self, ref, name: str) -> dict | None:

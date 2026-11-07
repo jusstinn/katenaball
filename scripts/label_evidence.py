@@ -28,7 +28,7 @@ import possession_metrics as pm  # noqa: E402
 from katena.eval import protocol as P  # noqa: E402
 from katena.external import control_evidence as ce  # noqa: E402
 from katena.external import idsse, metrica, metrica_stoppages  # noqa: E402
-from katena.labels import sandwich  # noqa: E402
+from katena.labels import run_ends_out, sandwich  # noqa: E402
 from katena.types import load_match  # noqa: E402
 
 CONVENTIONS = {f"S{T}": dict(T=T) for T in P.T_SWEEP}
@@ -42,9 +42,11 @@ def spell_stats(y: np.ndarray, fps: float) -> dict:
             "lt2": float((d < 2).mean())}
 
 
-def convention(y: np.ndarray, fps: float, name: str) -> np.ndarray:
+def convention(y: np.ndarray, fps: float, name: str, blocks=None) -> np.ndarray:
     kw = dict(CONVENTIONS[name])
     T = kw.pop("T")
+    if kw.get("tail") and blocks is not None:            # only the end of a half is out (not an X gap)
+        kw["out_at"] = run_ends_out(y, blocks)
     return sandwich(y, pm.valid_runs(y), fps, T, **kw)
 
 
@@ -234,7 +236,7 @@ def main() -> int:
         for r in refs_ds:
             m = load_match(r.path)
             for n in CONVENTIONS:
-                st[n].append(spell_stats(convention(m.y, m.fps, n), m.fps))
+                st[n].append(spell_stats(convention(m.y, m.fps, n, m.half_blocks), m.fps))
             for s0, s1, _, _ in ce.spell_kinds(m.y):
                 touches_x = (s0 == 0 or m.y[s0 - 1] == 3) or (s1 >= m.n or m.y[s1] == 3)
                 n_sp += 1

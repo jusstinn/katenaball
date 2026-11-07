@@ -9,7 +9,7 @@ import pytest
 
 import possession_metrics as pm
 from katena.external import control_evidence as ce
-from katena.labels import sandwich
+from katena.labels import run_ends_out, sandwich
 from katena.types import A, D, H, X
 
 
@@ -113,6 +113,21 @@ def test_tail_merges_touch_then_out_but_never_a_restart():
     assert (out[28:30] == A).all()                # the restart possessor after D is kept, however short
     assert (out[50:53] == H).all()                # a flip running into the end of the run is a tail too
     assert np.array_equal(sandwich(y, pm.valid_runs(y), 5.0, 1.0), y)   # default: no sandwich here
+
+
+def test_tail_does_not_treat_an_x_gap_inside_a_half_as_out():
+    # H 5 s | A 0.5 s | X (camera cutaway) | A 3 s, at 10 fps, T = 2 s: A keeps the ball after the cut
+    y = _seq([(H, 50), (A, 5), (X, 10), (A, 30)])
+    runs = pm.valid_runs(y)
+    half = [(1, 0, len(y) - 1)]
+    out_at = run_ends_out(y, half)
+    assert out_at == {len(y)}
+    for order in ("scan", "shortest"):
+        assert (sandwich(y, runs, 10.0, 2.0, tail=True, order=order, out_at=out_at)[50:55] == A).all()
+        assert (sandwich(y, runs, 10.0, 2.0, tail=True, order=order)[50:55] == H).all()   # harmonise's rule
+    # a flip running into the end of the half is still a tail
+    z = _seq([(H, 50), (A, 5), (X, 10)])
+    assert (sandwich(z, pm.valid_runs(z), 10.0, 2.0, tail=True, out_at=run_ends_out(z, half))[50:55] == H).all()
 
 
 def test_shortest_first_with_tail_reproduces_david_harmonise():
