@@ -135,6 +135,42 @@ recommend the one with the larger worst-case mean difference over the decision w
 on the 28 folds where it runs there, otherwise on the 8. This follows PLAN.md: "prefer changes that help
 in every world". The 8-fold numbers above were known when this was written.
 
+**Result 3: the gate, 28 folds.** `cur` scores target 0.5861, equal to M2. The coupled worlds have no
+SkillCorner folds, so their 8-fold rows above stand.
+
+| Decision world (28 folds) | cur | d2 - cur [CI] | wins | d2j - cur [CI] | wins |
+|---|---|---|---|---|---|
+| `mild` | 0.6116 | -0.0001 [-0.0035, +0.0032] | 14/28 | +0.0024 [-0.0010, +0.0059] | 15/28 |
+| `target` | 0.5861 | +0.0007 [-0.0028, +0.0042] | 13/28 | +0.0019 [-0.0014, +0.0051] | 15/28 |
+| `severe` | 0.5475 | +0.0031 [-0.0008, +0.0071] | 19/28 | +0.0036 [-0.0001, +0.0076] | 18/28 |
+| `target_ids` | 0.5844 | +0.0016 [-0.0022, +0.0050] | 17/28 | +0.0022 [-0.0015, +0.0056] | 15/28 |
+| `target_smooth` | 0.5796 | +0.0010 [-0.0029, +0.0050] | 15/28 | +0.0055 [+0.0014, +0.0097] | 19/28 |
+
+**Decision.** Both mixes are kept: no decision world is worse, on the 28 folds or on the 8.
+
+- **Recommendation: `d2j`** (amendment A2). Its worst decision world is +0.0019 (`target`), against
+  -0.0001 (`mild`) for `d2`. `d2j` is ahead of `d2` in every decision world.
+- **What it buys.** Coupled worlds gain +0.012 to +0.016 (CI > 0). `target_smooth` gains +0.0055, and the
+  secondary `severe_smooth` +0.013 (22/28).
+- **What it does not buy.** The headline independent `target` gains only +0.002, which is not
+  significant.
+- **The real cost: IDSSE.** By dataset, `d2j` costs IDSSE -0.006 in `target` (2/6 wins) and -0.011 in
+  `severe` (1/6). IDSSE is the only dataset whose ball is never missing natively, so it is the one where
+  the independent world is pure. The pooled rule does not see this, because Metrica (+0.008, +0.025),
+  whose own loss is already coupled, and SkillCorner (+0.004, +0.006) gain. On IDSSE, `d2j` gains in the
+  smooth world (+0.005) and the coupled worlds (+0.007 to +0.016).
+- **So the mix is a bet** that the real ATD's ball loss is tied to stoppages and that its positions are
+  smooth. The official-baseline fingerprint (Result 1) and the D5 jitter audit both point that way.
+  Neither was used to choose.
+- **Next for J2.** The final model should train on the `d2j` mix:
+  - `katena.sim.worlds.TRAIN_MIXES["d2j"]`, built with `katena.eval.d2.build_ref` and `build_pool`.
+  - The D2 worlds are built for development matches only so far, so the final 30-match training must
+    also build them for the two benches.
+  - `katena.eval.corpus` and every cached condition are unchanged.
+- **Not done.**
+  - The D2 worlds were not added to D5's domain-gap alarm.
+  - A 25 Hz identity world for D1 was not built; the options work at any frame rate.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
