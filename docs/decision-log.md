@@ -32,6 +32,10 @@ and at severe noise. `D3M2` (w = 0 through the same code) equals the stored M2 o
 macroF1 (IDSSE + Metrica, target-like): ensemble 0.8736, M2 0.8677. The TCN alone now has a SkillCorner score for the
 first time: 0.5941 against M2's 0.5930.
 
+**Second TCN seed (8 IDSSE + Metrica folds, a stability check).** With seed 1 the ensemble still passes: +0.0084
+[+0.0017, +0.0151], 7/8 at target-like; +0.0104 [+0.0033, +0.0172], 8/8 at severe. The TCN alone does not (+0.0032,
+4/8 at target-like), as in the bake-off: averaging with LightGBM absorbs most of the TCN's seed variance.
+
 **Where the gain is, and where it is not (information).** The TCN makes the ensemble smoother. It predicts fewer
 possessions per true one (IDSSE + Metrica 0.67 against M2's 0.69 at target-like, 0.65 against 0.70 at severe;
 SkillCorner 0.735 against 0.760) and, at target-like, matches more of the possessions over 8 s: it removes false
