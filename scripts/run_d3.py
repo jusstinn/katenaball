@@ -60,20 +60,32 @@ def show_gate(base: Results, res: Results, refs: list, cands: list) -> None:
                 a = np.mean([res.get((cand, T, "target", r.key))["spell_f1"] for r in rr])
                 b = np.mean([base.get(("M2", T, "target", r.key))["spell_f1"] for r in rr])
                 parts.append(f"{ds} {a:.4f} vs {b:.4f} (n={len(rr)})")
-        print(f"{cand} by dataset (target): " + "; ".join(parts))
+        nd = [r for r in refs if not r.is_sc and res.get((cand, T, "target", r.key))]
+        if nd:                                                       # tie-break metric, dead-labelled data only
+            parts.append("macroF1 (IDSSE+Metrica) {:.4f} vs {:.4f}".format(
+                np.mean([res.get((cand, T, "target", r.key))["macro_f1"] for r in nd]),
+                np.mean([base.get(("M2", T, "target", r.key))["macro_f1"] for r in nd])))
+        tt = res.get(("tau_table", T, cand, "all"))
+        if tt:
+            parts.append("taus " + ",".join(f"{v:g}" for v in sorted(set(tt["taus"].values()))))
+        print(f"{cand} vs M2 (target): " + "; ".join(parts))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["tcn", "score", "gate", "inner", "nested", "curve"])
+    ap.add_argument("stage", choices=["tcn", "score", "gate", "inner", "nested", "curve", "proto-m2"])
     ap.add_argument("--folds", default="8", choices=["8", "all"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--threads", type=int, default=E.TCN_THREADS)
     ap.add_argument("--limit", type=int, default=0, help="only the first N folds (timing)")
     ap.add_argument("--cand", nargs="*", default=["D3E50", "D3T", "D3M2"])
+    ap.add_argument("--steps", type=int, default=None, help="TCN steps (smoke tests only; default tcn.STEPS)")
+    ap.add_argument("--datasets", nargs="*", default=[], help="restrict the development set (prototype caches)")
     a = ap.parse_args()
     dev, locked = B.dev_and_locked()
     assert not {r.key for r in locked} & {r.key for r in dev}
+    if a.datasets:
+        dev = [r for r in dev if r.dataset in a.datasets]
     print("development matches:", len(dev), "| work:", P.WORK, flush=True)
     refs = refs_for(dev, a.folds)
     if a.limit:
@@ -84,14 +96,19 @@ def main() -> None:
         show_gate(Results(), store, refs, a.cand)
         return
     pools = Pools(dev)
-    if a.stage == "tcn":
-        d3.stage_tcn_lomo(pools, dev, refs, T, seed=a.seed, threads=a.threads)
+    if a.stage == "proto-m2":                    # a prototype cache has no M2 yet; the real one comes from D5
+        base = Results()
+        assert not any(k[0] == "M2" for k in base.d), "this cache already holds M2"
+        B.stage_lomo(pools, dev, "full", T)
+        B.decode_and_score(base, pools, dev, "full", T, "viterbi", "M2")
+    elif a.stage == "tcn":
+        d3.stage_tcn_lomo(pools, dev, refs, T, seed=a.seed, threads=a.threads, steps=a.steps)
     elif a.stage == "score":
         d3.stage_score(pools, refs, T, res=store)
     elif a.stage == "curve":                                         # sensitivity only, never a choice
         d3.stage_score(pools, refs, T, weights=(0.25, 0.75), res=store)
     elif a.stage == "inner":
-        d3.stage_inner(pools, dev, T, seed=a.seed, threads=a.threads)
+        d3.stage_inner(pools, dev, T, seed=a.seed, threads=a.threads, steps=a.steps)
     elif a.stage == "nested":
         print("nested choices:", d3.stage_nested(pools, dev, T))
 
