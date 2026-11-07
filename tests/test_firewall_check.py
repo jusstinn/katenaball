@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "scripts"))
+for path in (REPO, REPO / "scripts"):
+    sys.path.insert(0, str(path))
 
 import firewall_check as fc  # noqa: E402
 import games  # noqa: E402
