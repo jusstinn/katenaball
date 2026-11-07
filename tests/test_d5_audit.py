@@ -56,3 +56,26 @@ def test_split_pins_the_locked_benches():
     dev, locked = P.split(partial)
     assert {r.key for r in locked} == {"metrica/Sample_Game_2"}
     assert "idsse/DFL-MAT-J03WPY" in {r.key for r in dev}
+
+
+# --- F: the corpus code digest must not depend on the checkout's line endings ----------------
+
+def test_code_digest_ignores_crlf(tmp_path, monkeypatch):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import build_external as bx
+
+    def write(eol: bytes) -> None:
+        for i, f in enumerate(bx.CODE_FILES):
+            p = tmp_path / f
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(eol.join([b"# loader", b"x = %d" % i, b""]))
+
+    monkeypatch.setattr(bx, "REPO", tmp_path)
+    write(b"\n")
+    lf, lf_raw = bx.code_digest("idsse"), bx.code_digest("idsse", normalise_eol=False)
+    write(b"\r\n")                                   # what Git for Windows checks out
+    assert bx.code_digest("idsse") == lf == lf_raw
+    assert bx.code_digest("idsse", normalise_eol=False) != lf
+    assert bx.code_digest("skillcorner") != lf       # still per dataset

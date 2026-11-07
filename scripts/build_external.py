@@ -31,10 +31,14 @@ CODE_FILES = ["src/katena/types.py", "src/katena/external/common.py", "src/katen
               "src/katena/external/metrica.py", "src/katena/external/skillcorner.py"]
 
 
-def code_digest(dataset: str) -> str:
+def code_digest(dataset: str, normalise_eol: bool = True) -> str:
+    """SHA256 of the loader code. Line endings are normalised to LF, because Git for Windows checks
+    the same commit out with CRLF (core.autocrlf=true), which would otherwise give every OS its own
+    digest for identical code."""
     h = hashlib.sha256()
     for f in CODE_FILES[:2] + [f for f in CODE_FILES[2:] if Path(f).stem == dataset]:
-        h.update((REPO / f).read_bytes())
+        b = (REPO / f).read_bytes()
+        h.update(b.replace(b"\r\n", b"\n") if normalise_eol else b)
     return h.hexdigest()
 
 
@@ -85,7 +89,10 @@ def main() -> int:
             npz = out_dir / f"{name}.npz"
             stamp = {"inputs": digests, "code_sha256": code_digest(ds)}
             if npz.exists() and side.exists() and not args.force:
-                if {k: json.loads(side.read_text()).get(k) for k in stamp} == stamp:
+                old = json.loads(side.read_text(encoding="utf-8"))
+                # sidecars written before the EOL normalisation carry the raw digest; accept it
+                if old.get("inputs") == digests and old.get("code_sha256") in (
+                        stamp["code_sha256"], code_digest(ds, normalise_eol=False)):
                     print(f"[{ds}] {name}: up to date", flush=True)
                     continue
             t = time.time()
