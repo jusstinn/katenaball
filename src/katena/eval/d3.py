@@ -4,14 +4,17 @@ Uses the bake-off cache (features, pools, ``oof/full`` M2 probabilities, ``resul
 own outputs next to it: ``oof/<variant>/`` probability files and ``d3_results.pkl``. Never touches the
 locked benches. Scores are external-match aggregates.
 
-Candidates (all decoded like M2: 3-state Viterbi, priors fit on the training matches' labels, tau for
-match k chosen from the other matches' out-of-fold scores at target-like noise):
+Every candidate is decoded like M2 (3-state Viterbi, priors fit on the training matches' labels) at the
+fixed temperature ``TAU = 2``. The bake-off chose tau per fold from other folds whose models and priors had
+seen the held-out match (D5 audit, A2); all 28 folds chose 2 for M2, so fixing it changes nothing for M2 and
+keeps the comparison clean.
 
+- ``D3M2``   w = 0: the M2 probabilities through this code path; must equal the stored M2 scores.
 - ``D3E50``  logit average of the M2 heads and the TCN, TCN weight 0.5 fixed a priori. The gated one.
 - ``D3T``    the deterministic TCN alone (the M5 analogue, now on every fold).
 - ``D3W*``   other fixed weights, a sensitivity curve only: choosing a weight from it would be
              choosing on the gate folds.
-- ``D3N``    weight and tau chosen per outer M6 group from inner out-of-fold predictions of models that
+- ``D3N``    the weight chosen per outer M6 group from inner out-of-fold predictions of models that
              never saw the group (strictly nested). Needs ``stage_inner``.
 """
 
@@ -31,11 +34,11 @@ from katena.eval.bootstrap import adopted, paired_bootstrap
 from katena.eval.lomo import Pools, Results, timed
 from katena.models import ensemble as E
 
-VAR_TCN = "tcn_d3"                     # LOMO TCN probabilities, deterministic configuration
+VAR_TCN = "tcn_d3"                     # LOMO TCN probabilities, deterministic configuration, seed 0
 N_GROUPS = 6
-RES_NAME = "d3_results.pkl"            # the 28-fold gate
-RES_SCREEN = "d3_screen.pkl"           # the 8-fold screen (tau chosen among those 8 folds, as for M5)
+RES_NAME = "d3_results.pkl"
 GATE_CONDS = ("target", "severe")
+TAU = 2.0                              # decoder temperature, fixed a priori (M2's plateau value)
 
 
 def d3_results(name: str = RES_NAME) -> Results:
@@ -101,38 +104,48 @@ def stage_tcn_lomo(pools: Pools, dev: list, folds: list, T: int = P.T_MAIN, seed
 
 
 # ---------------------------------------------------------------------------------------------
-# blending and scoring with the M2 protocol
+# blending and scoring at the fixed temperature
 
 def wname(w: float) -> str:
     return f"D3W{int(round(100 * w)):03d}"
 
 
-def write_blend(refs: list, w: float, variant: str, T: int = P.T_MAIN, gbdt: str = "full",
-                tcn_variant: str = VAR_TCN) -> None:
-    """Pseudo-variant OOF files holding the blended probabilities, for ``bakeoff.decode_and_score``."""
-    for r in refs:
-        og, ot = Lm.load_oof(gbdt, T, r), Lm.load_oof(tcn_variant, T, r)
-        arrays = {}
-        for c in S.ALL_EVAL_CONDS:
-            if f"pa_{c}" in og and f"pa_{c}" in ot:
-                arrays[f"pa_{c}"], arrays[f"ph_{c}"] = E.blend_heads((og[f"pa_{c}"], og[f"ph_{c}"]),
-                                                                     (ot[f"pa_{c}"], ot[f"ph_{c}"]), w)
-        _save(Lm.oof_path(variant, T, r), arrays)
+def cand_name(w: float, seed: int = 0) -> str:
+    name = {E.W_MAIN: "D3E50", 1.0: "D3T", 0.0: "D3M2"}.get(w, wname(w))
+    return name + (f"_s{seed}" if seed else "")
+
+
+def tcn_variant(seed: int = 0) -> str:
+    """OOF variant of the LOMO TCN trained with ``seed`` (seed 0 is the gated configuration)."""
+    return VAR_TCN if seed == 0 else f"{VAR_TCN}_s{seed}"
 
 
 def stage_score(pools: Pools, refs: list, T: int = P.T_MAIN, weights=(E.W_MAIN, 1.0, 0.0),
-                res: Results | None = None) -> Results:
-    """Decode and score fixed-weight blends with exactly M2's protocol. ``w = 0`` must reproduce M2."""
+                res: Results | None = None, seed: int = 0, tau: float = TAU) -> Results:
+    """Blend the stored LOMO probabilities at each fixed weight, decode (priors without the held-out
+    match, fixed tau) and score every condition. ``w = 0`` must reproduce M2. A TCN seed other than 0
+    gets its own names (``D3E50_s1`` ...), a stability check only."""
     res = res or d3_results()
-    for w in weights:
-        name = {E.W_MAIN: "D3E50", 1.0: "D3T", 0.0: "D3M2"}.get(w, wname(w))
-        write_blend(refs, w, f"blend_{name}", T)
-        B.decode_and_score(res, pools, refs, f"blend_{name}", T, "viterbi", name, conds=S.ALL_EVAL_CONDS)
+    t0 = time.time()
+    for r in refs:
+        og, ot = Lm.load_oof("full", T, r), Lm.load_oof(tcn_variant(seed), T, r)
+        pri = B.priors_for(pools, {r.key}, T)
+        gt = C.load_gt(r, T)
+        for c in S.ALL_EVAL_CONDS:
+            if f"pa_{c}" not in og or f"pa_{c}" not in ot:
+                continue
+            f = C.load_feat(r, c)
+            for w in weights:
+                pa, ph = E.blend_heads((og[f"pa_{c}"], og[f"ph_{c}"]), (ot[f"pa_{c}"], ot[f"ph_{c}"]), w)
+                rows = hmm.decode(pa, ph, f["half"], pri, tau, "viterbi")
+                res.put((cand_name(w, seed), T, c, r.key), Lm.score_rows(r, T, c, rows, f["idx"], gt))
+    res.save()
+    timed(f"scored {[cand_name(w, seed) for w in weights]} on {len(refs)} folds at tau {tau:g}", t0)
     return res
 
 
 # ---------------------------------------------------------------------------------------------
-# strictly nested choice of (w, tau) on M6 groups (optional, information)
+# strictly nested choice of the weight on M6 groups (optional, information)
 
 def groups(dev: list, n_groups: int = N_GROUPS) -> dict:
     return {r.key: P.group_of(r.id, n_groups) for r in dev}
@@ -168,18 +181,14 @@ def stage_inner(pools: Pools, dev: list, T: int = P.T_MAIN, seed: int = 0, threa
         timed(f"inner pair {g}{h} ({len(members)} matches held out)", t0)
 
 
-def nested_grid() -> list:
-    return [(w, tau) for w in E.W_GRID for tau in P.TAUS]
-
-
 def stage_nested(pools: Pools, dev: list, T: int = P.T_MAIN, res: Results | None = None,
-                 n_groups: int = N_GROUPS) -> dict:
-    """``D3N``: (w, tau) per outer group g, chosen on inner predictions for every match outside g from
-    models trained without g (and without the match's own group), decoded with priors that exclude
-    both groups. Then applied to the LOMO probabilities of g's matches. Returns {group: (w, tau)}."""
+                 n_groups: int = N_GROUPS, tau: float = TAU) -> dict:
+    """``D3N``: w per outer group g, chosen on inner predictions for every match outside g from models
+    trained without g (and without the match's own group), decoded with priors that exclude both
+    groups. Then applied to the LOMO probabilities of g's matches. Returns {group: w}."""
     res = res or d3_results()
     grp = groups(dev, n_groups)
-    grid = nested_grid()
+    grid = list(E.W_GRID)
     members = {g: {r.key for r in dev if grp[r.key] == g} for g in range(n_groups)}
     feats = {r.key: C.load_feat(r, "target") for r in dev}
     gts = {r.key: C.load_gt(r, T) for r in dev}
@@ -195,15 +204,15 @@ def stage_nested(pools: Pools, dev: list, T: int = P.T_MAIN, res: Results | None
             og, ot = Lm.load_oof(f"inner_gbdt_{a}{b}", T, r), Lm.load_oof(f"inner_tcn_{a}{b}", T, r)
             pri = hmm.fit_priors(pools.label_seqs(members[a] | members[b], T))
             f = feats[r.key]
-            for i, (w, tau) in enumerate(grid):
+            for i, w in enumerate(grid):
                 pa, ph = E.blend_heads((og["pa_target"], og["ph_target"]), (ot["pa_target"], ot["ph_target"]), w)
                 rows = hmm.decode(pa, ph, f["half"], pri, tau, "viterbi")
                 table[i, j] = Lm.score_rows(r, T, "target", rows, f["idx"], gts[r.key])["spell_f1"]
         choice[g] = E.choose(table, grid)
         res.put(("d3n_table", T, g, "all"), {"table": table, "grid": grid, "keys": [r.key for r in inner]})
-        timed(f"nested choice group {g}: w={choice[g][0]} tau={choice[g][1]}", t0)
+        timed(f"nested choice group {g}: w={choice[g]}", t0)
     for r in dev:
-        w, tau = choice[grp[r.key]]
+        w = choice[grp[r.key]]
         og, ot = Lm.load_oof("full", T, r), Lm.load_oof(VAR_TCN, T, r)
         pri = B.priors_for(pools, {r.key}, T)
         for c in S.ALL_EVAL_CONDS:

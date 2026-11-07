@@ -2,15 +2,17 @@
 """D3: TCN + LightGBM ensemble through the gate, on external development matches only.
 
 Needs the bake-off cache in KATENA_WORK (features, pools, ``oof/full``, ``results.pkl``). Never reads
-``data/`` or ``evaluation/gt/`` and never runs the locked benches. Heavy steps go through the slot runner:
+``data/`` or ``evaluation/gt/`` and never runs the locked benches. Every candidate is decoded at the fixed
+tau = 2 (``katena.eval.d3.TAU``). Heavy steps go through the slot runner:
 
-    heavy.py run --name d3 -- .venv/Scripts/python.exe scripts/run_d3.py tcn --folds 8
+    heavy.py run --name d3 -- .venv/Scripts/python.exe scripts/run_d3.py tcn --folds 8     # screen
     .venv/Scripts/python.exe scripts/run_d3.py score --folds 8
     .venv/Scripts/python.exe scripts/run_d3.py gate --folds 8
-    heavy.py run --name d3 -- .venv/Scripts/python.exe scripts/run_d3.py tcn --folds all
+    heavy.py run --name d3 -- .venv/Scripts/python.exe scripts/run_d3.py tcn --folds all   # gate
     .venv/Scripts/python.exe scripts/run_d3.py score --folds all
-    .venv/Scripts/python.exe scripts/run_d3.py gate --folds all
-    heavy.py run --name d3 -- .venv/Scripts/python.exe scripts/run_d3.py inner      # optional (D3N)
+    .venv/Scripts/python.exe scripts/run_d3.py gate --folds all      # 28 folds, and the 8 IDSSE+Metrica
+    .venv/Scripts/python.exe scripts/run_d3.py curve --folds all     # w = 0.25 / 0.75, information only
+    heavy.py run --name d3 -- .venv/Scripts/python.exe scripts/run_d3.py inner              # optional, D3N
     .venv/Scripts/python.exe scripts/run_d3.py nested
 """
 
@@ -44,12 +46,15 @@ def refs_for(dev: list, folds: str) -> list:
     return S.FOLDS8(dev) if folds == "8" else list(dev)
 
 
-def show_gate(base: Results, res: Results, refs: list, cands: list) -> None:
+def show_gate(base: Results, res: Results, refs: list, cands: list, label: str) -> None:
     T = P.T_MAIN
-    print(f"| candidate | cond | n | candidate mean | M2 mean | mean diff | 95% paired CI | wins | adopted |")
+    print(f"\n{label}: {len(refs)} folds, fixed tau {d3.TAU:g}")
+    print("| candidate | cond | n | candidate mean | M2 mean | mean diff | 95% paired CI | wins | adopted |")
     print("|---|---|---|---|---|---|---|---|---|")
     for cand in cands:
         for c, g in d3.gate(base, res, refs, cand).items():
+            if not g["n"]:
+                continue
             print(f"| {cand} | {c} | {g['n']} | {g['cand_mean']:.4f} | {g['inc_mean']:.4f} | {g['mean_diff']:+.4f} | "
                   f"[{g['lo']:+.4f}, {g['hi']:+.4f}] | {100 * g['win_rate']:.0f}% | {'yes' if g['adopted'] else 'no'} |")
     for cand in cands:                                              # per-dataset means, target-like
@@ -65,10 +70,8 @@ def show_gate(base: Results, res: Results, refs: list, cands: list) -> None:
             parts.append("macroF1 (IDSSE+Metrica) {:.4f} vs {:.4f}".format(
                 np.mean([res.get((cand, T, "target", r.key))["macro_f1"] for r in nd]),
                 np.mean([base.get(("M2", T, "target", r.key))["macro_f1"] for r in nd])))
-        tt = res.get(("tau_table", T, cand, "all"))
-        if tt:
-            parts.append("taus " + ",".join(f"{v:g}" for v in sorted(set(tt["taus"].values()))))
-        print(f"{cand} vs M2 (target): " + "; ".join(parts))
+        if parts:
+            print(f"{cand} vs M2 (target): " + "; ".join(parts))
 
 
 def main() -> None:
@@ -91,9 +94,12 @@ def main() -> None:
     if a.limit:
         refs = refs[:a.limit]
     T = P.T_MAIN
-    store = d3.d3_results(d3.RES_SCREEN if a.folds == "8" else d3.RES_NAME)
+    store = d3.d3_results()
     if a.stage == "gate":
-        show_gate(Results(), store, refs, a.cand)
+        base = Results()
+        show_gate(base, store, refs, a.cand, "all requested folds" if a.folds == "all" else "screen")
+        if a.folds == "all":                                         # D5 audit A18: dead-labelled folds apart
+            show_gate(base, store, S.FOLDS8(refs), a.cand, "IDSSE + Metrica only")
         return
     pools = Pools(dev)
     if a.stage == "proto-m2":                    # a prototype cache has no M2 yet; the real one comes from D5
@@ -102,15 +108,16 @@ def main() -> None:
         B.stage_lomo(pools, dev, "full", T)
         B.decode_and_score(base, pools, dev, "full", T, "viterbi", "M2")
     elif a.stage == "tcn":
-        d3.stage_tcn_lomo(pools, dev, refs, T, seed=a.seed, threads=a.threads, steps=a.steps)
+        d3.stage_tcn_lomo(pools, dev, refs, T, seed=a.seed, threads=a.threads, steps=a.steps,
+                          variant=d3.tcn_variant(a.seed))
     elif a.stage == "score":
-        d3.stage_score(pools, refs, T, res=store)
+        d3.stage_score(pools, refs, T, res=store, seed=a.seed)
     elif a.stage == "curve":                                         # sensitivity only, never a choice
         d3.stage_score(pools, refs, T, weights=(0.25, 0.75), res=store)
     elif a.stage == "inner":
         d3.stage_inner(pools, dev, T, seed=a.seed, threads=a.threads, steps=a.steps)
     elif a.stage == "nested":
-        print("nested choices:", d3.stage_nested(pools, dev, T))
+        print("nested choices:", d3.stage_nested(pools, dev, T, res=store))
 
 
 if __name__ == "__main__":

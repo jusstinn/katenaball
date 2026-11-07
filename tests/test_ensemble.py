@@ -150,7 +150,9 @@ def test_tiny_tcn_is_byte_identical_across_processes():
 @pytest.fixture
 def synth_corpus(tmp_path, monkeypatch):
     """Three synthetic 'metrica' matches whose ids fall in M6-style groups 0, 1, 2 of three; the bake-off
-    cache (features, pools, M2 LOMO probabilities and scores) is built under a temporary work dir."""
+    cache (features, pools, M2 LOMO probabilities, and M2 scores decoded the bake-off way at tau 2) is built
+    under a temporary work dir."""
+    from katena.decode import hmm
     from katena.eval import bakeoff as B
     from katena.eval import corpus as C
     from katena.eval import lomo as Lm
@@ -172,7 +174,12 @@ def synth_corpus(tmp_path, monkeypatch):
     pools = Lm.Pools(refs)
     B.stage_lomo(pools, refs, "full", P.T_MAIN)
     base = Lm.Results(tmp_path / "work" / "results.pkl")
-    B.decode_and_score(base, pools, refs, "full", P.T_MAIN, "viterbi", "M2")
+    for r in refs:
+        oof, pri = Lm.load_oof("full", P.T_MAIN, r), B.priors_for(pools, {r.key}, P.T_MAIN)
+        for c in C.conds_for(r):
+            f = C.load_feat(r, c)
+            rows = hmm.decode(oof[f"pa_{c}"], oof[f"ph_{c}"], f["half"], pri, 2.0, "viterbi")
+            base.put(("M2", P.T_MAIN, c, r.key), Lm.score_rows(r, P.T_MAIN, c, rows, f["idx"]))
     return refs, pools, base
 
 
@@ -196,5 +203,5 @@ def test_gate_pipeline_end_to_end(synth_corpus, tiny_tcn):
     # strictly nested choice on groups of three: one inner pair per group pair, then the outer apply
     d3.stage_inner(pools, refs, T, threads=2, n_groups=3, steps=2)
     choice = d3.stage_nested(pools, refs, T, res=res, n_groups=3)
-    assert set(choice) == {0, 1, 2} and all(c in d3.nested_grid() for c in choice.values())
+    assert set(choice) == {0, 1, 2} and all(w in E.W_GRID for w in choice.values())
     assert all(res.get(("D3N", T, "target", r.key)) for r in refs)
