@@ -12,13 +12,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synth import L, W, make_match
+from synth import L, make_match
 
 import possession_metrics as pm
 from katena.external import idsse, metrica, skillcorner
 from katena.external.common import (derive_speed, infer_attack_dir, infer_attack_dir_gk,
                                     nearest_team_agreement, validate_canonical)
-from katena.types import A, D, H, X, Match, load_match, save_match
+from katena.types import A, D, H, X, load_match, save_match
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
@@ -156,7 +156,7 @@ def test_profile_sandwich_and_official_spells():
 
 def _write_dfl(tmp_path: Path):
     base = datetime(2023, 5, 27, 13, 31, 0, tzinfo=timezone.utc)
-    info = f"""<?xml version="1.0"?><PutDataRequest><MatchInformation>
+    info = """<?xml version="1.0"?><PutDataRequest><MatchInformation>
 <General MatchId="DFL-MAT-TEST" MatchTitle="H:A"/>
 <Environment PitchX="105.00" PitchY="68.00"/>
 <Teams>

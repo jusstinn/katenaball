@@ -13,6 +13,8 @@ Feature groups (used by the ablations):
 ``dead_ball``    dead-ball cues that need the ball: out of bounds, ball stillness, restart geometry.
 ``dead_player``  dead-ball cues from players only: stillness, restart layouts, box and centre counts.
 ``miss``         ball-missingness context (visibility fractions, time since seen).
+``touch``        optional, computed at the native frame rate before downsampling (``touch.py``); only
+                 present when ``featurize`` is given the native ball.
 
 (The package is called ``featurize`` rather than ``features`` because the repository's
 ``.claude/settings.json`` denies access to any path named ``features/``.)
@@ -30,7 +32,7 @@ import pandas as pd
 from katena.external.common import infer_attack_dir
 from katena.types import Match
 
-GROUPS = ("ball", "free", "dead_ball", "dead_player", "miss")
+GROUPS = ("ball", "free", "dead_ball", "dead_player", "miss", "touch")
 FILL_S = 3.0           # linear ball interpolation across gaps up to this long
 BIG = 1e6
 
@@ -139,8 +141,10 @@ class _Cols:
 
 # ----------------------------------------------------------------------------------------------
 
-def featurize(m: Match, focal: int = 0, dirs: dict | None = None) -> Feats:
-    """Features for every in-play sample of ``m`` with team ``focal`` (0 home, 1 away) as focal."""
+def featurize(m: Match, focal: int = 0, dirs: dict | None = None, native=None) -> Feats:
+    """Features for every in-play sample of ``m`` with team ``focal`` (0 home, 1 away) as focal.
+    ``native``: the match's ball at the source frame rate (``touch.NativeBall``); when given, the
+    ``touch`` group is appended after the other groups."""
     dirs = dirs if dirs is not None else infer_dirs(m)
     mats, halves, cols = [], [], None
     for h, a, b in m.half_blocks:
@@ -151,8 +155,12 @@ def featurize(m: Match, focal: int = 0, dirs: dict | None = None) -> Feats:
         mats.append(np.stack(cols.data, 1))
         halves.append(np.full(b - a + 1, h, dtype=np.int8))
     idx = np.concatenate([np.arange(a, b + 1) for _, a, b in m.half_blocks])
-    return Feats(X=np.concatenate(mats, 0).astype(np.float32), names=cols.names,
-                 groups=np.array(cols.groups), idx=idx, half=np.concatenate(halves),
+    X, names, groups = np.concatenate(mats, 0).astype(np.float32), list(cols.names), list(cols.groups)
+    if native is not None:
+        from katena.featurize import touch
+        Xt, tnames, _ = touch.touch_features(m, native, focals=(focal,))
+        X, names, groups = np.concatenate([X, Xt[focal]], 1), names + tnames, groups + [touch.GROUP] * len(tnames)
+    return Feats(X=X, names=names, groups=np.array(groups), idx=idx, half=np.concatenate(halves),
                  meta={"dirs": dirs, "focal": focal})
 
 

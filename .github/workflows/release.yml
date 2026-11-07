@@ -1,0 +1,59 @@
+# CD for a submission candidate (docs/ci.md). Pushing a tag named submission-* re-runs the whole CI
+# on the tagged commit, then publishes a GitHub release note with the commit, the uv.lock sha256 and
+# the synthetic determinism hashes per OS. The release has no assets: hosted CI never sees the match
+# data, so the real submission is only ever built locally from the data bundle.
+name: Release
+
+on:
+  push:
+    tags: ["submission-*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
+  release-note:
+    name: release note
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write       # create the release
+    env:
+      UV_VERSION: "0.13.1"  # recorded in the note; keep in step with ci.yml
+      UV_PYTHON: "3.11.17"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: determinism-*
+          path: ${{ runner.temp }}/hashes
+      - name: Write the release note
+        run: |
+          python3 scripts/release_notes.py --tag "$GITHUB_REF_NAME" --commit "$GITHUB_SHA" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            "$RUNNER_TEMP"/hashes/*/hashes.json > "$RUNNER_TEMP/note.md"
+          cat "$RUNNER_TEMP/note.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the release (note only, no assets)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/note.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/note.md"
+          fi
