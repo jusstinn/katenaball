@@ -85,6 +85,17 @@ majority window) at 5 Hz, scored at T = 2 on the 6 IDSSE development matches
   0.72 / 0.30), because their own ball loss is coupled.
 - `target` and `target_dead15` reproduce bake-off Table 4 exactly.
 
+**The worlds as realised**, means over development matches, from each feature file's degrader record.
+
+- **Overall ball loss.** It stays at 0.41 in every `target` world.
+- **Coupling.** On IDSSE, P(miss | dead) / P(miss | alive) is 0.60 / 0.25 in `target_cpl50` and
+  0.79 / 0.09 in `target_cpl100`. Metrica is already coupled natively (0.81 to 0.84 dead) in every world,
+  because native loss is never reduced. `mild_cpl50` and `mild_cpl100` are the same world: a 20% overall
+  loss caps the dead share at 0.42 / 0.015.
+- **Identity.** `target_ids` has about 50 team-mate and 60 opponent swaps per IDSSE match, with 10% more
+  fragments and the same object count (20.3) and slots (46).
+- **SkillCorner.** It keeps 15.3 objects (audit A19).
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
