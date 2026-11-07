@@ -70,19 +70,33 @@ def main() -> None:
               f"max |dp| = {max(float(np.abs(new[k] - old[k]).max()) for k in old if k in new):.2e}", flush=True)
         return
     folds = S.FOLDS8(dev) if a.stage == "screen" else dev
+    sm = TG.SMOOTH
+    if a.stage == "screen":                                   # evaluation-only smooth-ball world
+        for r in folds:
+            TG.build_extra(r, sm)
+        Lm.timed(f"{sm} features", t0)
     pools = TG.TouchPools(dev)
     print(f"joined pool: {pools.X.shape[0]} rows x {pools.X.shape[1]} columns "
           f"({int((pools.groups == TG.TF.GROUP).sum())} touch)", flush=True)
-    TG.stage_lomo(pools, folds)
+    if a.stage == "screen":
+        TG.stage_lomo(pools, folds, extra=(sm,))
+        TG.stage_lomo(pools, folds, variant="m2refit", drop=(TG.TF.GROUP,), conds=["target", sm])
+    else:
+        TG.stage_lomo(pools, folds)
     del pools
     pri = _Priors(dev)
-    extra = tuple(C.EXTRA_CONDS)
+    conds = B.ALL_CONDS
     if a.stage == "screen":
         B.decode_and_score(res, pri, folds, "full", T, "viterbi", "M2_f8")
-        B.decode_and_score(res, pri, folds, TG.VARIANT, T, "viterbi", "M2T_f8")
+        B.decode_and_score(res, pri, folds, TG.VARIANT, T, "viterbi", "M2T_f8", conds=conds + (sm,))
+        B.decode_and_score(res, pri, folds, "m2refit", T, "viterbi", "M2r_f8", conds=("target", sm))
+        same = all(res.get(("M2r_f8", T, "target", r.key))["spell_f1"] == res.get(("M2_f8", T, "target", r.key))["spell_f1"]
+                   for r in folds)
+        print(f"M2 refit from the joined pool reproduces the cached M2 on all {len(folds)} folds: {same}", flush=True)
         print(TG.summary(res, "M2T_f8", "M2_f8", folds), flush=True)
+        print(TG.summary(res, "M2T_f8", "M2r_f8", folds, conds=(sm,)), flush=True)
     else:
-        B.decode_and_score(res, pri, folds, TG.VARIANT, T, "viterbi", TG.MODEL, extra_conds=extra)
+        B.decode_and_score(res, pri, folds, TG.VARIANT, T, "viterbi", TG.MODEL, extra_conds=tuple(C.EXTRA_CONDS))
         print(TG.summary(res, TG.MODEL, "M2", folds), flush=True)
     Lm.timed(f"{a.stage} done", t0)
 

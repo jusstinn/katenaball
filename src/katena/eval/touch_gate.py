@@ -18,6 +18,7 @@ see the same ball gaps, false detections and jitter.
 
 from __future__ import annotations
 
+import dataclasses
 import time
 
 import numpy as np
@@ -37,6 +38,14 @@ VARIANT = "touch"
 MODEL = "M2T"
 EDGES = (0, 2, 4, 8, 16, 32, 1e9)
 
+# Evaluation-only world, declared before any gate result: the target-like corruption with the same seed
+# (same ball gaps, false detections, fragments, ghosts and player jitter) but no ball jitter. Real native
+# ball tracks (Metrica sample games 1 and 3, SkillCorner) are smooth frame to frame, while the degrader's
+# ball jitter is i.i.d. at 5 Hz; this world checks that the touch group does not depend on the rough one.
+# Models are never trained on it.
+SMOOTH = "target_smoothball"
+EXTRA_EVAL = {SMOOTH: (dataclasses.replace(dg.TARGET, name=SMOOTH, sigma_ball=0.0), "target")}
+
 
 def tpaths(ref: P.Ref) -> dict:
     d = P.WORK
@@ -49,10 +58,30 @@ def corrupted(ref: P.Ref, m, m5, cond: str):
     step = int(m5.meta["step"])
     if cond == "native":
         return m5, np.asarray(m.ball, dtype=np.float32)
-    cfg = C.CONFIG[cond]
-    mc = dg.corrupt(m5, cfg, P.seed_for(ref.id, cond))
-    lifted = TF.lift_ball(m.ball, m5.ball, mc.ball, step, cfg.sigma_ball, P.seed_for(ref.id, cond + "|native"))
+    cfg, seed_cond = EXTRA_EVAL[cond] if cond in EXTRA_EVAL else (C.CONFIG[cond], cond)
+    mc = dg.corrupt(m5, cfg, P.seed_for(ref.id, seed_cond))
+    lifted = TF.lift_ball(m.ball, m5.ball, mc.ball, step, cfg.sigma_ball, P.seed_for(ref.id, seed_cond + "|native"))
     return mc, lifted
+
+
+def build_extra(ref: P.Ref, cond: str = SMOOTH, force: bool = False) -> str:
+    """Base and touch features of an evaluation-only condition, written next to the cached ones in the
+    corpus format (``feat/<key>__<cond>.npz``) so the shared decode and score code can read them."""
+    from katena.featurize.build import featurize, infer_dirs
+    out_b, out_t = C.paths(ref)["feat"](cond), tpaths(ref)["feat"](cond)
+    if not force and out_b.exists() and out_t.exists():
+        return ref.key
+    m = load_match(ref.path)
+    m5 = downsample(m)
+    mc, lifted = corrupted(ref, m, m5, cond)
+    dirs = infer_dirs(mc)
+    f0, f1 = featurize(mc, 0, dirs), featurize(mc, 1, dirs)
+    np.savez(out_b, X0=f0.X, X1=f1.X, idx=f0.idx, half=f0.half, m0=m0_predict(mc), names=np.array(f0.names),
+             groups=f0.groups, dirs=np.array([dirs[h] for h, _, _ in m5.half_blocks]),
+             deg=np.array([mc.meta["degrade"]["ball_missing"], mc.meta["degrade"]["mean_objects"]]))
+    X, names, idx = TF.touch_features(mc, TF.NativeBall(lifted, m.fps, int(m5.meta["step"])))
+    np.savez(out_t, A0=X[0], A1=X[1], idx=idx, names=np.array(names))
+    return ref.key
 
 
 def build_one(ref: P.Ref, force: bool = False, check: bool = True) -> str:
@@ -156,13 +185,16 @@ def run_fold(pools: TouchPools, ref: P.Ref, cols: np.ndarray, variant: str = VAR
     np.savez(out, **arrays)
 
 
-def stage_lomo(pools: TouchPools, folds: list, variant: str = VARIANT, drop=(), T: int = P.T_MAIN) -> None:
+def stage_lomo(pools: TouchPools, folds: list, variant: str = VARIANT, drop=(), T: int = P.T_MAIN,
+               extra: tuple = (), conds: list | None = None) -> None:
+    """LOMO heads on base + touch columns (minus ``drop`` groups); predictions for the corpus conditions of
+    each fold plus ``extra`` ones, or exactly ``conds``."""
     t0 = time.time()
     cols = pools.cols(drop=drop)
     for r in folds:
         if Lm.oof_path(variant, T, r).exists():
             continue
-        run_fold(pools, r, cols, variant, T)
+        run_fold(pools, r, cols, variant, T, conds=list(conds) if conds else C.conds_for(r) + list(extra))
         Lm.timed(f"{variant} fold {r.key}", t0)
 
 
