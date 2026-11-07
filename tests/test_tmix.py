@@ -63,6 +63,18 @@ def test_spell_score_equals_official_spell_f1():
             assert TM.spell_score(gt, pred, sc_mode=sc)["spell_f1"] == pytest.approx(pm.evaluate(gt, p)["spell_f1_mean"], abs=1e-12)
 
 
+def test_fast_spell_overlaps_equal_official():
+    rng = np.random.default_rng(5)
+    for _ in range(100):
+        gt, pr = _random_labels(rng), _random_labels(rng)
+        n = min(len(gt), len(pr))
+        gt, pr = gt[:n], pr[:n]
+        runs = pm.valid_runs(gt)
+        g, p = pm.possession_spells(gt, runs), pm.possession_spells(pm.fill_abstentions(pr, runs), runs)
+        assert TM.spell_overlaps(g, p) == pm.spell_overlaps(g, p)
+    assert TM.spell_overlaps([], [(0, 5, 0)]) == [] and TM.spell_overlaps([(0, 5, 0)], []) == []
+
+
 def test_regret_picks_the_worst_convention():
     means = {("a", "S0"): 0.5, ("a", "S5"): 0.6, ("b", "S0"): 0.45, ("b", "S5"): 0.65}
     rg = TM.regret(means, ["a", "b"], ("S0", "S5"))

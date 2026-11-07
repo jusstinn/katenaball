@@ -191,6 +191,26 @@ def load_ph(mname: str, ref, cond: str, out_dir: Path | None = None) -> np.ndarr
 # ---------------------------------------------------------------------------------------------
 # scoring: the official spellF1 formula, without the transition metrics evaluate() also computes
 
+def spell_overlaps(gt_spells: list, pred_spells: list) -> list:
+    """Same list as ``possession_metrics.spell_overlaps`` (same IoU floats, same order), without
+    the all-pairs loop: spells of one sequence are disjoint and sorted, so the predictions that
+    overlap a ground-truth spell are one contiguous range."""
+    if not gt_spells or not pred_spells:
+        return []
+    ps = np.array([s[0] for s in pred_spells])
+    pe = np.array([s[1] for s in pred_spells])
+    out = []
+    for i, (gs, ge, gc) in enumerate(gt_spells):
+        lo, hi = int(np.searchsorted(pe, gs, "right")), int(np.searchsorted(ps, ge, "left"))
+        for j in range(lo, hi):
+            p0, p1, pc = pred_spells[j]
+            if pc != gc:
+                continue
+            out.append(((min(ge, p1) - max(gs, p0)) / float(max(ge, p1) - min(gs, p0)), i, j))
+    out.sort(key=lambda item: (-item[0], item[1], item[2]))
+    return out
+
+
 def spell_score(gt: np.ndarray, pred: np.ndarray, sc_mode: bool = False) -> dict:
     """``spell_f1`` equal to ``possession_metrics.evaluate(gt, pred)['spell_f1_mean']`` plus the
     per-IoU matching flags the paired bootstrap needs (same keys as ``katena.eval.score.score``)."""
@@ -199,7 +219,7 @@ def spell_score(gt: np.ndarray, pred: np.ndarray, sc_mode: bool = False) -> dict
     runs = pm.valid_runs(gt)
     filled = pm.fill_abstentions(pred, runs)
     gt_sp, pr_sp = pm.possession_spells(gt, runs), pm.possession_spells(filled, runs)
-    ov = pm.spell_overlaps(gt_sp, pr_sp)
+    ov = spell_overlaps(gt_sp, pr_sp)
     flags = np.vstack([pm.matched_gt_flags(ov, len(gt_sp), t) for t in pm.SPELL_IOUS])
     f1s = []
     for row in flags:
