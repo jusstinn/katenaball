@@ -234,7 +234,28 @@ TBD: 28 folds, gate and regret tables.
 
 ## 6. Recommendation
 
-TBD.
+1. **Keep `protocol.T_MAIN = 2` and single-convention training.** Mixing T (MIX) and soft-T
+   augmentation (AUG) lose at the T = 2 gate and raise the worst-case regret. The model's output is
+   already smoother than its training labels (M2 scores 0.569 against S2 but 0.676 against H3.5 on the 8
+   folds), so blurring the team head's targets buys no robustness.
+2. **Do not train on the 3.5 s convention.** Trained on David's labels, the model loses at T = 2 and
+   also against its own ground truth. If the target were 3.5 s-like, T = 2 training would still be the
+   better choice. That is the reconciliation: 3.5 s is a defensible *description* of controlled
+   possession in DFL data; T = 2 is the better *training* convention under it and under the sweep.
+3. **Training at T = 1 is not a reason to move T_MAIN.** It wins at the T = 2 gate on the 8 folds, but
+   doubles the worst-case regret and loses where the written definition points (S5, H3.5, E).
+4. **`tail=True`: not adopted, keep ready.** A tie at T = 2, and better against the smoother conventions
+   on IDSSE. Switch if the organisers answer "no" to question 2 below.
+5. **Metrica stoppages from restarts: not adopted under the rule, but the labels are cleaner.** Neutral
+   on the gate. Adopting it would be a data-quality decision that moves the Metrica development score
+   (M2: 0.643 against the default labels, 0.625 against the restart-rule labels); the team should make
+   it explicitly, not as a score change.
+6. **Ask the organisers (section 7)**, and treat the absolute score as uncertain by about 0.1 from the
+   convention alone: the same M2 predictions score 0.50 (S0) to 0.65 (H3.5) on 28 folds.
+7. **For the technical document:** say we train on per-frame owner labels with opponent touches shorter
+   than 2 s that return to the owner merged, restart possessors kept, dead ball from ball status (IDSSE)
+   or derived from events (Metrica), and that the convention was chosen for robustness, not fitted to
+   the target.
 
 ## 7. Question for the organisers
 
