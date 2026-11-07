@@ -120,7 +120,8 @@ about one possession in eight.
 
 Impact: Metrica is 2 of 28 development folds (and the locked bench), but 24.9% of the alive head's training rows.
 Its D labels teach "dead" on live frames, and the Metrica development score (0.643) is measured against them.
-Table 7's "ball missing on 79% of Metrica dead frames" understates the coupling in that sample.
+Table 7's "ball missing on 79% of Metrica dead frames" understates the coupling in that sample, at least in Game 3
+(the only game with a second labelling).
 **Recommendation (D4):** derive stoppages backwards from restarts, or end a D span when on-ball play resumes,
 and take it through the gate. Do not change it ad hoc: it moves every Metrica number.
 
