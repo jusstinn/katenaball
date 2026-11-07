@@ -6,6 +6,23 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-07
 
+### Screen: F2, two TCN seeds (pre-registration, written before any score)
+
+**Candidate F2.** F with its TCN member replaced by the logit-space mean (`ensemble.blend`, w = 0.5) of two
+TCNs trained identically except for the seed: 0 and 1. Then F2 blends exactly as F does, with the LightGBM
+member at w = 0.5 and Viterbi at tau 2. Nothing else changes: worlds, pool, columns, priors, steps and
+threads are all the same.
+
+**Screen.** The 8 IDSSE + Metrica development folds at `target` and `severe`, LOMO on the 27 other
+development matches (benches excluded), on this Mac. F (seed 0 only) is recomputed here the same way.
+
+**Rule, fixed now.** F2 is promising, and goes to David's 28-fold gate, if at `target` it wins at least 6
+of 8 folds with a paired 95% CI above 0, and it is not worse at `severe` (mean < 0 and CI upper bound < 0).
+Otherwise it is dropped. The screen decides nothing for the submission by itself.
+
+**Side check.** F recomputed here should match David's Windows means on the same 8 folds (target 0.5991,
+severe 0.5426). Any difference is a cross-machine reproducibility finding for J3.
+
 ### J4 gap filling: deprioritised, not run
 
 M2's base features already carry possession across ball gaps:
