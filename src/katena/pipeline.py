@@ -303,6 +303,11 @@ def label_match(model: Model, m, threads: int | None = None) -> tuple[np.ndarray
         "ball_missing_in_halves": round(float(np.isnan(m.ball[inside, 0]).mean()), 4),
         "label_share_in_halves": {k: round(float((codes[inside] == i).mean()), 4) for i, k in enumerate("HADX")},
         "spells_5hz": int(len(edges) + len(np.unique(f0.half))),
+        # Was the start of each half read as dead ball? A half's graded frames can begin before its
+        # kickoff (they are D in the ground truth). Shares over the opening seconds, aggregates only.
+        "d_share_half_opening": {f"half{h}_first{s}s": round(float((codes[a:min(b + 1, a + int(s * m.fps))] == 2)
+                                                                    .mean()), 3)
+                                 for h, a, b in m.half_blocks for s in (60, 120)},
         "touch_events": TF.count_touches(m5, TF.native_ball(m)),
         "seconds": {"features": round(t1 - t0, 1), "models_and_decode": round(time.time() - t1, 1)},
     }

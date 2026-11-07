@@ -6,6 +6,30 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-07
 
+### J4 gap filling: deprioritised, not run
+
+M2's base features already carry possession across ball gaps:
+- `interp_short` fills short gaps.
+- Control and margin windows of 1-6 s (past, future and centred) average over the visible samples.
+- `since_tight` and `until_tight` (30 s cap) and `last_ctrl_sign` / `next_ctrl_sign` hold who last and next
+  controlled the ball.
+- The miss group has the time since and until the ball was seen.
+- D1's touch features hold the last and next touching team.
+
+A J4 gate would need F's TCN out-of-fold probabilities rebuilt on this machine (about 100 min) for a small
+expected gain. We dropped it before computing anything, so no score informed this.
+
+### Public-window check: `scripts/check_public_window.py` (pipeline check only)
+
+It prints PASS/FAIL only, never a score:
+- the official file checks;
+- home/away orientation: swapping H and A must lower team accuracy;
+- frame alignment: shifts of ±5 and ±10 s must lower spellF1;
+- better than the published smooth50 baseline.
+
+A FAIL points at a bug (slot order, home team, offsets), never at tuning. `tests/test_check_public_window.py`
+checks, on public files only, that it catches a swap and a 10 s shift. Log every run here.
+
 ### J2: final pipeline (Justin + Claude, `j2-final-pipeline`)
 
 **What.** `katena.pipeline` and `scripts/make_submission.py` (`make submit`) train candidate F exactly as
@@ -41,7 +65,9 @@ copying anything (corpus, worlds, train, 3 workers) in 18 min.
 
 **Open for the team.**
 - **Kickoff.** The graded second half starts before its kickoff, and those frames are D. F has to find
-  that from the tracking. A kickoff detector must work from the tracking, never from a frame constant.
+  that from the tracking. `predict` reports the D share over the first 60 s and 120 s of each half, an
+  aggregate. If the second half's share is high, F already handles it. If it is low, build a kickoff
+  detector from the tracking, never from a frame constant.
 - **Cross-machine.** The two-machine hash test (J3) compares submission bytes, because torch's last bits
   differ by CPU.
 

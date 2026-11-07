@@ -6,7 +6,7 @@ TEAM ?= katenaball
 OUT  := submissions/$(TEAM).csv
 WORKERS ?= 3
 
-.PHONY: submit external model predict validate test
+.PHONY: submit external model predict validate test check-target check-public
 
 submit: external model predict validate
 
@@ -27,3 +27,14 @@ validate:
 
 test:
 	uv run pytest -q
+
+# Human-run, once the data bundle is in data/ (J1). Every script prints aggregates or pass/fail only.
+check-target:
+	$(PY) scripts/probe_schema.py
+	$(PY) scripts/check_target.py
+	$(PY) scripts/check_target_layout.py
+	$(PY) scripts/check_touch_target.py
+
+# Booleans only; the public window is a pipeline check, never a selector. Log each run in the decision log.
+check-public:
+	$(PY) scripts/check_public_window.py $(OUT)
