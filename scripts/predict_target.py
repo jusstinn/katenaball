@@ -80,6 +80,9 @@ def main(argv=None) -> int:
     ap.add_argument("--synthetic", action="store_true",
                     help="smoke test on a corrupted synthetic match instead of the target")
     ap.add_argument("--synthetic-half-minutes", type=float, default=3.0)
+    ap.add_argument("--external", default=None, metavar="NAME",
+                    help="with --synthetic: use this corrupted external development match instead "
+                         "(full length, for a realistic runtime; labels dropped)")
     args = ap.parse_args(argv)
     t0 = time.time()
 
@@ -97,7 +100,14 @@ def main(argv=None) -> int:
         return 2
 
     if args.synthetic:
-        m = synthetic_target(args.synthetic_half_minutes)
+        if args.external:
+            from katena.model import data as D
+            from katena.noise import corrupt
+            spec = D.eval_spec(args.external)
+            m = corrupt(D.prepare_clean(args.external), spec.cfg, seed=spec.seed)
+            m.y = None
+        else:
+            m = synthetic_target(args.synthetic_half_minutes)
         n_expected = m.n
         out = args.out or os.path.join(tempfile.mkdtemp(prefix="katena_smoke_"), "katenaball_synthetic.csv")
         print("SYNTHETIC smoke test (no competition data is read)")
