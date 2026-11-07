@@ -98,3 +98,56 @@ def test_probe_schema_never_prints_a_data_row(tmp_path, capsys):
     probe_schema.probe_csv_header(str(no_header))
     out = capsys.readouterr().out
     assert "1822.663" not in out and "11185" not in out and "4 fields" in out
+
+
+# --- F: the ATD reader's layout assumptions, checked from the EPTS metadata itself ----------
+
+def _epts_meta(order, n_players=6, n_frames=100) -> str:
+    """FIFA/EPTS metadata whose raw groups follow ``order`` (indices into the <Player> list)."""
+    half = n_players // 2
+    players = "".join(f'<Player id="P{i}" teamId="{"T1" if i < half else "T2"}"><Name>Track {i + 1}</Name>'
+                      f'</Player>' for i in range(n_players))
+    chans = "".join(f'<PlayerChannel id="p{i}_{c}" playerId="P{i}" channelId="{c}"/>'
+                    for i in range(n_players) for c in ("x", "y", "speed"))
+    groups = "".join('<SplitRegister separator=",">' + "".join(
+        f'<PlayerChannelRef playerChannelId="p{i}_{c}"/>' for c in ("x", "y", "speed")) + "</SplitRegister>"
+        for i in order)
+    return (f'<?xml version="1.0"?><main><Metadata><Sessions><Session><MatchParameters>'
+            f'<Score idLocalTeam="T1" idVisitingTeam="T2"/></MatchParameters></Session></Sessions>'
+            f'<Teams><Team id="T1"/><Team id="T2"/></Teams><Players>{players}</Players>'
+            f'<PlayerChannels>{chans}</PlayerChannels></Metadata><DataFormatSpecifications>'
+            f'<DataFormatSpecification startFrame="1" endFrame="{n_frames}" separator=":">'
+            f'<StringRegister name="frameCount"/><SplitRegister separator=";">{groups}</SplitRegister>'
+            f'<SplitRegister separator=","><BallChannelRef channelId="x"/><BallChannelRef channelId="y"/>'
+            f'<BallChannelRef channelId="z"/></SplitRegister></DataFormatSpecification>'
+            f'</DataFormatSpecifications></main>')
+
+
+def test_layout_report_detects_group_order_the_reader_cannot_see(tmp_path):
+    from katena.target.atd import read_slot_teams
+    from katena.target.layout import assumptions_hold, layout_report
+
+    aligned, shuffled = tmp_path / "a.xml", tmp_path / "s.xml"
+    aligned.write_text(_epts_meta([0, 1, 2, 3, 4, 5]), encoding="utf-8")
+    shuffled.write_text(_epts_meta([3, 0, 4, 1, 5, 2]), encoding="utf-8")
+    ra, rs = layout_report(aligned, n_frames=100), layout_report(shuffled, n_frames=100)
+    assert assumptions_hold(ra) and ra["specs_cover_1_to_n"] and ra["first_team_is_local_team"]
+    assert ra["channels_per_group"] == {"x,y,speed": 6} and ra["ball_channels"] == {"x,y,z": 1}
+    assert not assumptions_hold(rs) and rs["group_order_matches_player_elements"] is False
+    # the reader takes teams from <Player> order in both files: right for one, wrong for the other
+    truth_shuffled = [1, 0, 1, 0, 1, 0]                  # teams of raw groups 3, 0, 4, 1, 5, 2
+    assert read_slot_teams(aligned).tolist() == [0, 0, 0, 1, 1, 1]
+    assert read_slot_teams(shuffled).tolist() != truth_shuffled
+    for rep in (ra, rs):                                 # nothing but structure in the report
+        assert not any(s in str(rep) for s in ("P0", "T1", "Track"))
+
+
+def test_layout_report_on_metadata_without_a_format_spec(tmp_path):
+    from katena.target.layout import assumptions_hold, layout_report
+
+    p = tmp_path / "m.xml"
+    p.write_text('<Metadata><Teams><Team id="T1"/><Team id="T2"/></Teams><Players>'
+                 '<Player id="P0" teamId="T1"/><Player id="P1" teamId="T2"/></Players></Metadata>',
+                 encoding="utf-8")
+    rep = layout_report(p, n_frames=10)
+    assert rep["n_format_specs"] == 0 and not assumptions_hold(rep)
