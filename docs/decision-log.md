@@ -248,7 +248,7 @@ matches, including `DFL-MAT-J03WQQ`, which is now the locked IDSSE bench. Only l
 no model was trained, scored or selected on it. The rerun without it moves the pooled estimate from 3.7 s to 3.5 s and
 changes no conclusion.
 
-## 2026-11-07: D1, native-frame-rate touch features (David)
+### D1: native-frame-rate touch features (David)
 
 **What was built.** A new feature group `touch` (53 columns, `src/katena/featurize/touch.py`) computed at the source
 frame rate (25 Hz IDSSE and Metrica, 10 Hz SkillCorner) and aggregated onto the 5 Hz grid. The ball's velocity breaks are
