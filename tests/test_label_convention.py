@@ -245,6 +245,36 @@ def test_read_dfl_situations_and_owner_behaviour(tmp_path):
     assert ce.brief_flip_near(y, fps, np.array([30, 101])).tolist() == [False, True]
 
 
+def test_metrica_restart_stoppages():
+    from katena.external import metrica, metrica_stoppages as ms
+    order = [0]
+
+    def ev(start, end, team, typ, sub=""):
+        order[0] += 1
+        return metrica.Event(1, start, end, team, typ, sub, order[0])
+
+    events = [
+        ev(1, 1, 0, "SET PIECE", "KICK OFF"),
+        ev(10, 20, 0, "PASS"),
+        ev(30, 30, 1, "RECOVERY"),
+        ev(40, 45, 1, "BALL OUT"),               # out at frame 45: dead from 46 (0-based 45)
+        ev(60, 60, 0, "SET PIECE", "THROW IN"),  # restart at 60 (0-based 59)
+        ev(70, 70, 0, "FAULT RECEIVED"),         # trigger ... but play goes on (no restart follows)
+        ev(80, 90, 1, "PASS"),                   # live play after the trigger
+        ev(100, 110, 1, "PASS"),                 # last in-play action before the goal kick, ends at 110
+        ev(130, 130, 0, "BALL LOST", "GOAL KICK"),   # a goal kick tagged BALL LOST: still a restart
+        ev(140, 150, 1, "PASS"),
+    ]
+    y_def, win, _ = metrica.derive_labels(events, 160)
+    y, win_r, st = ms.derive_labels(events, 160)
+    assert win == win_r == [(1, 0, 149)]
+    assert (y[:45] != D).all() and (y[45:59] == D).all() and y[59] == H         # BALL OUT end + 1 .. restart
+    assert (y[79:110] == A).all()                                               # the trigger does not swallow play
+    assert (y[110:129] == D).all() and y[129] == H and (y[139:150] == A).all()  # untagged stoppage before the goal kick
+    assert (y_def[69:129] == D).all() and (y_def[129:150] == D).all()           # default: dead from the foul onwards
+    assert st["stoppages_with_marker"] == 1 and st["stoppages_without_marker"] == 2
+
+
 def test_metrica_actions_from_events():
     E = SimpleNamespace
     ev = [E(type="PASS", start=11, end=20, team=0), E(type="CARRY", start=30, end=40, team=1),

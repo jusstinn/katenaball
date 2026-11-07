@@ -27,7 +27,7 @@ import numpy as np  # noqa: E402
 import possession_metrics as pm  # noqa: E402
 from katena.eval import protocol as P  # noqa: E402
 from katena.external import control_evidence as ce  # noqa: E402
-from katena.external import idsse, metrica  # noqa: E402
+from katena.external import idsse, metrica, metrica_stoppages  # noqa: E402
 from katena.labels import sandwich  # noqa: E402
 from katena.types import load_match  # noqa: E402
 
@@ -262,6 +262,58 @@ def main() -> int:
         print(f"\npooled accuracy-best t = {mev['pooled']['accuracy_best_t']:.1f} s over {mev['n_flips']} flips; "
               f"per game {mev['per_match']}")
         summary["metrica_circular"] = _jsonable(mev)
+
+        # 7. Metrica dead ball: the default trigger rule against stoppages derived from restarts ---
+        print("\n## Metrica dead ball: default trigger rule vs backward-from-restart (D5 audit A3)\n")
+        print("| game | rule | dead share | P(ball missing given D) | P(ball present given alive) | dead span median / p90 s "
+              "| spells (S0) | mean s (S0) | spells (S2) |")
+        print("|---|---|---|---|---|---|---|---|---|")
+        summary["metrica_stoppages"] = {}
+        for r in [r for r in dev if r.dataset == "metrica"]:
+            m = load_match(r.path)
+            gd = P.EXTERNAL / "metrica" / "repo" / "data" / r.id
+            if r.id == "Sample_Game_3":
+                events = metrica._read_json_events(gd / "Sample_Game_3_events.json",
+                                                   metrica._parse_epts_meta(gd / "Sample_Game_3_metadata.xml")["local"])
+            else:
+                events = metrica._read_csv_events(gd / f"{r.id}_RawEventsData.csv")
+            y_def, win_def, _ = metrica.derive_labels(events, m.n)
+            y_r, win_r, st_r = metrica_stoppages.derive_labels(events, m.n)
+            assert np.array_equal(y_def, m.y) and win_def == win_r     # the cached labels are the default rule
+            np.savez_compressed(out_dir / f"metrica_{r.id}__R.npz", y=y_r)
+            miss = ~np.isfinite(m.ball[:, 0])
+            row = {}
+            for rule, yy in (("default", y_def), ("restart", y_r)):
+                g = yy != 3
+                dead, alive = g & (yy == 2), g & (yy < 2)
+                edges = np.diff(np.concatenate(([0], dead.astype(np.int8), [0])))
+                spans = (np.flatnonzero(edges == -1) - np.flatnonzero(edges == 1)) / m.fps
+                s0, s2 = spell_stats(yy, m.fps), spell_stats(convention(yy, m.fps, "S2"), m.fps)
+                row[rule] = {"dead_share": float(dead.sum() / g.sum()), "miss_given_dead": float(miss[dead].mean()),
+                             "present_given_alive": float((~miss[alive]).mean()),
+                             "span_median_s": float(np.median(spans)), "span_p90_s": float(np.percentile(spans, 90)),
+                             "spells_S0": s0["n"], "mean_S0": s0["mean_s"], "spells_S2": s2["n"]}
+                v = row[rule]
+                print(f"| {r.id} | {rule} | {v['dead_share']:.1%} | {v['miss_given_dead']:.3f} | {v['present_given_alive']:.3f} | "
+                      f"{v['span_median_s']:.1f} / {v['span_p90_s']:.1f} | {v['spells_S0']} | {v['mean_S0']:.1f} | {v['spells_S2']} |")
+            both = (y_def != 3) & (y_r != 3)
+            alive2 = both & (y_def < 2) & (y_r < 2)
+            row["agreement"] = float((y_def[both] == y_r[both]).mean())
+            row["alive_dead_agreement"] = float(((y_def[both] == 2) == (y_r[both] == 2)).mean())
+            row["team_agreement_both_alive"] = float((y_def[alive2] == y_r[alive2]).mean())
+            row["spell_f1_one_as_other_S2"] = float(pm.evaluate(convention(y_r, m.fps, "S2"),
+                                                                convention(y_def, m.fps, "S2"))["spell_f1_mean"])
+            flipped = both & (y_def == 2) & (y_r < 2)
+            row["default_dead_restart_alive_frames"] = int(flipped.sum())
+            row["ball_present_on_those"] = float((~miss[flipped]).mean()) if flipped.any() else float("nan")
+            row["stoppages_with_marker"] = st_r["stoppages_with_marker"]
+            row["stoppages_without_marker"] = st_r["stoppages_without_marker"]
+            summary["metrica_stoppages"][r.id] = row
+            print(f"| {r.id} | agreement | frames {row['agreement']:.1%}, alive/dead {row['alive_dead_agreement']:.1%}, "
+                  f"team where both alive {row['team_agreement_both_alive']:.1%}; {row['default_dead_restart_alive_frames']} "
+                  f"frames dead only in the default, ball present on {row['ball_present_on_those']:.0%} of them; spellF1 of one "
+                  f"against the other (S2) {row['spell_f1_one_as_other_S2']:.3f}; stoppages with / without a marker "
+                  f"{row['stoppages_with_marker']} / {row['stoppages_without_marker']} | | | | | | |")
 
     (P.WORK / "label_evidence.json").write_text(json.dumps(summary, indent=1))
     print(f"\nwrote {P.WORK / 'label_evidence.json'} and {len(ids)} event-defined label files")

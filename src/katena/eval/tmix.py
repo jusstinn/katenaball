@@ -15,9 +15,15 @@ Training label schemes (``MODELS``):
   T at which the focal team has the ball, fitted as weighted 0/1 copies of the row with the same
   binary objective (the expected loss over T).
 
-Decoding is M2's: Viterbi, priors fitted on the IDSSE and Metrica training matches' labels in the
-model's own convention (pooled over T for MIX and AUG), tau chosen per fold from the other folds'
-mean spellF1 against the model's own convention(s).
+* ``MR``: the D5 audit's Metrica candidate (finding A3). Metrica's dead ball comes from
+  ``katena.external.metrica_stoppages`` (stoppages derived backwards from restarts) instead of the
+  default trigger rule, then T = 2. It changes D labels, so both heads are refitted (``"both"``).
+  ``S2R`` is the matching ground truth (equal to ``S2`` outside Metrica).
+
+Decoding is M2's: Viterbi with priors fitted on the IDSSE and Metrica training matches' labels in the
+model's own convention (pooled over T for MIX and AUG). tau is fixed at 2 a priori (D5 audit A2: the
+bake-off chose it from folds that saw the held-out match; all 28 chose 2). ``tau=None`` restores the
+per-fold selection.
 """
 
 from __future__ import annotations
@@ -39,12 +45,14 @@ from katena.types import D, X
 CONV = {f"S{T}": dict(T=T) for T in P.T_SWEEP}
 CONV.update({"S2tail": dict(T=2, tail=True), "H3.5": dict(T=3.5, tail=True, order="shortest")})
 EVAL_MAIN = tuple(f"S{T}" for T in P.T_SWEEP)
-EVAL_EXTRA = ("S2tail", "H3.5", "E")             # E (event-defined) exists for IDSSE folds only
+EVAL_EXTRA = ("S2tail", "H3.5", "E", "S2R")      # E: IDSSE folds only; S2R: S2 with Metrica's restart rule
 SWEEP = tuple(f"S{T}" for T in P.T_SWEEP)
 MODELS = {**{f"S{T}": ("single", (f"S{T}",)) for T in P.T_SWEEP},
           "MIX": ("mix", SWEEP), "AUG": ("aug", SWEEP),
-          "H3.5": ("single", ("H3.5",)), "S2tail": ("single", ("S2tail",))}
+          "H3.5": ("single", ("H3.5",)), "S2tail": ("single", ("S2tail",)),
+          "MR": ("both", ("S2R",))}
 CONDS = ("target", "severe")
+TAU = 2.0
 TMIX_DIR = P.WORK / "tmix"
 
 
@@ -74,6 +82,11 @@ class Labels:
             if e.exists():
                 with np.load(e) as z:
                     ys["E"] = z["y"]
+            if r.dataset != "metrica":
+                ys["S2R"] = ys["S2"]
+            elif (e_dir / f"metrica_{r.id}__R.npz").exists():
+                with np.load(e_dir / f"metrica_{r.id}__R.npz") as z:
+                    ys["S2R"] = conv_labels(z["y"], g["fps"], "S2")
             self.y[r.key] = ys
 
     def gt(self, ref, name: str) -> dict | None:
@@ -98,6 +111,8 @@ def pool_labels(pools: Lm.Pools, labels: Labels, name: str, generic: bool = Fals
         return pools.y[int(name[1:])]
     parts = []
     for r in pools.refs:
+        if name not in labels.y[r.key]:
+            raise KeyError(f"{r.key} has no {name} labels (run scripts/label_evidence.py --metrica first)")
         with np.load(C.paths(r)["pool"]) as z:          # the row index only, not the features
             idx = z["idx"]
         parts.append(labels.work(r, name)[idx])
@@ -157,6 +172,26 @@ def fit_fold(pools: Lm.Pools, labels: Labels, ref, models: list, pool_y: dict, d
     for mname in todo:
         kind, names = MODELS[mname]
         ys = [pool_y[n][keep] for n in names]
+        if kind == "both":                           # gbdt.fit_heads on M2's rows, without a copy of the pool
+            y = ys[0]
+            team_rows = np.flatnonzero((y == 0) | (y == 1))
+            alive_rows = np.flatnonzero(pools.dead_ok[keep] & (y < 3))
+            team = lgb.train(gbdt.PARAMS, lgb.Dataset(take(pools.X, keep[team_rows]),
+                                                      (y[team_rows] == o[team_rows]).astype(np.float32),
+                                                      free_raw_data=True), gbdt.N_TREES)
+            alive = lgb.train(gbdt.PARAMS, lgb.Dataset(take(pools.X, keep[alive_rows]),
+                                                       (y[alive_rows] != 2).astype(np.float32),
+                                                       free_raw_data=True), gbdt.N_TREES)
+            arrays = {}
+            for c, f in feats.items():
+                X0, X1 = take(f["X0"]), take(f["X1"])
+                arrays[f"pa_{c}"] = (0.5 * (alive.predict(X0) + alive.predict(X1))).astype(np.float32)
+                arrays[f"ph_{c}"] = (0.5 * (team.predict(X0) + 1.0 - team.predict(X1))).astype(np.float32)
+            path = out_dir / mname / f"{ref.dataset}_{ref.id}.npz"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.savez(path, **arrays)
+            log(f"[{time.strftime('%H:%M:%S')}] {ref.key} {mname} ({time.time() - t0:.0f}s)")
+            continue
         rows, target, weight = team_design(kind, ys, o, draw[keep] if kind == "mix" else None)
         if weight is None:
             if shared is None:
@@ -186,6 +221,15 @@ def load_ph(mname: str, ref, cond: str, out_dir: Path | None = None) -> np.ndarr
         return Lm.load_oof("full", P.T_MAIN, ref)[f"ph_{cond}"]
     with np.load((out_dir or TMIX_DIR / "oof") / mname / f"{ref.dataset}_{ref.id}.npz") as z:
         return z[f"ph_{cond}"]
+
+
+def load_pa(mname: str, ref, cond: str, out_dir: Path | None = None) -> np.ndarray:
+    """The model's own alive head if it refitted one (kind "both"), else M2's."""
+    path = (out_dir or TMIX_DIR / "oof") / mname / f"{ref.dataset}_{ref.id}.npz"
+    if mname != "S2" and MODELS[mname][0] == "both":
+        with np.load(path) as z:
+            return z[f"pa_{cond}"]
+    return Lm.load_oof("full", P.T_MAIN, ref)[f"pa_{cond}"]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -237,20 +281,21 @@ def feat_rows(ref, cond: str) -> dict:
         return {"half": z["half"], "idx": z["idx"]}
 
 
-def decode_scores(pools_labels: Labels, refs: list, mname: str, conds=CONDS, taus=P.TAUS,
-                  evals=EVAL_MAIN + EVAL_EXTRA, log=print) -> dict:
-    """{(cond, eval convention, match key): score} for one model, tau chosen per fold from the other
-    folds in ``refs`` (target cond, mean spellF1 against the model's own conventions)."""
+def decode_scores(pools_labels: Labels, refs: list, mname: str, conds=CONDS, tau: float | None = TAU,
+                  taus=P.TAUS, evals=EVAL_MAIN + EVAL_EXTRA, log=print) -> dict:
+    """{(cond, eval convention, match key): score} for one model. ``tau`` fixed (default 2); with
+    ``tau=None`` it is chosen per fold from the other folds in ``refs`` (target cond, mean spellF1
+    against the model's own conventions), as the bake-off did."""
     _, own = MODELS[mname]
     t0 = time.time()
-    pa = {r.key: Lm.load_oof("full", P.T_MAIN, r) for r in refs}
     feats = {r.key: {c: feat_rows(r, c) for c in conds} for r in refs}
     pri = {r.key: hmm.fit_priors(pools_labels.seqs({r.key}, own)) for r in refs}
+    pa = {r.key: {c: load_pa(mname, r, c) for c in conds} for r in refs}
     ph = {r.key: {c: load_ph(mname, r, c) for c in conds} for r in refs}
 
-    def rows_for(r, c, tau):
+    def rows_for(r, c, t):
         f = feats[r.key][c]
-        return hmm.decode(pa[r.key][f"pa_{c}"], ph[r.key][c], f["half"], pri[r.key], tau, "viterbi")
+        return hmm.decode(pa[r.key][c], ph[r.key][c], f["half"], pri[r.key], t, "viterbi")
 
     def score_rows(r, c, rows, name):
         g = pools_labels.gt(r, name)
@@ -259,17 +304,21 @@ def decode_scores(pools_labels: Labels, refs: list, mname: str, conds=CONDS, tau
         pred = to_native_codes(rows, feats[r.key][c]["idx"], g["step"], g["n_native"])
         return spell_score(g["y"], pred, sc_mode=r.is_sc)
 
-    table = np.zeros((len(taus), len(refs)))
-    for j, r in enumerate(refs):
-        for ti, tau in enumerate(taus):
-            rows = rows_for(r, "target", tau)
-            table[ti, j] = np.mean([score_rows(r, "target", rows, n)["spell_f1"] for n in own])
+    chosen = {r.key: tau for r in refs}
+    if tau is None:
+        table = np.zeros((len(taus), len(refs)))
+        for j, r in enumerate(refs):
+            for ti, t in enumerate(taus):
+                rows = rows_for(r, "target", t)
+                table[ti, j] = np.mean([score_rows(r, "target", rows, n)["spell_f1"] for n in own])
+        for j, r in enumerate(refs):
+            others = np.delete(table, j, axis=1).mean(1) if len(refs) > 1 else table[:, 0]
+            chosen[r.key] = taus[int(np.argmax(others))]
     out = {}
-    for j, r in enumerate(refs):
-        tau = taus[int(np.argmax(np.delete(table, j, axis=1).mean(1)))] if len(refs) > 1 else taus[int(np.argmax(table[:, 0]))]
-        out[("tau", r.key)] = tau
+    for r in refs:
+        out[("tau", r.key)] = chosen[r.key]
         for c in conds:
-            rows = rows_for(r, c, tau)
+            rows = rows_for(r, c, chosen[r.key])
             for name in evals:
                 s = score_rows(r, c, rows, name)
                 if s is not None:
