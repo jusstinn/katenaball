@@ -170,7 +170,7 @@ def _parse_epts_meta(path: Path):
 
 def _read_json_events(path: Path, local: str) -> list[Event]:
     out = []
-    for i, e in enumerate(json.loads(path.read_text())["data"]):
+    for i, e in enumerate(json.loads(path.read_text(encoding="utf-8"))["data"]):
         sub = e["subtypes"]
         if isinstance(sub, dict):
             sub = [sub]
@@ -192,7 +192,7 @@ def build_game3(game_dir: Path) -> Match:
     P = np.full((n_lines, len(all_pids), 2), np.nan)
     ball = np.full((n_lines, 2), np.nan)
     bad_lines = 0
-    with open(game_dir / "Sample_Game_3_tracking.txt") as f:
+    with open(game_dir / "Sample_Game_3_tracking.txt", encoding="utf-8") as f:
         seg_i = 0
         for i, line in enumerate(f):
             fr, pl, bl = line.rstrip("\n").split(":")[:3]

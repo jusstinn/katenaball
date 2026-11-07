@@ -104,7 +104,10 @@ def _git_clone(url: str, commit: str, dest: Path, env_extra: dict | None = None)
     if (dest / ".git").exists():
         return
     env = {**os.environ, **(env_extra or {})}
-    subprocess.run(["git", "clone", "--quiet", url, str(dest)], check=True, env=env)
+    # Byte-exact checkout on every OS: Git for Windows defaults to core.autocrlf=true, which rewrites
+    # LF as CRLF in text files (the Metrica CSVs) and breaks the pinned SHA256 in the manifest.
+    subprocess.run(["git", "clone", "--quiet", "--config", "core.autocrlf=false", "--config", "core.eol=lf",
+                    url, str(dest)], check=True, env=env)
     subprocess.run(["git", "-C", str(dest), "-c", "advice.detachedHead=false", "checkout", "--quiet", commit],
                    check=True, env=env)
 

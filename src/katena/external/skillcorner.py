@@ -40,7 +40,7 @@ def match_ids(root: Path) -> list[str]:
 
 def build_match(match_dir: Path) -> Match:
     mid = match_dir.name
-    mj = json.loads((match_dir / f"{mid}_match.json").read_text())
+    mj = json.loads((match_dir / f"{mid}_match.json").read_text(encoding="utf-8"))
     L, W = float(mj["pitch_length"]), float(mj["pitch_width"])
     home_id = mj["home_team"]["id"]
     # tracking player_id corresponds to ``trackable_object`` in match.json (checked below)
@@ -49,7 +49,7 @@ def build_match(match_dir: Path) -> Match:
     periods = {p["period"]: (p["start_frame"], p["end_frame"]) for p in mj["match_periods"]}
 
     frames, rows = [], []
-    with open(match_dir / f"{mid}_tracking_extrapolated.jsonl") as f:
+    with open(match_dir / f"{mid}_tracking_extrapolated.jsonl", encoding="utf-8") as f:
         for line in f:
             d = json.loads(line)
             frames.append(d["frame"])

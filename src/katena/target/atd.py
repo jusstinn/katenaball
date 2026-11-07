@@ -62,7 +62,7 @@ def read_raw(raw_path: str | Path, n_frames: int, n_slots: int, pitch: tuple[flo
     report = {"n_lines": 0, "n_malformed": 0, "n_out_of_range": 0, "n_duplicate": 0,
               "first_frame_id": None, "last_frame_id": None}
 
-    with open(raw_path) as handle:
+    with open(raw_path, encoding="utf-8") as handle:
         for line in handle:
             report["n_lines"] += 1
             parts = line.strip().split(":")

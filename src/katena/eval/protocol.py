@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-CANON = REPO / "external_data" / "canonical"
-WORK = REPO / "work" / "bakeoff"
+# Optional overrides, so several checkouts can share one corpus and keep separate caches.
+# KATENA_EXTERNAL is the corpus root (what scripts/build_external.py --root writes); unset = <repo>/external_data.
+EXTERNAL = Path(os.environ.get("KATENA_EXTERNAL") or REPO / "external_data")
+CANON = EXTERNAL / "canonical"
+WORK = Path(os.environ.get("KATENA_WORK") or REPO / "work" / "bakeoff")
 
 DATASETS = ("idsse", "metrica", "skillcorner")
 LOCKED_METRICA = "Sample_Game_2"

@@ -149,7 +149,8 @@ def report(label: str, rows: list[dict]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", type=Path, default=REPO / "external_data" / "canonical")
+    ap.add_argument("--root", type=Path,
+                    default=Path(__import__("os").environ.get("KATENA_EXTERNAL") or REPO / "external_data") / "canonical")
     ap.add_argument("--datasets", nargs="+", default=["idsse", "metrica", "skillcorner"])
     ap.add_argument("--x-policy", choices=["break", "ffill"], default="break")
     ap.add_argument("--pooled-only", action="store_true", help="print only the per-dataset pooled rows")

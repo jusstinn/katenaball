@@ -24,7 +24,7 @@ from sklearn.linear_model import LogisticRegression  # noqa: E402
 from katena.grid import block_mask, downsample  # noqa: E402
 from katena.types import D, load_match  # noqa: E402
 
-ROOT = REPO / "external_data" / "canonical"
+ROOT = Path(__import__("os").environ.get("KATENA_EXTERNAL") or REPO / "external_data") / "canonical"
 OUT = REPO / "src" / "katena" / "sim" / "calibration.json"
 
 
