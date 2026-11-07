@@ -240,6 +240,8 @@ def gate(base: Results, d3: Results, refs: list, cand: str, inc: str = "M2", T: 
     out = {}
     for c in conds:
         rr = [r for r in refs if get(cand, c, r) and get(inc, c, r)]
+        if not rr:                      # nothing scored yet (gate before score, or D3N before nested)
+            continue
         bs = paired_bootstrap([get(cand, c, r) for r in rr], [get(inc, c, r) for r in rr])
         bs["adopted"] = adopted(bs)
         bs["cand_mean"] = float(np.mean([get(cand, c, r)["spell_f1"] for r in rr])) if rr else float("nan")

@@ -15,8 +15,9 @@ CPU), ``--save-model`` / ``--load-model`` (the same weights, inference only). Ea
 copies of the probabilities moved by one float32 ulp, with and without rounding, to test whether
 rounding before decoding makes the labels robust. External matches only; never ``data/``.
 
-``synthetic`` needs no data at all: the real TCN and the blend on a synthetic sequence, so CI can run it
-on every OS and ``compare-json`` the hashes across machines (CI's ``synthetic_e2e.py`` covers M2):
+``synthetic`` needs no data at all: the real TCN and the blend on a synthetic sequence, so it can run on
+every OS and ``compare-json`` the hashes across machines (CI's ``synthetic_e2e.py`` covers M2). CI does
+not run it yet, so TCN identity across operating systems is untested:
 
     python scripts/d3_determinism.py synthetic --out tcn_hashes_<os>.json
     python scripts/d3_determinism.py compare-json tcn_hashes_windows.json tcn_hashes_macos.json
