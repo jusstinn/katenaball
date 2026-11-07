@@ -125,7 +125,6 @@ def build_one(ref: P.Ref, force: bool = False, check: bool = True, kind: str = "
     tp["feat"]("x").parent.mkdir(parents=True, exist_ok=True)
     m = load_match(ref.path)
     m5 = downsample(m)
-    step = int(m5.meta["step"])
     rng = np.random.default_rng(P.seed_for(ref.id, "pool"))       # the corpus pool's orientation draws
     pool_A, pool_o, pool_i, names = [], [], [], None
     for c in conds:
