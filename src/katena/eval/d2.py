@@ -374,6 +374,37 @@ def m0_table(refs: list, worlds=M0_WORLDS, t_eval: int = T) -> dict:
     return out
 
 
+# ---------------------------------------------------------------------------------------------
+# reference signatures for the label-free alarm (katena.sim.alarm)
+
+ALARM_WORLDS = ("mild", "target", "severe", "target_dead15", "target_cpl50", "target_cpl100", "target_ids",
+                "target_cpl100_ids")
+
+
+def alarm_reference(refs: list) -> dict:
+    """Signatures of the IDSSE development matches in each world (the ball is never missing natively,
+    so the world alone sets the ball loss), plus Metrica's own tracking (``metrica_native``: its real NaN
+    ball, players uncorrupted; development games only)."""
+    from katena.sim import alarm
+    sigs = {w: [] for w in ALARM_WORLDS + ("metrica_native",)}
+    used = []
+    for r in refs:
+        if r.dataset not in W.DEAD_LABEL_DATASETS:
+            continue
+        used.append(r.key)
+        m5 = downsample(load_match(r.path))
+        if r.dataset == "metrica":
+            sigs["metrica_native"].append(alarm.signature(m5))
+            continue
+        for w in ALARM_WORLDS:
+            cfg = C.CONFIG.get(w) or W.config(w)
+            sigs[w].append(alarm.signature(dg.corrupt(m5, cfg, P.seed_for(r.id, w))))
+    return {"matches": used, "grid_hz": 5.0,
+            "note": "external development matches only (worlds: IDSSE; metrica_native: Metrica); "
+                    "mean, sd, min, max over matches",
+            "worlds": {w: alarm.summarise(s) for w, s in sigs.items() if s}}
+
+
 def save(obj, name: str) -> Path:
     import pickle
     p = root() / name

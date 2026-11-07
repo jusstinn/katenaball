@@ -77,7 +77,7 @@ def _fmt_m0(tab: dict) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=("build", "pools", "lomo", "score", "m0"))
+    ap.add_argument("stage", choices=("build", "pools", "lomo", "score", "m0", "alarm"))
     ap.add_argument("--folds", default="8", help="8 (IDSSE + Metrica), 28 (all development), or match keys")
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--variants", default="cur,d2")
@@ -111,6 +111,16 @@ def main() -> None:
         tab = d2.m0_table(dev)
         d2.save(tab, "m0.pkl")
         print(_fmt_m0(tab))
+    elif a.stage == "alarm":
+        from katena.sim import alarm
+        ref = d2.alarm_reference(dev)
+        alarm.REF_PATH.write_text(json.dumps(ref, indent=1, sort_keys=True) + "\n")
+        keys = alarm.BALL_KEYS + ("objects_mean", "slot_starts_per_min")
+        print("| world | " + " | ".join(keys) + " |")
+        print("|---|" + "---|" * len(keys))
+        for w, st in ref["worlds"].items():
+            print(f"| {w} | " + " | ".join(f"{st[k][0]:.3f} ({st[k][1]:.3f})" for k in keys) + " |")
+        print("wrote", alarm.REF_PATH)
     print(f"[d2] done in {(time.time() - t0) / 60:.1f} min", flush=True)
 
 

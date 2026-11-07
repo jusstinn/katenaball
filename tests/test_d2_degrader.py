@@ -87,9 +87,10 @@ def test_existing_named_configs_have_the_d2_options_off():
 
 # --- a longer synthetic match with real dead spans ----------------------------------------------
 
-def dead_span_match(seed: int = 0, minutes: float = 24.0, fps: float = 5.0) -> Match:
-    """Two halves of alternating possessions and stoppages (dead share about 0.4), 22 moving players,
-    a ball at the carrier's feet while alive and still (or off the pitch) while dead."""
+def dead_span_match(seed: int = 0, minutes: float = 24.0, fps: float = 5.0, dead_speed: float = 1.0) -> Match:
+    """Two halves of alternating possessions and stoppages (dead share about 0.4), 22 moving players
+    (their steps scaled by ``dead_speed`` during stoppages), a ball at the carrier's feet while alive and
+    still while dead."""
     rng = np.random.default_rng(seed)
     half = int(minutes / 2 * 60 * fps)
     n = 2 * half + int(60 * fps)
@@ -99,24 +100,26 @@ def dead_span_match(seed: int = 0, minutes: float = 24.0, fps: float = 5.0) -> M
     P = np.full((n, S, 2), np.nan, dtype=np.float32)
     ball = np.full((n, 2), np.nan, dtype=np.float32)
     y = np.full(n, X, dtype=np.int8)
+    carrier = np.zeros(n, dtype=np.int64)
     for h, a, b in blocks:
-        t = np.arange(a, b + 1)
-        base = np.c_[rng.uniform(10, 95, S), rng.uniform(5, 63, S)]
-        walk = np.cumsum(rng.normal(0, 0.4, (len(t), S, 2)), axis=0)
-        P[t] = np.clip(base[None] + 6 * np.tanh(walk / 6), [0, 0], [105, 68])
         f = a
         while f <= b:
-            alive_len = int(rng.uniform(5, 50) * fps)
-            dead_len = int(rng.uniform(8, 40) * fps)
             code = H if rng.random() < 0.5 else A
-            e = min(b + 1, f + alive_len)
+            e = min(b + 1, f + int(rng.uniform(5, 50) * fps))
             y[f:e] = code
-            carrier = int(rng.integers(0, 11)) + (0 if code == H else 11)
-            ball[f:e] = P[f:e, carrier] + 0.5
-            f, e = e, min(b + 1, e + dead_len)
+            carrier[f:e] = int(rng.integers(0, 11)) + (0 if code == H else 11)
+            f, e = e, min(b + 1, e + int(rng.uniform(8, 40) * fps))
             y[f:e] = D
-            ball[f:e] = ball[f - 1] if f > a else (52.5, 34.0)
             f = e
+        t = np.arange(a, b + 1)
+        base = np.c_[rng.uniform(10, 95, S), rng.uniform(5, 63, S)]
+        step = rng.normal(0, 0.4, (len(t), S, 2)) * np.where(y[t] == D, dead_speed, 1.0)[:, None, None]
+        P[t] = np.clip(base[None] + 6 * np.tanh(np.cumsum(step, axis=0) / 6), [0, 0], [105, 68])
+        for i in t:
+            if y[i] < D:
+                ball[i] = P[i, carrier[i]] + 0.5
+            else:
+                ball[i] = ball[i - 1] if i > a else (52.5, 34.0)
     speed = np.where(np.isfinite(P[..., 0]), 2.0, np.nan).astype(np.float32)
     return Match(P=P, team=team, speed=speed, ball=ball, half_blocks=blocks, attack_dir={1: 1, 2: -1},
                  y=y, pitch=(105.0, 68.0), fps=fps, name="dead_span_synth", source="synthetic", meta={})
