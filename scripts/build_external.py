@@ -59,7 +59,8 @@ def jobs(root: Path, dataset: str):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", type=Path, default=REPO / "external_data")
+    ap.add_argument("--root", type=Path,
+                    default=Path(__import__("os").environ.get("KATENA_EXTERNAL") or REPO / "external_data"))
     ap.add_argument("--datasets", nargs="+", default=["idsse", "metrica", "skillcorner"],
                     choices=["idsse", "metrica", "skillcorner"])
     ap.add_argument("--skip-download", action="store_true")

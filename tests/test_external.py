@@ -307,7 +307,7 @@ def test_skillcorner_parser_on_synthetic(tmp_path):
 
 # --- real data (skipped unless built) ---------------------------------------------------------
 
-CANON = REPO / "external_data" / "canonical"
+CANON = Path(__import__("os").environ.get("KATENA_EXTERNAL") or REPO / "external_data") / "canonical"
 REAL = sorted(CANON.glob("*/*.npz")) if CANON.exists() else []
 
 
