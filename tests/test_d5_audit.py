@@ -79,3 +79,22 @@ def test_code_digest_ignores_crlf(tmp_path, monkeypatch):
     assert bx.code_digest("idsse") == lf == lf_raw
     assert bx.code_digest("idsse", normalise_eol=False) != lf
     assert bx.code_digest("skillcorner") != lf       # still per dataset
+
+
+# --- F: the schema probe must not print a data row when a CSV has no header ------------------
+
+def test_probe_schema_never_prints_a_data_row(tmp_path, capsys):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import probe_schema
+
+    with_header = tmp_path / "h.csv"
+    with_header.write_text("frame,h00,h01,valid\n0,1822.663,-511.2005,1\n", encoding="utf-8")
+    probe_schema.probe_csv_header(str(with_header))
+    assert "columns: frame,h00,h01,valid" in capsys.readouterr().out
+    no_header = tmp_path / "n.csv"
+    no_header.write_text("11185,1822.663,-511.2005,1\n", encoding="utf-8")
+    probe_schema.probe_csv_header(str(no_header))
+    out = capsys.readouterr().out
+    assert "1822.663" not in out and "11185" not in out and "4 fields" in out
