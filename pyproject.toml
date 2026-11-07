@@ -1,0 +1,28 @@
+[project]
+name = "katena"
+version = "0.1.0"
+description = "katenaball: football possession labelling (More than a Hack 2027, Phase 1)"
+requires-python = "==3.11.*"
+dependencies = [
+    "lightgbm==4.7.0",
+    "numba==0.68.1",
+    "numpy==2.2.6",
+    "pandas==2.3.3",
+    "scikit-learn==1.9.1",
+    "scipy==1.17.1",
+    "torch==2.15.0",
+]
+
+[dependency-groups]
+dev = ["pytest==8.4.2"]
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/katena"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "evaluation", "tests"]

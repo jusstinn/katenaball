@@ -74,3 +74,9 @@ external_data/
 *.npy
 *.npz
 *.zip
+
+# bake-off caches: derived from external matches, large
+work/
+
+# a stray submission or frame-level export in the repo root
+/*.csv

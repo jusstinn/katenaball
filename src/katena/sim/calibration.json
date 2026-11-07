@@ -1,0 +1,83 @@
+{
+ "ball_gap_metrica_alive_onset": {
+  "mean_s": 2.3469387755102042,
+  "median_s": 0.2,
+  "mu": -0.6534214004591363,
+  "n": 98,
+  "p90_s": 3.0,
+  "sigma": 1.3480408079958976
+ },
+ "ball_gap_pooled": {
+  "mean_s": 5.880462184873949,
+  "median_s": 3.6,
+  "mu": 1.2908414454419197,
+  "n": 2856,
+  "p90_s": 10.4,
+  "sigma": 0.9532158852631373
+ },
+ "metrica_dead_onset_odds_ratio": 15.884612081475689,
+ "onset_logit_metrica_alive": {
+  "intercept": -7.351933442227809,
+  "onset_rate": 0.0027469579586668668,
+  "per_10mps_ball_speed": 0.6330301263546718,
+  "per_4_congested_players": 2.3657204514715633
+ },
+ "onset_logit_skillcorner": {
+  "intercept": -3.7364123619231946,
+  "onset_rate": 0.010584007901817644,
+  "per_10mps_ball_speed": -0.6567876906075543,
+  "per_4_congested_players": -1.4473700206645839
+ },
+ "player_gap_pooled": {
+  "mean_s": 11.83649026074782,
+  "median_s": 4.0,
+  "mu": 1.4079956916779113,
+  "n": 138563,
+  "p90_s": 24.200000000000003,
+  "sigma": 1.4820736102022416
+ },
+ "sources": {
+  "metrica": {
+   "ball_gap": {
+    "mean_s": 15.788354430379746,
+    "median_s": 9.200000000000001,
+    "mu": 1.6954456153463249,
+    "n": 395,
+    "p90_s": 39.32000000000001,
+    "sigma": 1.863076544202592
+   },
+   "ball_missing_fraction_mean": 0.36719347318216605,
+   "ball_missing_fraction_range": [
+    0.31713384723195515,
+    0.40573814366770156
+   ],
+   "n_hazard_rows": 53389,
+   "p_missing_given_alive_label": 0.023729307046002828,
+   "p_missing_given_dead_label": 0.8142516398330352
+  },
+  "skillcorner": {
+   "ball_gap": {
+    "mean_s": 4.2902072328321825,
+    "median_s": 3.4000000000000004,
+    "mu": 1.2259009143113875,
+    "n": 2461,
+    "p90_s": 8.4,
+    "sigma": 0.6832624265549552
+   },
+   "ball_missing_fraction_mean": 0.19821063696112476,
+   "ball_missing_fraction_range": [
+    0.14615728328865057,
+    0.2462926347009392
+   ],
+   "n_hazard_rows": 352324,
+   "player_gap": {
+    "mean_s": 11.83649026074782,
+    "median_s": 4.0,
+    "mu": 1.4079956916779113,
+    "n": 138563,
+    "p90_s": 24.200000000000003,
+    "sigma": 1.4820736102022416
+   }
+  }
+ }
+}
