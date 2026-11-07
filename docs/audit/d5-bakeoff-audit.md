@@ -127,10 +127,10 @@ and take it through the gate. Do not change it ad hoc: it moves every Metrica nu
 ### A4. X on graded frames at block edges (low; fixed)
 
 `score.to_native_codes` expands 5 Hz predictions by nearest sample. When a half block does not start or end on
-the 5-frame grid, its first or last one or two frames map to a sample outside the block, which is X. Over the 30
-external matches that is 16 graded frames (J03WN1 4, J03WOH, J03WPY, J03WR9, Games 1-2 2 each, Game 3 and
-SkillCorner 1996436 1 each). The target's graded halves happen to sit on the grid (0 frames), but any change of
-blocks in J2 would reintroduce it, and the rule is never to write X on a graded frame.
+the 5-frame grid, its first or last one or two frames map to a sample outside the block, which is X. In the base
+cache that is 14 graded frames over the 30 external matches (J03WN1 3; J03WOH, J03WPY, J03WR9, Games 1 and 2 two
+each; Game 3 one), 12 of them on development folds. The target's graded halves happen to sit on the grid (0
+frames), but any change of blocks in J2 would reintroduce it, and the rule is never to write X on a graded frame.
 
 Fix `5f72876`: `to_native_codes(..., blocks)` clips each frame to the nearest sample inside its own block;
 `score_rows`, the error census and `probe_focus.py` pass the blocks. Re-scoring M2 from the cache: 12 frames
@@ -272,7 +272,7 @@ Read as code; none was run on the match.
 
 20 of the 28 equally weighted folds are SkillCorner, which has no dead-ball label (its null possession is
 ungraded) and 71.7% of the team head's training rows. A change to dead-ball handling cannot show on those folds.
-**Recommendation:** report the 8 IDSSE + Metrica folds beside the 28-fold mean in every gate (M2: 0.568), and gate
+**Recommendation:** report the 8 IDSSE + Metrica folds beside the 28-fold mean in every gate (M2: 0.569), and gate
 dead-ball changes (D2 coupling, J5 tags, J6 cutaways) on those 8.
 
 ### A19. SkillCorner "target-like" is not target-like on players (low; D2)
