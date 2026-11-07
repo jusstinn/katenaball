@@ -36,6 +36,12 @@ first time: 0.5941 against M2's 0.5930.
 [+0.0017, +0.0151], 7/8 at target-like; +0.0104 [+0.0033, +0.0172], 8/8 at severe. The TCN alone does not (+0.0032,
 4/8 at target-like), as in the bake-off: averaging with LightGBM absorbs most of the TCN's seed variance.
 
+**Strictly nested weight (secondary, information).** For each M6 group, w in {0, 0.25, 0.5, 0.75, 1} was chosen on
+inner predictions from LightGBM heads and TCNs trained without that group and without the scored match's own group
+(15 group pairs, 39 min of one slot). The groups chose 0.5, 0.5, 0.75, 0.25, 0.75, 0.5, never w = 0. Applied to the
+LOMO predictions: target-like +0.0044 [+0.0002, +0.0084], 14/28 wins, fail; severe +0.0139 [+0.0095, +0.0183],
+25/28, pass. Choosing the weight inside the folds does not rescue the target-like gate.
+
 **Where the gain is, and where it is not (information).** The TCN makes the ensemble smoother. It predicts fewer
 possessions per true one (IDSSE + Metrica 0.67 against M2's 0.69 at target-like, 0.65 against 0.70 at severe;
 SkillCorner 0.735 against 0.760) and, at target-like, matches more of the possessions over 8 s: it removes false
