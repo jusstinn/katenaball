@@ -200,6 +200,90 @@ def control_labels(y: np.ndarray, rows: np.ndarray, team: np.ndarray, fps: float
 
 
 # ---------------------------------------------------------------------------------------------
+# how the per-frame owner behaves where DFL's own event operators judged possession
+
+def read_dfl_situations(events_path, home_id: str) -> dict:
+    """Events that carry DFL's own judgement of a possession change: ``duel_kept`` and
+    ``duel_changed`` (TacklingGame ``PossessionChange`` false / true; team = winner) and
+    ``clearance`` (OtherBallAction ``DefensiveClearance``; team = clearing side)."""
+    t, kind, team = [], [], []
+    root = ET.parse(str(events_path)).getroot()
+    for ev in root.iter("Event"):
+        when = ev.get("EventTime")
+        if not when:
+            continue
+        ts = datetime.fromisoformat(when).timestamp()
+        for el in ev.iter():
+            if el.tag == "TacklingGame" and el.get("WinnerTeam") and el.get("PossessionChange") in ("true", "false"):
+                t.append(ts)
+                kind.append("duel_changed" if el.get("PossessionChange") == "true" else "duel_kept")
+                team.append(0 if el.get("WinnerTeam") == home_id else 1)
+            elif el.tag == "OtherBallAction" and el.get("DefensiveClearance") == "true" and el.get("Team"):
+                t.append(ts)
+                kind.append("clearance")
+                team.append(0 if el.get("Team") == home_id else 1)
+    return {"t": np.asarray(t, dtype=np.float64), "kind": np.asarray(kind), "team": np.asarray(team, dtype=np.int8)}
+
+
+def brief_flip_near(y: np.ndarray, fps: float, rows: np.ndarray, window_s: float = 1.0,
+                    short_s: float = 2.0) -> np.ndarray:
+    """bool per row: a flip (return or to_dead) shorter than ``short_s`` starts within
+    +-``window_s`` of the row."""
+    starts = np.array(sorted(a for a, b, _, kd in spell_kinds(y) if kd != "restart" and (b - a) < short_s * fps),
+                      dtype=np.int64)
+    w = int(round(window_s * fps))
+    lo = np.searchsorted(starts, rows - w, "left")
+    hi = np.searchsorted(starts, rows + w, "right")
+    return (hi - lo) > 0
+
+
+def owner_behaviour(y: np.ndarray, fps: float, rows: np.ndarray, kind: np.ndarray, team: np.ndarray,
+                    seed: int = 0) -> dict:
+    """Aggregates on one match (rows already aligned, -1 = off grid):
+
+    * ``duel_kept_flip``: share of duels DFL scored as *no* possession change that have a brief
+      flip in the tracking owner within +-1 s; ``base_flip``: the same share at random alive frames.
+    * ``duel_changed_winner``: share of duels scored as a possession change after which (2 s on) the
+      owner is the winner's team.
+    * ``clearance_out_flip``: of clearances followed by dead ball within 3 s, the share whose last
+      spell before the dead ball is a brief (< 2 s) flip of the clearing team.
+    """
+    alive = (y == H) | (y == A)
+    ok = (rows >= 0) & (rows < len(y))
+    ok[ok] = alive[rows[ok]]
+    out = {}
+    dk = ok & (kind == "duel_kept")
+    out["n_duel_kept"] = int(dk.sum())
+    out["duel_kept_flip"] = float(brief_flip_near(y, fps, rows[dk]).mean()) if dk.any() else float("nan")
+    rng = np.random.default_rng(seed)
+    rand = rng.choice(np.flatnonzero(alive), size=2000, replace=True)
+    out["base_flip"] = float(brief_flip_near(y, fps, rand).mean())
+    dc = ok & (kind == "duel_changed")
+    later = np.minimum(rows + int(2 * fps), len(y) - 1)
+    good = dc & alive[np.where(dc, later, 0)]
+    out["n_duel_changed"] = int(good.sum())
+    out["duel_changed_winner"] = float((y[later[good]] == team[good]).mean()) if good.any() else float("nan")
+    flips = spell_kinds(y)
+    n_out, n_flip = 0, 0
+    for r, k, c in zip(rows, kind, team):
+        if k != "clearance" or r < 0:
+            continue
+        seg = y[r:r + int(3 * fps)]
+        dead = np.flatnonzero(seg == D)
+        if not len(dead):
+            continue
+        n_out += 1
+        d0 = r + int(dead[0])
+        last = [f for f in flips if f[1] == d0]                  # the spell that ends at the dead ball
+        if last and last[0][3] == "to_dead" and last[0][2] == (H if c == 0 else A) \
+                and (last[0][1] - last[0][0]) < 2 * fps:
+            n_flip += 1
+    out["n_clearance_out"] = n_out
+    out["clearance_out_flip"] = n_flip / n_out if n_out else float("nan")
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
 # thresholds
 
 GRID = np.round(np.arange(0.2, 8.01, 0.1), 2)

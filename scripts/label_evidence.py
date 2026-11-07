@@ -56,8 +56,11 @@ def idsse_match(ref) -> dict:
     t0 = datetime.fromisoformat(m.meta["t0_utc"]).timestamp()
     rows, diag = ce.align_dfl(m.y, t0, m.fps, acts)
     ctrl = np.isin(acts["tag"], ce.CONTROL_TAGS)
+    sit = ce.read_dfl_situations(files["events"], home)
+    srows = np.rint((sit["t"] - t0) * m.fps).astype(np.int64) + int(round(diag["shift_s"] * m.fps))
+    srows = np.where((srows >= 0) & (srows < m.n), srows, -1)
     out = {"name": ref.id, "fps": m.fps, "y": m.y, "rows": rows, "team": acts["team"], "diag": diag,
-           "keep": ctrl, "keep_strict": ctrl & acts["done"]}
+           "keep": ctrl, "keep_strict": ctrl & acts["done"], "sit": {**sit, "rows": srows}}
     return out
 
 
@@ -174,8 +177,37 @@ def main() -> int:
         print(f"| {name} | {row['n']:.0f} | {row['mean_s']:.1f} | {row['median_s']:.1f} | {row['lt2']:.1%} | "
               f"{row['to_dead_lt2_per_match']:.1f} |")
 
+    # 4. what the per-frame owner does where DFL's event operators judged possession -------------
+    print("\n## DFL per-frame owner around events DFL itself scored (IDSSE dev, pooled)\n")
+    print("| labels | duels scored 'no possession change' with a brief owner flip within 1 s | same at random "
+          "alive frames | duels scored 'possession change': owner = winner 2 s later | clearances going dead "
+          "within 3 s: brief flip to the clearing team just before |")
+    print("|---|---|---|---|---|")
+    summary["owner_behaviour"] = {}
+    for name in ("S0", "S2", "S5", "S2tail", "H3.5", "E"):
+        acc = {}
+        for d in ids:
+            if name == "E":
+                yc = np.load(out_dir / f"idsse_{d['name']}__E.npz")["y"]
+            else:
+                yc = convention(d["y"], d["fps"], name)
+            ob = ce.owner_behaviour(yc, d["fps"], d["sit"]["rows"], d["sit"]["kind"], d["sit"]["team"])
+            for k, v in ob.items():
+                acc.setdefault(k, []).append(v)
+        w = {k: np.asarray(v, dtype=float) for k, v in acc.items()}
+        row = {"duel_kept_flip": float(np.average(w["duel_kept_flip"], weights=w["n_duel_kept"])),
+               "base_flip": float(w["base_flip"].mean()),
+               "duel_changed_winner": float(np.average(w["duel_changed_winner"], weights=w["n_duel_changed"])),
+               "clearance_out_flip": float(np.average(w["clearance_out_flip"], weights=w["n_clearance_out"])),
+               "n_duel_kept": int(w["n_duel_kept"].sum()), "n_duel_changed": int(w["n_duel_changed"].sum()),
+               "n_clearance_out": int(w["n_clearance_out"].sum())}
+        summary["owner_behaviour"][name] = row
+        print(f"| {name} | {row['duel_kept_flip']:.2f} (n={row['n_duel_kept']}) | {row['base_flip']:.2f} | "
+              f"{row['duel_changed_winner']:.2f} (n={row['n_duel_changed']}) | {row['clearance_out_flip']:.2f} "
+              f"(n={row['n_clearance_out']}) |")
+
     if a.metrica:
-        mts = [metrica_match(r) for r in dev if r.dataset == "metrica"]
+        mts =[metrica_match(r) for r in dev if r.dataset == "metrica"]
         mev = evidence(mts, ("return", "to_dead"))["derived"]
         print("\n## Metrica development games (labels derived from the same events: circular)\n")
         print(fmt_bins(mev["by_bin"]))

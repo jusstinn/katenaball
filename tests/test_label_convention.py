@@ -224,6 +224,27 @@ def test_read_dfl_actions(tmp_path):
     assert acts["t"][1] - acts["t"][0] == pytest.approx(1.0)
 
 
+def test_read_dfl_situations_and_owner_behaviour(tmp_path):
+    xml = """<?xml version="1.0" encoding="utf-8"?><PutDataRequest>
+    <Event EventTime="2023-05-27T15:30:15.000+02:00"><TacklingGame WinnerTeam="AWAY" PossessionChange="false"/></Event>
+    <Event EventTime="2023-05-27T15:30:20.000+02:00"><TacklingGame WinnerTeam="AWAY" PossessionChange="true"/></Event>
+    <Event EventTime="2023-05-27T15:30:25.000+02:00"><OtherBallAction Team="AWAY" DefensiveClearance="true"/></Event>
+    <Event EventTime="2023-05-27T15:30:26.000+02:00"><OtherBallAction Team="AWAY"/></Event>
+    </PutDataRequest>"""
+    p = tmp_path / "events.xml"
+    p.write_text(xml, encoding="utf-8")
+    sit = ce.read_dfl_situations(p, "HOME")
+    assert sit["kind"].tolist() == ["duel_kept", "duel_changed", "clearance"] and sit["team"].tolist() == [1, 1, 1]
+    fps = 10.0
+    # H 0-99 | A 100-104 (brief flip at the kept duel) | H 105-199 | A 200-244 | H 245-249 (tail) | A 250-254 | D
+    y = _seq([(H, 100), (A, 5), (H, 95), (A, 45), (H, 5), (A, 5), (D, 20)])
+    rows = np.array([101, 200, 251])
+    ob = ce.owner_behaviour(y, fps, rows, sit["kind"], sit["team"])
+    assert ob["duel_kept_flip"] == 1.0 and ob["duel_changed_winner"] == 1.0
+    assert ob["n_clearance_out"] == 1 and ob["clearance_out_flip"] == 1.0
+    assert ce.brief_flip_near(y, fps, np.array([30, 101])).tolist() == [False, True]
+
+
 def test_metrica_actions_from_events():
     E = SimpleNamespace
     ev = [E(type="PASS", start=11, end=20, team=0), E(type="CARRY", start=30, end=40, team=1),
