@@ -151,3 +151,48 @@ def test_layout_report_on_metadata_without_a_format_spec(tmp_path):
                  encoding="utf-8")
     rep = layout_report(p, n_frames=10)
     assert rep["n_format_specs"] == 0 and not assumptions_hold(rep)
+
+
+# --- ported from david/foundation: the domain-gap alarm (aggregates only, fits nothing) ------
+
+def _gap_fixture():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import check_domain_gap as cdg
+    from katena.sim import degrade as dg
+    clean = [cdg.synthetic_clean(s, half_s=240.0) for s in (1, 2, 3)]
+    return cdg, dg, clean
+
+
+def test_domain_gap_separates_worlds_and_not_seeds():
+    import dataclasses
+
+    from katena.diag import domain_gap as gapmod
+    cdg, dg, clean = _gap_fixture()
+    real = dg.corrupt(clean[0], dg.TARGET, seed=5)
+    same = [dg.corrupt(clean[0], dg.TARGET, seed=6)]               # same match and world, other seed
+    clean_side = [clean[0]]                                         # same match, no corruption
+    r_same = gapmod.domain_gap(real, same)
+    r_far = gapmod.domain_gap(real, clean_side)
+    assert 0.25 < r_same["auc"] < 0.75
+    assert r_far["auc"] > 0.95
+    assert tuple(r_far) == gapmod.RESULT_KEYS
+    assert all(name in gapmod.FEATURE_NAMES for name, _ in r_far["top_features"])
+    # deterministic, and blind to labels
+    assert gapmod.domain_gap(real, clean_side) == r_far
+    assert gapmod.domain_gap(dataclasses.replace(real, y=None), clean_side) == r_far
+
+
+def test_domain_gap_module_fits_nothing_to_its_input():
+    from katena.diag import domain_gap as gapmod
+    public = [n for n in dir(gapmod) if not n.startswith("_") and callable(getattr(gapmod, n))]
+    assert set(public) <= {"domain_gap", "window_features", "Match", "annotations"}
+    cdg, dg, clean = _gap_fixture()
+    with __import__("pytest").raises(ValueError):                    # grids must match
+        gapmod.domain_gap(clean[0], [dataclasses_replace_fps(clean[1], 25.0)])
+
+
+def dataclasses_replace_fps(m, fps):
+    import dataclasses
+    return dataclasses.replace(m, fps=fps)
