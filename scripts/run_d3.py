@@ -79,16 +79,17 @@ def main() -> None:
     if a.limit:
         refs = refs[:a.limit]
     T = P.T_MAIN
+    store = d3.d3_results(d3.RES_SCREEN if a.folds == "8" else d3.RES_NAME)
     if a.stage == "gate":
-        show_gate(Results(), d3.d3_results(), refs, a.cand)
+        show_gate(Results(), store, refs, a.cand)
         return
     pools = Pools(dev)
     if a.stage == "tcn":
         d3.stage_tcn_lomo(pools, dev, refs, T, seed=a.seed, threads=a.threads)
     elif a.stage == "score":
-        d3.stage_score(pools, refs, T)
+        d3.stage_score(pools, refs, T, res=store)
     elif a.stage == "curve":                                         # sensitivity only, never a choice
-        d3.stage_score(pools, refs, T, weights=(0.25, 0.75))
+        d3.stage_score(pools, refs, T, weights=(0.25, 0.75), res=store)
     elif a.stage == "inner":
         d3.stage_inner(pools, dev, T, seed=a.seed, threads=a.threads)
     elif a.stage == "nested":

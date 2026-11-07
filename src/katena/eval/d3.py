@@ -33,12 +33,13 @@ from katena.models import ensemble as E
 
 VAR_TCN = "tcn_d3"                     # LOMO TCN probabilities, deterministic configuration
 N_GROUPS = 6
-RES_NAME = "d3_results.pkl"
+RES_NAME = "d3_results.pkl"            # the 28-fold gate
+RES_SCREEN = "d3_screen.pkl"           # the 8-fold screen (tau chosen among those 8 folds, as for M5)
 GATE_CONDS = ("target", "severe")
 
 
-def d3_results() -> Results:
-    return Results(P.WORK / RES_NAME)
+def d3_results(name: str = RES_NAME) -> Results:
+    return Results(P.WORK / name)
 
 
 def _save(out, arrays: dict) -> None:
