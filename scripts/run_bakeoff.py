@@ -28,13 +28,33 @@ from katena.eval.lomo import Pools, Results, timed  # noqa: E402
 import time  # noqa: E402
 
 
+CACHE_MARKERS = {"results.pkl", "feat", "pool", "gt", "oof"}      # what a bake-off cache holds
+
+
+def wipe_refusal(work: Path) -> str | None:
+    """Why ``--fresh`` must not delete ``work``, or None. KATENA_WORK can point anywhere, so only an empty
+    directory or one that looks like a bake-off cache is deleted, never one holding the corpus or the repo."""
+    work = work.resolve()
+    for name, other in (("the external corpus", P.EXTERNAL), ("the repository", REPO)):
+        other = other.resolve()
+        if work == other or work in other.parents:
+            return f"{work} contains {name} ({other})"
+    entries = {e.name for e in work.iterdir()}
+    if entries and not entries & CACHE_MARKERS:
+        return f"{work} does not look like a bake-off cache (none of {sorted(CACHE_MARKERS)})"
+    return None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--fresh", action="store_true", help="delete work/bakeoff first")
+    ap.add_argument("--fresh", action="store_true", help="delete the bake-off cache (KATENA_WORK) first")
     ap.add_argument("--skip", nargs="*", default=[], help="stages to skip: tcn m6 sweep bench")
     ap.add_argument("--workers", type=int, default=6)
     a = ap.parse_args()
     if a.fresh and P.WORK.exists():
+        why = wipe_refusal(P.WORK)
+        if why:
+            sys.exit(f"--fresh refused: {why}")
         shutil.rmtree(P.WORK)
     P.WORK.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
