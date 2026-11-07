@@ -90,6 +90,23 @@ def test_lift_ball_downsamples_to_the_5hz_corruption():
     np.testing.assert_array_equal(same, m.ball)
 
 
+def test_lift_ball_keeps_bursts_closed_over_samples_missing_at_the_source():
+    m = make_match()                                                      # NaN on some native frames
+    m5 = downsample(m)
+    for cfg in (dg.TARGET, dg.SEVERE):
+        mc = dg.corrupt(m5, cfg, 3)
+        lift = T.lift_ball(m.ball, m5.ball, mc.ball, 5, cfg.sigma_ball, 1)
+        np.testing.assert_array_equal(lift[::5], mc.ball)
+        c_ok, k_ok = np.isfinite(m5.ball[:, 0]), np.isfinite(mc.ball[:, 0])
+        dropped = c_ok & ~k_ok
+        inside = ~c_ok
+        inside[1:-1] &= dropped[:-2] & dropped[2:]
+        inside[[0, -1]] = False
+        assert inside.any()                                               # the fixture exercises the case
+        anc = np.minimum((np.arange(m.n) + 2) // 5, m5.n - 1)
+        assert not np.isfinite(lift[inside[anc], 0]).any(), cfg.name
+
+
 def test_touch_rows_align_and_featurize_appends_the_group():
     m = make_match()
     m5 = downsample(m)

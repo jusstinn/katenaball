@@ -102,6 +102,8 @@ a runtime, the feature shape and two jitter statistics of the real ball, next to
 development match in the target-like, smooth-ball and severe worlds. It is an alarm for which jitter world the target
 resembles, never a selector.
 
+**Correction (review, after the gate).** `touch.lift_ball` let the ball reappear inside a simulated loss burst on the native frames of a sample that was already missing at the source (Metrica and SkillCorner; IDSSE never misses the ball natively). Such a sample now counts as dropped when the nearest source-visible samples on both sides were dropped. The numbers above predate the fix and were not re-run, since the group is not adopted; the touch cache is keyed on the hash of `touch.py`, so any new run rebuilds it.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on

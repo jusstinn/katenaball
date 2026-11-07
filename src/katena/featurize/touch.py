@@ -88,7 +88,9 @@ def lift_ball(ball_native: np.ndarray, ball5_clean: np.ndarray, ball5_corrupt: n
     frames around each sample (the frames whose nearest sample it is):
 
     * a sample the degrader dropped (finite in ``ball5_clean``, NaN in ``ball5_corrupt``) drops all its
-      native frames, so bursts keep their durations;
+      native frames, so bursts keep their durations; so does a sample already missing at the source
+      whose nearest source-visible samples on both sides were dropped (it sits inside a burst, and its
+      native frames must not show the ball in the middle of it);
     * a false detection (moved further than any jitter could, ``> max(2, 4 sqrt(2) sigma)`` m) is held
       at its position on its native frames, as the degrader holds it over its samples;
     * every other visible native frame gets the clean native position plus i.i.d. N(0, sigma^2) jitter
@@ -111,6 +113,12 @@ def lift_ball(ball_native: np.ndarray, ball5_clean: np.ndarray, ball5_corrupt: n
     clean_ok = np.isfinite(c5[:, 0])
     vis = np.isfinite(k5[:, 0])
     dropped = clean_ok & ~vis
+    i5 = np.arange(n5)
+    left = np.maximum.accumulate(np.where(clean_ok, i5, -1))                # last source-visible <= i
+    right = np.minimum.accumulate(np.where(clean_ok, i5, n5)[::-1])[::-1]   # next source-visible >= i
+    inside = ~clean_ok & (left >= 0) & (right < n5)
+    inside[inside] = dropped[left[inside]] & dropped[right[inside]]
+    dropped = dropped | inside
     delta = np.where((clean_ok & vis)[:, None], k5 - c5, 0.0)
     tol = max(2.0, 4.0 * np.sqrt(2.0) * float(sigma))
     false = clean_ok & vis & (np.hypot(delta[:, 0], delta[:, 1]) > tol)
