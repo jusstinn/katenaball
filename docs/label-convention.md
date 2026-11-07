@@ -92,7 +92,9 @@ run. Restart spells are still kept. `order="shortest"` merges the shortest flip 
 ### David's control evidence, rerun without the locked bench
 
 `katena.external.control_evidence` ports David's tool to `katena.types.Match` and Justin's loaders. It
-reproduces his per-match numbers exactly (flip counts, clock shifts, agreement, best t). A flip is a
+reproduces his per-match flip counts, clock shifts, Play-team agreement and per-match best t exactly;
+two held-out accuracies differ in the third decimal (the two loaders map event times to frames
+differently by up to a frame, and the leave-one-out pool no longer holds the bench). A flip is a
 spell that starts straight from the other team's spell. It has control evidence when its team makes a
 DFL `Play`, `ShotAtGoal` or `BallClaiming` during it (plus or minus 0.4 s, after a per-match clock
 shift). Six IDSSE development matches:

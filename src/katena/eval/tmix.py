@@ -211,6 +211,12 @@ def spell_score(gt: np.ndarray, pred: np.ndarray, sc_mode: bool = False) -> dict
     return {"spell_f1": float(np.mean(f1s)), "n_gt": len(gt_sp), "n_pred": len(pr_sp), "flags": flags}
 
 
+def feat_rows(ref, cond: str) -> dict:
+    """``half`` and ``idx`` of a cached feature file, without loading the features."""
+    with np.load(C.paths(ref)["feat"](cond)) as z:
+        return {"half": z["half"], "idx": z["idx"]}
+
+
 def decode_scores(pools_labels: Labels, refs: list, mname: str, conds=CONDS, taus=P.TAUS,
                   evals=EVAL_MAIN + EVAL_EXTRA, log=print) -> dict:
     """{(cond, eval convention, match key): score} for one model, tau chosen per fold from the other
@@ -218,7 +224,7 @@ def decode_scores(pools_labels: Labels, refs: list, mname: str, conds=CONDS, tau
     _, own = MODELS[mname]
     t0 = time.time()
     pa = {r.key: Lm.load_oof("full", P.T_MAIN, r) for r in refs}
-    feats = {r.key: {c: C.load_feat(r, c) for c in conds} for r in refs}
+    feats = {r.key: {c: feat_rows(r, c) for c in conds} for r in refs}
     pri = {r.key: hmm.fit_priors(pools_labels.seqs({r.key}, own)) for r in refs}
     ph = {r.key: {c: load_ph(mname, r, c) for c in conds} for r in refs}
 
