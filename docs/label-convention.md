@@ -21,12 +21,22 @@ benches (`DFL-MAT-J03WQQ`, `Sample_Game_2`) are excluded from every number here,
 - **External data cannot identify the target's convention.** No external dataset is labelled by the
   corrected-tracking process behind the ground truth. The written definition is qualitative, and the
   public window may not be used to choose. Perfect labels in one plausible convention score only
-  0.58-0.94 spellF1 against another, so the convention alone moves the absolute score by about 0.1.
+  0.58-0.94 spellF1 against another, and the same M2 predictions score 0.495 to 0.653 across the
+  conventions (28 folds): the convention alone moves the absolute score by about 0.15.
 - **Metrica's dead ball runs long** (D5 audit A3, confirmed): main's rule keeps D through live play
   after a trigger and misses goal kicks tagged BALL LOST. David's backward-from-restart rule makes the
   ball missing on 99.1% of Game 3's dead frames (main: 88.0%). Tested as candidate `MR`, section 5.
-- **Training across T:** see section 5. TBD.
-- **Recommendation:** TBD. Keep `protocol.T_MAIN = 2` until then.
+- **Training across T does not pass the gate.** Mixing T per row (MIX) ties M2 at T = 2 on 28 folds and
+  lowers the worst-case regret there (0.006 against 0.009), but loses on the 8 IDSSE + Metrica folds
+  (-0.006, 1 win in 8) where its regret is more than double M2's. Soft labels over T (AUG) lose
+  everywhere. Training on David's 3.5 s labels loses at T = 2 (-0.008 on 28 folds) and barely helps
+  even against its own ground truth.
+- **Two near-misses to flag.** The `tail` option has the lowest worst-case regret on 28 folds (0.004)
+  and the best scores against S3, H3.5 and E, but misses the gate (+0.0024, 68% wins, interval touches
+  zero). Training at T = 1 *passes* the gate at T = 2 (+0.0034 [+0.0005, +0.0062], 79% wins on 28;
+  also on the 8), at a slightly higher worst-case regret (0.011 against 0.009).
+- **Recommendation:** keep `protocol.T_MAIN = 2` and single-T training; keep `tail` and the Metrica
+  restart rule as options; ask the organisers the question in section 7. Section 6 has the reasons.
 
 ## 1. What the upstream documents say
 
@@ -213,13 +223,79 @@ has no dead ball and splits spells at X.
 by less than 0.004 (28 folds), so a known target convention would have to be matched through the
 training labels, not the decoder.
 
-### Results: 8 IDSSE + Metrica folds (screen), target-like, tau = 2
+### Results, target-like, tau = 2 (`label_tmix.py --summary`)
 
-Mean spellF1; rows are the training scheme, columns the evaluation convention (E: 6 IDSSE folds).
+All 28 development folds; mean spellF1, rows the training scheme, columns the evaluation convention
+(E: the 6 IDSSE folds). Bold: best in the column.
 
 | Train \ eval | S0 | S1 | S2 | S3 | S5 | S2tail | H3.5 | E |
 |---|---|---|---|---|---|---|---|---|
-| S0 | 0.468 | 0.508 | 0.573 | 0.618 | 0.629 | 0.607 | 0.673 | 0.686 |
+| S0 | 0.499 | 0.539 | 0.588 | 0.618 | 0.631 | 0.608 | 0.651 | 0.686 |
+| S1 | **0.500** | **0.541** | **0.590** | 0.619 | 0.632 | **0.610** | 0.654 | 0.683 |
+| **S2 = M2** | 0.495 | 0.536 | 0.586 | 0.618 | 0.634 | 0.607 | 0.653 | 0.686 |
+| S3 | 0.491 | 0.532 | 0.584 | 0.619 | 0.640 | 0.605 | 0.656 | 0.679 |
+| S5 | 0.472 | 0.513 | 0.567 | 0.606 | **0.642** | 0.590 | 0.649 | 0.659 |
+| MIX | 0.494 | 0.535 | 0.586 | 0.619 | 0.639 | 0.607 | 0.656 | 0.680 |
+| AUG | 0.490 | 0.531 | 0.581 | 0.615 | 0.636 | 0.602 | 0.652 | 0.678 |
+| H3.5 | 0.485 | 0.526 | 0.578 | 0.613 | 0.641 | 0.602 | 0.657 | 0.678 |
+| S2tail | 0.497 | 0.538 | 0.589 | **0.621** | 0.638 | **0.610** | **0.658** | **0.692** |
+| MR | 0.496 | 0.537 | 0.586 | 0.618 | 0.635 | 0.607 | 0.653 | 0.691 |
+
+**Gate** against M2 at T = 2 ground truth (MR at S2R, its own Metrica labels), paired bootstrap over
+possessions, 2000 draws. Passing needs wins on at least 70% of folds and an interval above zero.
+
+| Candidate | 8 IDSSE + Metrica | 28 folds | 20 SkillCorner | Passes |
+|---|---|---|---|---|
+| MIX | -0.0058 [-0.0110, -0.0009], 12% | -0.0001 [-0.0030, +0.0031], 43% | +0.0022 [-0.0017, +0.0061], 55% | no |
+| AUG | -0.0111 [-0.0165, -0.0057], 0% | -0.0050 [-0.0080, -0.0020], 21% | -0.0025 [-0.0063, +0.0010], 30% | no |
+| H3.5 | -0.0160 [-0.0221, -0.0102], 0% | -0.0078 [-0.0118, -0.0038], 29% | -0.0045 [-0.0095, +0.0005], 40% | no |
+| S2tail | +0.0007 [-0.0038, +0.0052], 75% | +0.0024 [-0.0003, +0.0051], 68% | +0.0032 [-0.0002, +0.0066], 65% | no (narrowly on 28) |
+| MR | +0.0026 [-0.0035, +0.0083], 62% | +0.0010 [-0.0021, +0.0043], 57% | +0.0003 [-0.0032, +0.0039], 55% | no |
+| S1 (reference) | +0.0055 [+0.0008, +0.0106], 100% | +0.0034 [+0.0005, +0.0062], 79% | +0.0026 [-0.0009, +0.0059], 70% | **yes on 8 and 28** |
+| S0 (reference) | +0.0042 [-0.0007, +0.0092], 75% | +0.0019 [-0.0010, +0.0046], 54% | +0.0010 [-0.0026, +0.0046], 45% | no |
+| S3 (reference) | -0.0114 [-0.0168, -0.0059], 0% | -0.0023 [-0.0055, +0.0010], 25% | +0.0014 [-0.0026, +0.0052], 35% | no |
+
+**Worst-case regret over S0-S5** (best scheme's mean minus this scheme's, at the worst convention):
+
+| Scheme | 8, target | 8, severe | 28, target | 28, severe |
+|---|---|---|---|---|
+| **S2 = M2** | **0.005** | **0.007** | 0.009 | 0.010 |
+| S2tail | 0.007 | 0.008 | **0.004** | **0.004** |
+| MIX | 0.012 | 0.015 | 0.006 | 0.007 |
+| AUG | 0.017 | 0.012 | 0.010 | 0.006 |
+| S1 | 0.010 | 0.010 | 0.011 | 0.011 |
+| S0 | 0.010 | 0.010 | 0.012 | 0.012 |
+| S3 | 0.018 | 0.014 | 0.009 | 0.008 |
+| H3.5 | 0.024 | 0.019 | 0.016 | 0.008 |
+| S5 | 0.049 | 0.036 | 0.028 | 0.020 |
+
+What this says:
+
+- **Training across T does not pass.** MIX ties at the gate on 28 folds and lowers the worst-case regret
+  there (0.006 against 0.009), but on the 8 IDSSE + Metrica folds it loses at the gate (-0.006, 1 win in 8)
+  and doubles the regret. The 28-fold gain comes from SkillCorner, whose labels split spells at X. AUG
+  is worse on every pool. Mixing conventions blurs the team head's targets without buying robustness
+  where the labels look most like the target's (status plus owner per frame).
+- **Smoother training labels do not help even against smoother truth.** Trained on David's convention
+  (H3.5), the model loses at the gate and gains only 0.004 against its own ground truth on 28 folds
+  (loses 0.006 on the 8). Training below the evaluation convention is better because the features see
+  plus or minus 8 s and the decoder smooths anyway.
+- **The tail option is the most robust scheme on 28 folds** (worst-case regret 0.004 at both noise
+  levels) and scores best against S3, H3.5 and E, but it misses the gate narrowly (68% wins, interval
+  touches zero) and is second to M2 on the 8 folds.
+- **Training at T = 1 passes the gate at T = 2** (+0.003 on 28 folds, +0.006 on 8), consistent with the
+  bake-off's own sweep (Table 3b: train 1 beat train 2 at evaluation 2). It loses against S5 and E, and
+  its worst-case regret is higher (0.011 against 0.009 on 28; 0.010 against 0.005 on 8).
+- **All differences are small next to the convention itself:** at most 0.01 between schemes, against
+  0.16 for the same M2 predictions across conventions (0.495 at S0 to 0.653 at H3.5), and the scorer's
+  own noise band of 0.04.
+
+Severe noise leads to the same conclusions (regret table). The 8 IDSSE + Metrica folds' matrix (M2 at S2:
+0.569, as in the D5 audit):
+
+| Train \ eval | S0 | S1 | S2 | S3 | S5 | S2tail | H3.5 | E |
+|---|---|---|---|---|---|---|---|---|
+| S0 | **0.468** | 0.508 | 0.573 | 0.618 | 0.629 | 0.607 | 0.673 | 0.686 |
 | S1 | **0.468** | **0.509** | **0.574** | 0.619 | 0.628 | **0.608** | 0.675 | 0.683 |
 | **S2 = M2** | 0.463 | 0.504 | 0.569 | 0.619 | 0.633 | 0.603 | 0.676 | 0.686 |
 | S3 | 0.451 | 0.490 | 0.557 | 0.613 | 0.636 | 0.591 | 0.669 | 0.679 |
@@ -230,28 +306,33 @@ Mean spellF1; rows are the training scheme, columns the evaluation convention (E
 | S2tail | 0.461 | 0.502 | 0.570 | **0.622** | 0.637 | 0.604 | **0.680** | **0.692** |
 | MR | 0.462 | 0.503 | 0.567 | 0.619 | 0.634 | 0.602 | 0.673 | 0.691 |
 
-TBD: 28 folds, gate and regret tables.
-
 ## 6. Recommendation
 
-1. **Keep `protocol.T_MAIN = 2` and single-convention training.** Mixing T (MIX) and soft-T
-   augmentation (AUG) lose at the T = 2 gate and raise the worst-case regret. The model's output is
-   already smoother than its training labels (M2 scores 0.569 against S2 but 0.676 against H3.5 on the 8
-   folds), so blurring the team head's targets buys no robustness.
-2. **Do not train on the 3.5 s convention.** Trained on David's labels, the model loses at T = 2 and
-   also against its own ground truth. If the target were 3.5 s-like, T = 2 training would still be the
-   better choice. That is the reconciliation: 3.5 s is a defensible *description* of controlled
-   possession in DFL data; T = 2 is the better *training* convention under it and under the sweep.
-3. **Training at T = 1 is not a reason to move T_MAIN.** It wins at the T = 2 gate on the 8 folds, but
-   doubles the worst-case regret and loses where the written definition points (S5, H3.5, E).
-4. **`tail=True`: not adopted, keep ready.** A tie at T = 2, and better against the smoother conventions
-   on IDSSE. Switch if the organisers answer "no" to question 2 below.
-5. **Metrica stoppages from restarts: not adopted under the rule, but the labels are cleaner.** Neutral
-   on the gate. Adopting it would be a data-quality decision that moves the Metrica development score
-   (M2: 0.643 against the default labels, 0.625 against the restart-rule labels); the team should make
-   it explicitly, not as a score change.
-6. **Ask the organisers (section 7)**, and treat the absolute score as uncertain by about 0.1 from the
-   convention alone: the same M2 predictions score 0.50 (S0) to 0.65 (H3.5) on 28 folds.
+1. **Keep single-convention training; drop MIX and AUG.** Neither passes the gate. MIX's lower regret on
+   28 folds comes from SkillCorner and reverses on the 8 folds whose labels share the target's mechanics.
+   The model's output is already smoother than its training labels (M2: 0.586 against S2, 0.653 against
+   H3.5 on 28 folds), so blurring the team head's targets buys nothing.
+2. **Do not train on the 3.5 s convention.** It loses at T = 2 (-0.008 [-0.012, -0.004] on 28 folds,
+   -0.016 on 8) and gains at most 0.004 against its own ground truth. The reconciliation: 3.5 s is a
+   defensible *description* of controlled possession in DFL data; it is not a good *training* label,
+   even for a 3.5 s target.
+3. **Keep `protocol.T_MAIN = 2`, and put T = 1 to the team as the one change the gate supports.** Under
+   the pre-registered rule, training at T = 1 is adopted at T = 2 evaluation (+0.0034, 79% wins on 28;
+   +0.0055, 8 of 8 on the IDSSE + Metrica folds). I recommend against it for now. Its worst-case regret
+   is higher (0.011 against 0.009 on 28, 0.010 against 0.005 on 8), and it loses at S5 and E, the
+   conventions closest to the written "controlled" definition. Its gain is a tenth of the scorer's noise
+   band. If the organisers say the owner follows touches (question 1 below), move to T = 1 or lower.
+4. **`tail=True`: not adopted, keep ready.** It narrowly misses the gate on 28 folds (+0.0024, 68% wins,
+   interval touches zero), has the lowest worst-case regret there (0.004), and is the convention the
+   definition implies for a touch that goes straight out. Switch if the organisers answer "no" to
+   question 2, or if the team accepts adoption on regret.
+5. **Metrica stoppages from restarts: not adopted under the rule, but the labels are cleaner.** It is
+   neutral on the gate (+0.0010 on 28 folds, +0.0026 on 8, both intervals include zero). Adopting it is
+   a data-quality decision that moves the Metrica development numbers (M2: 0.643 against the default
+   labels, 0.625 against the restart-rule labels). The team should take that decision explicitly, not
+   as a score change.
+6. **Ask the organisers (section 7)**, and treat the absolute score as uncertain by about 0.15 from the
+   convention alone: the same M2 predictions score 0.495 (S0) to 0.653 (H3.5) on 28 folds.
 7. **For the technical document:** say we train on per-frame owner labels with opponent touches shorter
    than 2 s that return to the owner merged, restart possessors kept, dead ball from ball status (IDSSE)
    or derived from events (Metrica), and that the convention was chosen for robustness, not fitted to
