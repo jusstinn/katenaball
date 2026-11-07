@@ -1,0 +1,6 @@
+#!/bin/sh
+# Data firewall: refuse a push if the pushed tips, or any commit not yet on a remote, hold match
+# data, private ground truth, submissions, frame-level exports, caches or weights. This repository
+# is public, so a push is publication. git passes the refs being pushed on stdin.
+# Enable with: git config core.hooksPath .githooks   (docs/ci.md)
+exec sh "$(git rev-parse --show-toplevel)/.githooks/firewall.sh" --pre-push

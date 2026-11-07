@@ -15,7 +15,6 @@ from katena.eval import protocol as P
 from katena.eval.score import score, to_native_codes
 from katena.models import gbdt
 from katena.models.rules import m1_predict
-from katena.types import X as XL
 
 OOF_DIR = P.WORK / "oof"
 RES_PATH = P.WORK / "results.pkl"
@@ -90,7 +89,7 @@ def decode_rows(oof: dict, cond: str, f: dict, pri: hmm.Priors, tau: float, kind
 
 def score_rows(ref: P.Ref, T: int, cond: str, rows: np.ndarray, idx: np.ndarray, gt=None) -> dict:
     g = gt or C.load_gt(ref, T)
-    pred = to_native_codes(rows, idx, g["step"], g["n_native"])
+    pred = to_native_codes(rows, idx, g["step"], g["n_native"], g["blocks"])
     return score(g["y"], pred, sc_mode=ref.is_sc)
 
 

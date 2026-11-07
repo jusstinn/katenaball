@@ -1,0 +1,5 @@
+#!/bin/sh
+# Data firewall: refuse a commit whose index holds match data, private ground truth, submissions,
+# frame-level exports, caches or weights. Checks the index only; untracked files are never read.
+# Enable with: git config core.hooksPath .githooks   (docs/ci.md)
+exec sh "$(git rev-parse --show-toplevel)/.githooks/firewall.sh"

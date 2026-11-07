@@ -1,0 +1,76 @@
+{
+ "calibrated_on": "skillcorner development matches (real automatic tracking); IDSSE development matches as the clean base",
+ "curve_idsse_target_settings": {
+  "ball": [
+   0.048319973051548004,
+   0.09160427190363407,
+   0.18835537880659103,
+   0.3398863896727562,
+   0.48690710961818695,
+   0.6354601159691811,
+   0.9320918321609497
+  ],
+  "player": [
+   0.05043604955278173,
+   0.053915586676993046,
+   0.061702454173146,
+   0.08379307864172021,
+   0.10975577249761201,
+   0.16597667433032826,
+   0.3145965272757662
+  ],
+  "sigma_ball": [
+   0.0,
+   0.02,
+   0.05,
+   0.1,
+   0.15,
+   0.2,
+   0.3
+  ],
+  "sigma_player": [
+   0.0,
+   0.005,
+   0.01,
+   0.02,
+   0.03,
+   0.05,
+   0.1
+  ]
+ },
+ "degraded_idsse_target_now": {
+  "ball": 1.8030449897050858,
+  "player": 0.9185085493808649
+ },
+ "real": {
+  "metrica": {
+   "ball_median": 0.02216238947585225,
+   "ball_range": [
+    0.005924937315285206,
+    0.038399841636419296
+   ],
+   "matches": 2,
+   "player_median": 0.04406067472023943,
+   "player_range": [
+    0.03892474027686438,
+    0.04919660916361449
+   ]
+  },
+  "skillcorner": {
+   "ball_median": 0.2116166688501835,
+   "ball_range": [
+    0.19220155104994774,
+    0.22560906410217285
+   ],
+   "matches": 20,
+   "player_median": 0.04550575108500446,
+   "player_range": [
+    0.0419498850753226,
+    0.047953917841153236
+   ]
+  }
+ },
+ "sigma_ball": 0.0576754223147555,
+ "sigma_player": 0.0,
+ "statistic": "D5 domain-gap jitter: 2-D second difference at 5 Hz; player = slot mean per sample (capped at 2 m), 10 s window mean; ball = 10 s window median; median over windows"
+}
