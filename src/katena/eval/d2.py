@@ -268,7 +268,9 @@ def run_lomo(fold_refs: list, dev: list, variants=VARIANTS) -> None:
                 arrays[f"pa_{w}"], arrays[f"ph_{w}"] = heads.predict(f["X0"], f["X1"])
             out = oof_path(v, r)
             out.parent.mkdir(parents=True, exist_ok=True)
-            np.savez(out, **arrays)
+            tmp = out.with_name(out.stem + ".tmp.npz")
+            np.savez(tmp, **arrays)
+            tmp.replace(out)                        # a half-written fold is never taken as done
             Lm.timed(f"{v} fold {r.key}", t0)
         del pools
 
