@@ -19,7 +19,9 @@ see the same ball gaps, false detections and jitter.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import time
+from pathlib import Path
 
 import numpy as np
 
@@ -36,6 +38,8 @@ from katena.types import load_match
 
 VARIANT = "touch"
 MODEL = "M2T"
+# touch columns are tagged with the source hash of the feature code and rebuilt when it changes
+SRC = hashlib.sha256(Path(TF.__file__).read_bytes()).hexdigest()[:16]
 EDGES = (0, 2, 4, 8, 16, 32, 1e9)
 
 # Evaluation-only world, declared before any gate result: the target-like corruption with the same seed
@@ -69,7 +73,7 @@ def build_extra(ref: P.Ref, cond: str = SMOOTH, force: bool = False) -> str:
     corpus format (``feat/<key>__<cond>.npz``) so the shared decode and score code can read them."""
     from katena.featurize.build import featurize, infer_dirs
     out_b, out_t = C.paths(ref)["feat"](cond), tpaths(ref)["feat"](cond)
-    if not force and out_b.exists() and out_t.exists():
+    if not force and out_b.exists() and _fresh(out_t):
         return ref.key
     m = load_match(ref.path)
     m5 = downsample(m)
@@ -80,7 +84,7 @@ def build_extra(ref: P.Ref, cond: str = SMOOTH, force: bool = False) -> str:
              groups=f0.groups, dirs=np.array([dirs[h] for h, _, _ in m5.half_blocks]),
              deg=np.array([mc.meta["degrade"]["ball_missing"], mc.meta["degrade"]["mean_objects"]]))
     X, names, idx = TF.touch_features(mc, TF.NativeBall(lifted, m.fps, int(m5.meta["step"])))
-    np.savez(out_t, A0=X[0], A1=X[1], idx=idx, names=np.array(names))
+    np.savez(out_t, A0=X[0], A1=X[1], idx=idx, names=np.array(names), src=np.array(SRC))
     return ref.key
 
 
@@ -88,7 +92,7 @@ def build_one(ref: P.Ref, force: bool = False, check: bool = True) -> str:
     """Touch columns for every condition of ``ref`` and for its training-pool rows."""
     tp = tpaths(ref)
     conds = C.conds_for(ref)
-    if not force and tp["pool"].exists() and all(tp["feat"](c).exists() for c in conds):
+    if not force and _fresh(tp["pool"]) and all(_fresh(tp["feat"](c)) for c in conds):
         return ref.key
     tp["pool"].parent.mkdir(parents=True, exist_ok=True)
     tp["feat"]("x").parent.mkdir(parents=True, exist_ok=True)
@@ -108,7 +112,7 @@ def build_one(ref: P.Ref, force: bool = False, check: bool = True) -> str:
                 deg = np.array([mc.meta["degrade"]["ball_missing"], mc.meta["degrade"]["mean_objects"]])
                 if not np.allclose(deg, base["deg"], rtol=0, atol=1e-9):
                     raise RuntimeError(f"{ref.key} {c}: degrader statistics differ from the cache")
-        np.savez(tp["feat"](c), A0=X[0], A1=X[1], idx=idx, names=np.array(names))
+        np.savez(tp["feat"](c), A0=X[0], A1=X[1], idx=idx, names=np.array(names), src=np.array(SRC))
         if c in C.POOL_CONDS:
             sel = np.flatnonzero((np.arange(len(idx)) + C.POOL_CONDS.index(c)) % C.POOL_STRIDE == 0)
             o = rng.integers(0, 2, len(sel)).astype(np.int8)
@@ -120,8 +124,15 @@ def build_one(ref: P.Ref, force: bool = False, check: bool = True) -> str:
         bp = C.load_pool(ref)
         if not (np.array_equal(bp["o"], o) and np.array_equal(bp["idx"], ii)):
             raise RuntimeError(f"{ref.key}: touch pool rows do not line up with the base pool")
-    np.savez(tp["pool"], A=np.concatenate(pool_A), o=o, idx=ii, names=np.array(names))
+    np.savez(tp["pool"], A=np.concatenate(pool_A), o=o, idx=ii, names=np.array(names), src=np.array(SRC))
     return ref.key
+
+
+def _fresh(path) -> bool:
+    if not path.exists():
+        return False
+    with np.load(path) as z:
+        return "src" in z.files and str(z["src"]) == SRC
 
 
 def _job(args):
@@ -142,7 +153,10 @@ def build_all(refs: list, workers: int = 2, force: bool = False) -> None:
 
 def load_tfeat(ref: P.Ref, cond: str) -> dict:
     with np.load(tpaths(ref)["feat"](cond)) as z:
-        return {k: z[k] for k in z.files}
+        out = {k: z[k] for k in z.files}
+    if str(out.get("src", "")) != SRC:
+        raise RuntimeError(f"{ref.key} {cond}: touch columns are stale (built by other feature code)")
+    return out
 
 
 class TouchPools(Lm.Pools):
@@ -154,6 +168,8 @@ class TouchPools(Lm.Pools):
         for r in refs:
             with np.load(tpaths(r)["pool"]) as z:
                 parts.append({k: z[k] for k in z.files})
+        if any(str(p.get("src", "")) != SRC for p in parts):
+            raise RuntimeError("touch pool is stale (built by other feature code)")
         A = np.concatenate([p["A"] for p in parts])
         if len(A) != len(self.X) or not np.array_equal(np.concatenate([p["o"] for p in parts]), self.o):
             raise RuntimeError("touch pool does not line up with the base pool")
