@@ -14,8 +14,10 @@ Determinism: ``fit_tcn`` turns on deterministic algorithms, fixes the intra-op t
 seeds torch; the batch order comes from the seeded NumPy generator inside ``tcn.train``. Results also
 depend on the CPU kernels torch picks, so ``pin_cpu_env`` fixes those when called before torch is
 imported. ``scripts/d3_determinism.py`` trains and predicts in separate processes and compares the
-SHA-256 of every output. ``quantize`` rounds probabilities to a binary grid before decoding; it only
-absorbs last-bit differences, not a different training run.
+SHA-256 of every output: on one machine every byte repeats. Other thread counts or kernels change the
+probabilities in about the sixth decimal and, on the folds probed, no decoded label (decision log,
+2026-11-07). ``quantize`` / ``quantize_logit`` round probabilities before decoding, for that experiment
+only: rounding cannot undo a different training run, and the decode is already insensitive to last bits.
 """
 
 from __future__ import annotations
@@ -32,8 +34,9 @@ TCN_THREADS = 4                  # torch intra-op threads; a different count giv
 QBITS = 16                       # quantize: probabilities rounded to multiples of 2**-QBITS
 
 # Environment that fixes which CPU kernels torch and MKL use. It must be in the environment before
-# torch is imported (oneDNN, MKL and ATen read it once). AVX2 is the newest ISA every x86-64 machine
-# we use has; on this build it is also the default, so pinning it changes nothing here.
+# torch is imported (oneDNN, MKL and ATen read it once). AVX2 is this machine's ISA, so pinning it
+# changes nothing here; it keeps an AVX-512 x86-64 machine on the same kernel family. On Apple silicon
+# these variables do nothing: other kernels run there.
 CPU_ENV = {"ATEN_CPU_CAPABILITY": "avx2", "ONEDNN_MAX_CPU_ISA": "AVX2", "MKL_CBWR": "AVX2",
            "OMP_NUM_THREADS": str(TCN_THREADS), "MKL_NUM_THREADS": str(TCN_THREADS)}
 
