@@ -37,6 +37,10 @@ def check(pools, labels, folds, pool_y, draw) -> None:
     """Pipeline check: the refitted T = 2 team head must equal M2's cached one, and the S2 scores
     must equal results.pkl's M2 scores (28 folds only: tau depends on the fold set)."""
     r = folds[0]
+    for name in ("S0", "S2", "S5"):
+        same = np.array_equal(TM.pool_labels(pools, labels, name, generic=True), pools.y[int(name[1:])])
+        print(f"check: pooled {name} labels rebuilt from the native ground truth equal the cache: {same}")
+        assert same
     TM.MODELS["S2r"] = ("single", ("S2",))
     TM.fit_fold(pools, labels, r, ["S0", "S2r"], pool_y, draw)      # S2r reuses S0's binned Dataset
     for c in TM.CONDS:

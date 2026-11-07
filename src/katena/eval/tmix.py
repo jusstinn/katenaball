@@ -91,13 +91,15 @@ class Labels:
         return [self.work(r, n) for r in self.refs if r.key not in exclude and not r.is_sc for n in names]
 
 
-def pool_labels(pools: Lm.Pools, labels: Labels, name: str) -> np.ndarray:
-    """Labels of every pooled row (``pools`` order) under convention ``name``."""
-    if name in SWEEP:
+def pool_labels(pools: Lm.Pools, labels: Labels, name: str, generic: bool = False) -> np.ndarray:
+    """Labels of every pooled row (``pools`` order) under convention ``name``. ``generic`` forces
+    the path used for conventions the cache does not hold (a check that row order is right)."""
+    if name in SWEEP and not generic:
         return pools.y[int(name[1:])]
     parts = []
     for r in pools.refs:
-        idx = C.load_pool(r)["idx"]
+        with np.load(C.paths(r)["pool"]) as z:          # the row index only, not the features
+            idx = z["idx"]
         parts.append(labels.work(r, name)[idx])
     return np.concatenate(parts).astype(np.int8)
 
@@ -141,30 +143,37 @@ def fit_fold(pools: Lm.Pools, labels: Labels, ref, models: list, pool_y: dict, d
     if not todo:
         return
     t0 = time.time()
-    m = ~np.isin(pools.keys, [ref.key])
+    keep = np.flatnonzero(~np.isin(pools.keys, [ref.key]))     # M2's training rows, M2's order
     cols = pools.cols()
-    o = pools.o[m]
-    Xm = pools.X[m]
+    every = np.array_equal(cols, np.arange(pools.X.shape[1]))
+
+    def take(X, idx=None):                                     # same values as X[idx][:, cols]
+        Z = X if idx is None else X[idx]
+        return Z if every else Z[:, cols]
+
+    o = pools.o[keep]
     feats = {c: C.load_feat(ref, c) for c in conds}
     shared = None                                    # one binned Dataset for every unweighted scheme
     for mname in todo:
         kind, names = MODELS[mname]
-        ys = [pool_y[n][m] for n in names]
-        rows, target, weight = team_design(kind, ys, o, draw[m] if kind == "mix" else None)
+        ys = [pool_y[n][keep] for n in names]
+        rows, target, weight = team_design(kind, ys, o, draw[keep] if kind == "mix" else None)
         if weight is None:
             if shared is None:
-                shared = lgb.Dataset(Xm[rows][:, cols], target, free_raw_data=False)
+                shared = lgb.Dataset(take(pools.X, keep[rows]), target, free_raw_data=False)
                 shared_rows = rows
             else:
                 assert np.array_equal(rows, shared_rows)
                 shared.set_label(target)
             ds = shared
         else:
-            ds = lgb.Dataset(Xm[rows][:, cols], target, weight=weight, free_raw_data=True)
+            ds = lgb.Dataset(take(pools.X, keep[rows]), target, weight=weight, free_raw_data=True)
         team = lgb.train(gbdt.PARAMS, ds, gbdt.N_TREES)
+        if ds is not shared:
+            del ds
         arrays = {}
         for c, f in feats.items():
-            ph = 0.5 * (team.predict(f["X0"][:, cols]) + 1.0 - team.predict(f["X1"][:, cols]))
+            ph = 0.5 * (team.predict(take(f["X0"])) + 1.0 - team.predict(take(f["X1"])))
             arrays[f"ph_{c}"] = ph.astype(np.float32)
         path = out_dir / mname / f"{ref.dataset}_{ref.id}.npz"
         path.parent.mkdir(parents=True, exist_ok=True)
