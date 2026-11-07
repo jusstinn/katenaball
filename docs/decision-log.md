@@ -76,9 +76,9 @@ majority window) at 5 Hz, scored at T = 2 on the 6 IDSSE development matches
 
 - **Coupling closes the gap; identity and jitter do not.** The independent world misses the published
   smooth50 macroF1 by 0.28. `target_cpl50` misses it by 0.06 and `target_cpl100` by 0.03, the other way.
-- **The Metrica-like world matches the whole fingerprint.** `target_cpl100` comes within 0.03 to 0.04 on
-  all eight published numbers. It also gets the published order of the windows: macroF1 peaks at
-  smooth25 and spellF1 at smooth50. The independent world peaks spellF1 at smooth125.
+- **The Metrica-like world matches the whole fingerprint.** `target_cpl100` comes within 0.035 of all
+  eight published numbers, always slightly above them. It also gets the published order of the windows:
+  macroF1 peaks at smooth25 and spellF1 at smooth50. The independent world peaks spellF1 at smooth125.
 - **Caveats.** This is consistent with the real ATD dropping the ball through stoppages, but it is not a
   measurement. It also depends on the target's label convention, its dead share, and 5 Hz against
   25 Hz. On Metrica's two development games every world already looks like this (smooth50 about
