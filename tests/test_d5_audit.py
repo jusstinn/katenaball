@@ -36,3 +36,23 @@ def test_to_native_codes_target_blocks_never_leaked():
     out = to_native_codes(np.zeros(len(idx), np.int8), idx, step, n)
     for _, a, b in blocks:
         assert not (out[a:b + 1] == X).any()
+
+
+# --- F: locked benches are pinned by id, not recomputed from whatever is on disk -------------
+
+def test_split_pins_the_locked_benches():
+    from pathlib import Path
+
+    from katena.eval import protocol as P
+    assert P.locked_idsse(list(P.IDSSE_IDS)) == P.LOCKED_IDSSE
+    refs = ([P.Ref("idsse", i, Path(i)) for i in P.IDSSE_IDS]
+            + [P.Ref("metrica", f"Sample_Game_{k}", Path("m")) for k in (1, 2, 3)]
+            + [P.Ref("skillcorner", "1874553", Path("s"))])
+    dev, locked = P.split(refs)
+    assert {r.key for r in locked} == {"idsse/DFL-MAT-J03WQQ", "metrica/Sample_Game_2"}
+    assert len(dev) == 9
+    # a corpus missing the IDSSE bench must not promote the next-smallest hash (J03WPY) to bench
+    partial = [r for r in refs if r.id != P.LOCKED_IDSSE]
+    dev, locked = P.split(partial)
+    assert {r.key for r in locked} == {"metrica/Sample_Game_2"}
+    assert "idsse/DFL-MAT-J03WPY" in {r.key for r in dev}
