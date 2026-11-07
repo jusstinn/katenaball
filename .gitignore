@@ -74,3 +74,6 @@ external_data/
 *.npy
 *.npz
 *.zip
+
+# Claude Code agent worktrees
+.claude/worktrees/
