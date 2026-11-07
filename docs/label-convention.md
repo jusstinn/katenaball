@@ -22,6 +22,9 @@ benches (`DFL-MAT-J03WQQ`, `Sample_Game_2`) are excluded from every number here,
   corrected-tracking process behind the ground truth. The written definition is qualitative, and the
   public window may not be used to choose. Perfect labels in one plausible convention score only
   0.58-0.94 spellF1 against another, so the convention alone moves the absolute score by about 0.1.
+- **Metrica's dead ball runs long** (D5 audit A3, confirmed): main's rule keeps D through live play
+  after a trigger and misses goal kicks tagged BALL LOST. David's backward-from-restart rule makes the
+  ball missing on 99.1% of Game 3's dead frames (main: 88.0%). Tested as candidate `MR`, section 5.
 - **Training across T:** see section 5. TBD.
 - **Recommendation:** TBD. Keep `protocol.T_MAIN = 2` until then.
 
@@ -49,7 +52,7 @@ field may follow touches at least there.
 | Owner | DFL/TRACAB per-frame `BallPossession` (always 1 or 2) | Derived from events: team of the last PASS, CARRY, RECOVERY or SET PIECE | Per-frame `possession.group` |
 | Dead ball | Per-frame `BallStatus` = 0 | Derived: dead trigger until the next restart event | None |
 | Unknown | Never | Outside the first and last event of a half | `group` null -> X (46% of in-play frames) |
-| Same mechanics as the target? | Yes: status plus owner per frame | No: event-derived, approximate D | No: no D, X splits spells |
+| Same mechanics as the target? | Yes: status plus owner per frame | No: event-derived; D runs long (section 8) | No: no D, X splits spells |
 | Raw spells, mean / under 2 s | 7.2 s / 30% | 10.7 s / 17% | 9.6 s / 22% |
 
 **IDSSE is touch-level.** Around duels that DFL's own event operators scored as *no* possession change
@@ -207,6 +210,38 @@ for any statistic of the ground truth, and each part has a short answer:
 How the answers map to our options: "changes" to 1 means touch-level, train near T = 0. "Stays" to 1
 plus a number of seconds in 3 sets T. "No" to 2 means `tail=True`. "An operator's judgement" means an
 event-based convention like `E`.
+
+## 8. Metrica dead ball (D5 audit, finding A3)
+
+Main's Metrica rule makes the ball dead from a trigger event until the next SET PIECE or a PASS tagged
+GOAL KICK. The event vocabulary shows three ways that runs long: a goal kick tagged `BALL LOST | GOAL
+KICK` (11 in the two development games) does not end the stoppage; `BALL OUT` starts D at the event's
+start (the last touch) rather than when the ball is out; and a trigger with no tagged restart keeps
+the ball dead through live play. It also leaves an untagged stoppage alive.
+
+`katena.external.metrica_stoppages` ports David's rule, which anchors every stoppage on its restart
+and looks backwards for the first stop marker after the last in-play action (or that action's end).
+Ownership and windows are main's. Metrica's open tracking removes the ball while it is out of play,
+so the share of D frames with the ball missing measures how clean a D label is:
+
+| Game | Rule | Dead share | Ball missing on D | Ball present when alive | Dead span median / p90 | Spells (raw) |
+|---|---|---|---|---|---|---|
+| 1 | default | 51.3% | 0.731 | 0.992 | 28.0 / 66.7 s | 276 |
+| 1 | restart | 42.0% | 0.850 | 0.963 | 20.4 / 48.1 s | 359 |
+| 3 | default | 34.6% | 0.880 | 0.980 | 13.5 / 49.6 s | 330 |
+| 3 | restart | 30.6% | **0.991** | 0.980 | 11.8 / 40.5 s | 383 |
+
+On Game 3 this reproduces the audit (David's own loader: 0.992; the 7,215 frames that only the default
+calls dead have the ball present 77% of the time). On Game 1 the dead side improves too, but some
+frames the restart rule calls alive have no ball (0.992 to 0.963): a stoppage with no marker starts
+when the last action ends, which can be late. The two rules agree on 90.5% (Game 1) and 93.9% (Game 3)
+of frames and on the team on 99.9-100% of frames both call alive. Scored against each other at T = 2
+they reach only 0.83 and 0.89 spellF1, so the choice moves every Metrica number. Metrica is 2 of 28
+development folds but about a quarter of the alive head's training rows.
+
+The gate for this candidate (`MR`: both heads refitted on the restart-rule labels) is in section 5.
+IDSSE and SkillCorner folds keep their ground truth, so they are the clean test; Metrica folds are
+scored against both rules.
 
 ## Reproduce
 

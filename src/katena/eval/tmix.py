@@ -50,7 +50,9 @@ SWEEP = tuple(f"S{T}" for T in P.T_SWEEP)
 MODELS = {**{f"S{T}": ("single", (f"S{T}",)) for T in P.T_SWEEP},
           "MIX": ("mix", SWEEP), "AUG": ("aug", SWEEP),
           "H3.5": ("single", ("H3.5",)), "S2tail": ("single", ("S2tail",)),
-          "MR": ("both", ("S2R",))}
+          "MR": ("both", ("S2R",)),
+          # no training: M2's heads, decoder priors from another convention
+          "S2pS5": ("decode", ("S5",)), "S2pH3.5": ("decode", ("H3.5",))}
 CONDS = ("target", "severe")
 TAU = 2.0
 TMIX_DIR = P.WORK / "tmix"
@@ -154,7 +156,8 @@ def fit_fold(pools: Lm.Pools, labels: Labels, ref, models: list, pool_y: dict, d
     from katena.models import gbdt
     lgb = gbdt.lgb
     out_dir = out_dir or TMIX_DIR / "oof"
-    todo = [mname for mname in models if mname != "S2" and not (out_dir / mname / f"{ref.dataset}_{ref.id}.npz").exists()]
+    todo = [mname for mname in models if mname != "S2" and MODELS[mname][0] != "decode"
+            and not (out_dir / mname / f"{ref.dataset}_{ref.id}.npz").exists()]
     if not todo:
         return
     t0 = time.time()
@@ -217,7 +220,7 @@ def fit_fold(pools: Lm.Pools, labels: Labels, ref, models: list, pool_y: dict, d
 
 
 def load_ph(mname: str, ref, cond: str, out_dir: Path | None = None) -> np.ndarray:
-    if mname == "S2":
+    if mname == "S2" or MODELS[mname][0] == "decode":
         return Lm.load_oof("full", P.T_MAIN, ref)[f"ph_{cond}"]
     with np.load((out_dir or TMIX_DIR / "oof") / mname / f"{ref.dataset}_{ref.id}.npz") as z:
         return z[f"ph_{cond}"]

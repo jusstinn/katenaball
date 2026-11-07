@@ -143,7 +143,7 @@ def report(scores: dict, folds: list, models: list) -> None:
             if "S2" not in models or cond != "target":
                 continue
             print(f"\n### {cond}, {sname}: against M2 (= S2), paired bootstrap over possessions, 2000 draws\n")
-            print("| candidate | eval | n | mean diff | 95% CI | wins | adopted |")
+            print("| candidate | eval | n | mean diff | 95% CI | wins | passes the rule |")
             print("|---|---|---|---|---|---|---|")
             for m in [x for x in models if x != "S2"]:
                 for e in (("S2R", "S2") if m == "MR" else ("S2", "S0", "S5", "H3.5")):
