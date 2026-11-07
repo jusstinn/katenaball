@@ -6,17 +6,19 @@
     uv run python scripts/d2_worlds.py score --folds 8
     uv run python scripts/d2_worlds.py m0             # simulated official baseline in every world
 
-The decision rule was registered before any gate result, in docs/decision-log.md (2026-11-07, D2).
+The decision rule was registered before any gate result, in docs/decision-log.md (2026-11-07, D2), with
+amendment A1 (tau fixed at 2; the 8 IDSSE + Metrica folds gated beside the 28; smooth-jitter worlds and the
+``d2j`` candidate), also before any gate result.
 
 Only development matches are used: the locked benches are never built, trained on or scored here. The
 existing conditions (mild, target, severe), their pools and the ground truth come from the bake-off cache
 under KATENA_WORK, made by ``katena.eval.corpus``. The new worlds (``katena.sim.worlds``) are written
 beside them under new names, so no existing cache entry changes.
 
-The two candidates differ only in the corruption world of each training row. Both use the same sample
-rows, focal orientations and labels as the bake-off pool (stride 4, one residue class per severity). In
-``d2``, each severity's rows are split evenly, interleaved, over the worlds that ``katena.sim.worlds.
-TRAIN_MIX`` lists for the match's dataset.
+The candidates differ only in the corruption world of each training row. All use the same sample rows,
+focal orientations and labels as the bake-off pool (stride 4, one residue class per severity). In ``d2``
+and ``d2j``, each severity's rows are split evenly, interleaved, over the worlds that
+``katena.sim.worlds.TRAIN_MIXES`` lists for the match's dataset. ``cur`` is the bake-off pool itself.
 """
 
 from __future__ import annotations
@@ -42,16 +44,19 @@ from katena.sim import worlds as W
 from katena.types import D, load_match
 
 T = P.T_MAIN
-VARIANTS = ("cur", "d2")
+TAU = 2.0                        # fixed a priori for every variant (amendment A1, D5 audit A2)
+VARIANTS = ("cur", "d2", "d2j")
+CANDIDATES = ("d2", "d2j")
 # Official baseline windows (starter/baseline.py VARIANTS), as half-widths in 5 Hz samples, and the published
 # full-match scores (macroF1, spellF1) from docs/upstream/EVALUATION.md.
 M0_WINDOWS = {"raw": 0, "smooth25": 5, "smooth50": 10, "smooth125": 25}
 PUBLISHED_M0 = {"raw": (0.6532, 0.0486), "smooth25": (0.6752, 0.1996), "smooth50": (0.6724, 0.2433),
                 "smooth125": (0.6356, 0.2242)}
 # Secondary worlds: built for the training mix anyway, so they are scored too, but not decision worlds.
-SECONDARY = ("mild_cpl50", "mild_cpl100", "mild_ids", "severe_cpl50", "severe_cpl100", "severe_ids")
+SECONDARY = ("mild_cpl50", "mild_cpl100", "mild_ids", "mild_smooth", "severe_cpl50", "severe_cpl100",
+             "severe_ids", "severe_smooth")
 M0_WORLDS = ("mild", "target", "severe", "target_dead3", "target_dead15", "target_cpl50", "target_cpl100",
-             "target_ids", "target_cpl100_ids", "mild_cpl100", "severe_cpl100")
+             "target_ids", "target_cpl100_ids", "target_smooth", "mild_cpl100", "severe_cpl100")
 
 
 def root() -> Path:
@@ -64,8 +69,8 @@ def dev_refs() -> list:
     return dev
 
 
-def mix_for(dataset: str) -> dict:
-    return W.TRAIN_MIX["dead_labels" if dataset in W.DEAD_LABEL_DATASETS else "no_dead_labels"]
+def mix_for(dataset: str, variant: str = "d2") -> dict:
+    return W.TRAIN_MIXES[variant]["dead_labels" if dataset in W.DEAD_LABEL_DATASETS else "no_dead_labels"]
 
 
 # The bake-off's own dead-coupled worlds (IDSSE only, already in the base cache): scored as secondary too.
@@ -81,7 +86,7 @@ def eval_worlds(ref: P.Ref) -> list:
 def new_worlds(ref: P.Ref) -> list:
     """D2 worlds to build for ``ref``: everything in its training mix or evaluation list that the base
     cache does not already hold."""
-    names = {w for ws in mix_for(ref.dataset).values() for w in ws} | set(eval_worlds(ref))
+    names = {w for v in CANDIDATES for ws in mix_for(ref.dataset, v).values() for w in ws} | set(eval_worlds(ref))
     return sorted(n for n in names if n not in dg.CONFIGS and n not in C.CONFIG)
 
 
@@ -162,8 +167,8 @@ def build_all(workers: int = 2, keys: list | None = None) -> None:
 # ---------------------------------------------------------------------------------------------
 # pools
 
-def pool_d2_path(ref: P.Ref) -> Path:
-    return P.WORK / "pool_d2" / f"{ref.dataset}_{ref.id}.npz"
+def pool_path(ref: P.Ref, variant: str = "d2") -> Path:
+    return P.WORK / f"pool_{variant}" / f"{ref.dataset}_{ref.id}.npz"
 
 
 def pool_rows(n_rows: int) -> dict:
@@ -200,23 +205,25 @@ def assemble_pool(ref: P.Ref, mix: dict, base: dict, load=C.load_feat) -> dict:
     return out
 
 
-def build_pool(ref: P.Ref, check: bool = True) -> None:
-    out = pool_d2_path(ref)
+def build_pool(ref: P.Ref, variant: str = "d2", check: bool = True) -> None:
+    out = pool_path(ref, variant)
     if out.exists():
         return
     base = C.load_pool(ref)
     if check:   # the layout reconstruction must give back the bake-off pool exactly
         again = assemble_pool(ref, {c: [c] for c in C.POOL_CONDS}, base)
         assert again["X"].tobytes() == base["X"].tobytes(), f"pool layout mismatch for {ref.key}"
-    pool = assemble_pool(ref, mix_for(ref.dataset), base)
+    pool = assemble_pool(ref, mix_for(ref.dataset, variant), base)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_name(out.stem + ".tmp.npz")
     np.savez(tmp, **pool)
     tmp.replace(out)
 
 
-def load_pool_d2(ref: P.Ref) -> dict:
-    with np.load(pool_d2_path(ref)) as z:
+def load_pool(ref: P.Ref, variant: str) -> dict:
+    if variant == "cur":
+        return C.load_pool(ref)
+    with np.load(pool_path(ref, variant)) as z:
         return {k: z[k] for k in z.files}
 
 
@@ -252,13 +259,12 @@ def oof_path(variant: str, ref: P.Ref) -> Path:
 
 
 def run_lomo(fold_refs: list, dev: list, variants=VARIANTS) -> None:
-    loaders = {"cur": C.load_pool, "d2": load_pool_d2}
     for v in variants:
         todo = [r for r in fold_refs if not oof_path(v, r).exists()]
         if not todo:
             continue
         t0 = time.time()
-        pools = LoadedPools(dev, loaders[v])
+        pools = LoadedPools(dev, lambda r, v=v: load_pool(r, v))
         cols = pools.cols()
         for r in todo:
             heads = pools.fit({r.key}, T, cols)
@@ -288,42 +294,25 @@ def label_seqs(dev: list, exclude: set) -> list:
     return out
 
 
-def score_folds(fold_refs: list, dev: list, variants=VARIANTS) -> dict:
-    """{(variant, world, match_key): score dict}, plus ("tau", variant, match_key): tau. Tau for match k is
-    the best mean target-world spellF1 over the other folds, as in the bake-off."""
+def score_folds(fold_refs: list, dev: list, variants=VARIANTS, tau: float = TAU) -> dict:
+    """{(variant, world, match_key): score dict}. Viterbi at a fixed tau (2, amendment A1: per-fold tau
+    selection would use folds whose models saw the held-out match), priors fit without the held-out match."""
     res: dict = {}
     gts = {r.key: C.load_gt(r, T) for r in fold_refs}
     pri = {r.key: hmm.fit_priors(label_seqs(dev, {r.key})) for r in fold_refs}
-    oofs = {}
-    for v in variants:
-        for r in fold_refs:
+    for r in fold_refs:
+        oofs = {}
+        for v in variants:
             with np.load(oof_path(v, r)) as z:
-                oofs[(v, r.key)] = {k: z[k] for k in z.files}
-    # tau per variant and fold, from the other folds' target-world scores
-    tf = {}
-    for r in fold_refs:
-        with np.load(C.paths(r)["feat"]("target")) as z:
-            tf[r.key] = {"half": z["half"], "idx": z["idx"]}
-    for v in variants:
-        table = np.zeros((len(P.TAUS), len(fold_refs)))
-        for j, r in enumerate(fold_refs):
-            o = oofs[(v, r.key)]
-            for ti, tau in enumerate(P.TAUS):
-                rows = hmm.decode(o["pa_target"], o["ph_target"], tf[r.key]["half"], pri[r.key], tau, "viterbi")
-                table[ti, j] = Lm.score_rows(r, T, "target", rows, tf[r.key]["idx"], gts[r.key])["spell_f1"]
-        for j, r in enumerate(fold_refs):
-            others = np.delete(table, j, axis=1).mean(1) if len(fold_refs) > 1 else table[:, j]
-            res[("tau", v, r.key)] = P.TAUS[int(np.argmax(others))]
-        res[("tau_table", v)] = {"table": table, "keys": [r.key for r in fold_refs]}
-    # every world, every variant; a world's rows (half, idx) are loaded once per fold
-    for r in fold_refs:
+                oofs[v] = {k: z[k] for k in z.files}
         for w in eval_worlds(r):
-            with np.load(C.paths(r)["feat"](w)) as z:
+            with np.load(C.paths(r)["feat"](w)) as z:          # a world's rows are loaded once per fold
                 half, idx = z["half"], z["idx"]
             for v in variants:
-                o = oofs[(v, r.key)]
-                rows = hmm.decode(o[f"pa_{w}"], o[f"ph_{w}"], half, pri[r.key], res[("tau", v, r.key)], "viterbi")
+                rows = hmm.decode(oofs[v][f"pa_{w}"], oofs[v][f"ph_{w}"], half, pri[r.key], tau, "viterbi")
                 res[(v, w, r.key)] = Lm.score_rows(r, T, w, rows, idx, gts[r.key])
+        for v in variants:
+            res[("tau", v, r.key)] = tau
     return res
 
 
@@ -347,12 +336,18 @@ def compare_worlds(res: dict, fold_refs: list, worlds=None, a: str = "d2", b: st
     return out
 
 
-def keep_verdict(cmp: dict) -> dict:
-    """The registered rule: keep the d2 mix iff no decision world is significantly worse."""
-    worse = [w for w in W.EVAL_WORLDS if w in cmp and cmp[w]["worse"]]
-    better = [w for w in W.EVAL_WORLDS if w in cmp and cmp[w]["better"]]
+def keep_verdict(cmp: dict, cmp8: dict | None = None) -> dict:
+    """The registered rule with amendment A1: keep a candidate mix iff no decision world is significantly
+    worse, on all the folds given (``cmp``) or on their IDSSE + Metrica subset (``cmp8``)."""
+    sets = [("all", cmp)] + ([("8", cmp8)] if cmp8 is not None else [])
+    worse = [f"{w} ({tag})" for tag, c in sets for w in W.EVAL_WORLDS if w in c and c[w]["worse"]]
+    better = [f"{w} ({tag})" for tag, c in sets for w in W.EVAL_WORLDS if w in c and c[w]["better"]]
     return {"keep": not worse, "worse": worse, "better": better,
             "missing": [w for w in W.EVAL_WORLDS if w not in cmp]}
+
+
+def dead_label_subset(fold_refs: list) -> list:
+    return [r for r in fold_refs if r.dataset in W.DEAD_LABEL_DATASETS]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -391,34 +386,30 @@ def m0_table(refs: list, worlds=M0_WORLDS, t_eval: int = T) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
-# reference signatures for the label-free alarm (katena.sim.alarm)
+# positional jitter, as the D5 audit measures it (A20; katena.diag.domain_gap on david/d5-audit)
 
-ALARM_WORLDS = ("mild", "target", "severe", "target_dead15", "target_cpl50", "target_cpl100", "target_ids",
-                "target_cpl100_ids")
-
-
-def alarm_reference(refs: list) -> dict:
-    """Signatures of the IDSSE development matches in each world (the ball is never missing natively,
-    so the world alone sets the ball loss), plus Metrica's own tracking (``metrica_native``: its real NaN
-    ball, players uncorrupted; development games only)."""
-    from katena.sim import alarm
-    sigs = {w: [] for w in ALARM_WORLDS + ("metrica_native",)}
-    used = []
-    for r in refs:
-        if r.dataset not in W.DEAD_LABEL_DATASETS:
-            continue
-        used.append(r.key)
-        m5 = downsample(load_match(r.path))
-        if r.dataset == "metrica":
-            sigs["metrica_native"].append(alarm.signature(m5))
-            continue
-        for w in ALARM_WORLDS:
-            cfg = C.CONFIG.get(w) or W.config(w)
-            sigs[w].append(alarm.signature(dg.corrupt(m5, cfg, P.seed_for(r.id, w))))
-    return {"matches": used, "grid_hz": 5.0,
-            "note": "external development matches only (worlds: IDSSE; metrica_native: Metrica); "
-                    "mean, sd, min, max over matches",
-            "worlds": {w: alarm.summarise(s) for w, s in sigs.items() if s}}
+def jitter_stats(m, window_s: float = 10.0) -> tuple[float, float]:
+    """(player, ball) jitter of a work-grid match: the 2-D second difference of each present slot, capped at
+    2 m and averaged over slots per sample, then averaged over 10 s windows of the in-play blocks (player);
+    the ball's 2-D second difference, median per window (ball); each the median over windows."""
+    n = m.n
+    with np.errstate(invalid="ignore"):
+        d2p = np.full((n, m.P.shape[1]), np.nan)
+        d2p[1:-1] = np.linalg.norm(m.P[2:] - 2 * m.P[1:-1] + m.P[:-2], axis=-1)
+        cnt = np.isfinite(d2p).sum(1)
+        pl = np.where(cnt > 0, np.nansum(np.minimum(np.nan_to_num(d2p, nan=0.0), 2.0), 1) / np.maximum(cnt, 1), np.nan)
+        bl = np.full(n, np.nan)
+        bl[1:-1] = np.linalg.norm(m.ball[2:] - 2 * m.ball[1:-1] + m.ball[:-2], axis=-1)
+    w = max(2, int(round(window_s * m.fps)))
+    pw, bw = [], []
+    for _, a, b in m.half_blocks:
+        for s in range(a, b + 1 - w + 1, w):
+            p, q = pl[s:s + w], bl[s:s + w]
+            if np.isfinite(p).any():
+                pw.append(np.nanmean(p))
+            if np.isfinite(q).any():
+                bw.append(np.nanmedian(q))
+    return (float(np.median(pw)) if pw else float("nan"), float(np.median(bw)) if bw else float("nan"))
 
 
 def save(obj, name: str) -> Path:

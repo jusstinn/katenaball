@@ -295,6 +295,19 @@ def test_world_constants_match_the_metrica_calibration_record():
     assert abs(W.WORLDS["target_cpl50"].dead_miss - 0.60) < 1e-9
 
 
+def test_smooth_worlds_match_the_external_jitter_record():
+    import json
+    rec = json.loads((Path(dg.__file__).with_name("jitter_external.json")).read_text())
+    assert rec["real"]["skillcorner"]["matches"] == 20                 # development matches only
+    assert abs(W.SMOOTH_SIGMA_PLAYER - rec["sigma_player"]) < 0.002
+    assert abs(W.SMOOTH_SIGMA_BALL - rec["sigma_ball"]) < 0.002
+    for s in ("mild", "target", "severe"):
+        w = W.WORLDS[f"{s}_smooth"]
+        assert (w.sigma_player, w.sigma_ball) == (W.SMOOTH_SIGMA_PLAYER, W.SMOOTH_SIGMA_BALL)
+        assert dataclasses.replace(w, name=s, sigma_player=dg.CONFIGS[s].sigma_player,
+                                   sigma_ball=dg.CONFIGS[s].sigma_ball) == dg.CONFIGS[s]
+
+
 def test_new_worlds_run_at_the_native_frame_rate():
     m = dead_span_match(seed=12, minutes=8.0, fps=25.0)
     share = float((m.y[block_mask(m)] == D).mean())

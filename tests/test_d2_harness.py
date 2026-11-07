@@ -63,13 +63,18 @@ def test_pool_layout_reproduces_the_bakeoff_pool_and_interleaves_worlds():
 def test_worlds_per_dataset():
     ids = d2.new_worlds(_ref("idsse"))
     sc = d2.new_worlds(_ref("skillcorner"))
-    assert "target_cpl100" in ids and "severe_cpl50" in ids and "target_ids" in ids
-    assert all("_cpl" not in w for w in sc) and set(sc) == {"mild_ids", "target_ids", "severe_ids"}
-    assert not set(ids) & set(dg.CONFIGS)
+    assert {"target_cpl100", "severe_cpl50", "target_ids", "target_smooth", "target_cpl100_ids"} <= set(ids)
+    assert set(sc) == {f"{s}_{k}" for s in ("mild", "target", "severe") for k in ("ids", "smooth")}
+    assert not set(ids) & set(dg.CONFIGS) and not set(ids) & set(C.CONFIG)
     assert all(W.applies(w, "idsse") for w in d2.eval_worlds(_ref("metrica")))
-    assert set(d2.eval_worlds(_ref("skillcorner"))) == {"mild", "target", "severe", "target_ids", "mild_ids", "severe_ids"}
+    assert set(d2.eval_worlds(_ref("skillcorner"))) == {"mild", "target", "severe"} | set(sc)
+    assert {"target_dead3", "target_dead15"} <= set(d2.eval_worlds(_ref("idsse")))
     for name in W.WORLDS:                                       # new names never shadow cached conditions
         assert name not in C.CONFIG and name not in C.BASE_CONDS
+    for v in d2.CANDIDATES:                                     # each mix starts with the cached condition
+        for ds in ("idsse", "skillcorner"):
+            assert all(ws[0] == s for s, ws in d2.mix_for(ds, v).items())
+    assert set(d2.mix_for("idsse", "d2j")["target"]) == set(d2.mix_for("idsse", "d2")["target"]) | {"target_smooth"}
 
 
 def test_official_baseline_windows():
@@ -104,7 +109,7 @@ def _fake_cache(tmp_path, monkeypatch, n5=600, keys=("a", "b", "c")):
             f = C.paths(r)["feat"](w)
             f.parent.mkdir(parents=True, exist_ok=True)
             np.savez(f, idx=idx, half=half)
-        for v, noise in (("cur", 0.45), ("d2", 0.05)):
+        for v, noise in (("cur", 0.45), ("d2", 0.05), ("d2j", 0.05)):
             arrays = {}
             for w in d2.eval_worlds(r):
                 flip = rng.random(len(yr)) < noise
@@ -123,12 +128,13 @@ def test_score_stage_end_to_end_on_a_fake_cache(tmp_path, monkeypatch):
     for r in refs:
         for w in d2.eval_worlds(r):
             assert res[("d2", w, r.key)]["spell_f1"] >= res[("cur", w, r.key)]["spell_f1"]
-        assert res[("tau", "d2", r.key)] in P.TAUS
-    cmp = d2.compare_worlds(res, refs)
-    assert set(cmp) == set(W.EVAL_WORLDS) | set(d2.SECONDARY) | set(d2.SECONDARY_IDSSE)
-    assert all(c["n"] == 3 and c["mean_diff"] > 0 for c in cmp.values())
-    v = d2.keep_verdict(cmp)
-    assert v["keep"] and not v["worse"] and not v["missing"]
+        assert res[("tau", "d2", r.key)] == res[("tau", "cur", r.key)] == 2.0       # fixed (amendment A1)
+    for cand in d2.CANDIDATES:
+        cmp = d2.compare_worlds(res, refs, a=cand)
+        assert set(cmp) == set(W.EVAL_WORLDS) | set(d2.SECONDARY) | set(d2.SECONDARY_IDSSE)
+        assert all(c["n"] == 3 and c["mean_diff"] > 0 for c in cmp.values())
+        v = d2.keep_verdict(cmp, d2.compare_worlds(res, d2.dead_label_subset(refs), a=cand))
+        assert v["keep"] and not v["worse"] and not v["missing"]
 
 
 def _cmp(mean_diff, lo, hi, win_rate=0.5):
@@ -138,11 +144,14 @@ def _cmp(mean_diff, lo, hi, win_rate=0.5):
 
 def test_keep_rule():
     ok = {w: _cmp(0.001, -0.002, 0.004) for w in W.EVAL_WORLDS}
-    assert d2.keep_verdict(ok)["keep"]
+    assert d2.keep_verdict(ok)["keep"] and d2.keep_verdict(ok, ok)["keep"]
     bad = dict(ok, target=_cmp(-0.004, -0.007, -0.001))
     v = d2.keep_verdict(bad)
-    assert not v["keep"] and v["worse"] == ["target"]
+    assert not v["keep"] and v["worse"] == ["target (all)"]
+    v = d2.keep_verdict(ok, bad)                                  # worse on the 8 IDSSE + Metrica folds only
+    assert not v["keep"] and v["worse"] == ["target (8)"]
     sec = dict(ok, severe_ids=_cmp(-0.01, -0.02, -0.005))        # secondary worlds do not decide
-    assert d2.keep_verdict(sec)["keep"]
+    assert d2.keep_verdict(sec, sec)["keep"]
     good = dict(ok, target_cpl100=_cmp(0.01, 0.004, 0.016, 0.875))
-    assert d2.keep_verdict(good)["better"] == ["target_cpl100"]
+    assert d2.keep_verdict(good)["better"] == ["target_cpl100 (all)"]
+    assert "target_smooth" in W.EVAL_WORLDS

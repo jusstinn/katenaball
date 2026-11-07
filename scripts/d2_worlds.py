@@ -33,8 +33,8 @@ from katena.eval import protocol as P  # noqa: E402
 from katena.sim import worlds as W  # noqa: E402
 
 
-def _fmt_gate(cmp: dict, verdict: dict) -> str:
-    lines = ["| world | folds | cur | d2 | d2 - cur | 95% CI | wins | macroF1 cur / d2 | verdict |",
+def _fmt_gate(cmp: dict, verdict: dict, cand: str = "d2") -> str:
+    lines = [f"| world | folds | cur | {cand} | {cand} - cur | 95% CI | wins | macroF1 cur / {cand} | verdict |",
              "|---|---|---|---|---|---|---|---|---|"]
     for w, c in cmp.items():
         tag = "worse" if c["worse"] else ("better" if c["better"] else "-")
@@ -43,7 +43,7 @@ def _fmt_gate(cmp: dict, verdict: dict) -> str:
         lines.append(f"| {w} | {c['n']} | {c['mean_b']:.4f} | {c['mean_a']:.4f} | {c['mean_diff']:+.4f} | "
                      f"[{c['lo']:+.4f}, {c['hi']:+.4f}] | {c['wins']}/{c['n']} | {c['macro_b']:.3f} / {c['macro_a']:.3f} | {tag} |")
     lines.append("")
-    lines.append(f"KEEP d2 mix: {verdict['keep']}  (worse: {verdict['worse'] or 'none'}; "
+    lines.append(f"KEEP {cand} mix: {verdict['keep']}  (worse: {verdict['worse'] or 'none'}; "
                  f"better by the adoption rule: {verdict['better'] or 'none'}; missing: {verdict['missing'] or 'none'})")
     return "\n".join(lines)
 
@@ -75,7 +75,7 @@ def _fmt_m0(tab: dict) -> str:
     return "\n".join(lines)
 
 
-STAGES = ("build", "pools", "lomo", "score", "m0", "alarm")
+STAGES = ("build", "pools", "lomo", "score", "m0")
 
 
 def main() -> None:
@@ -83,7 +83,7 @@ def main() -> None:
     ap.add_argument("stages", help="one or more of " + ", ".join(STAGES) + ", comma-separated, run in order")
     ap.add_argument("--folds", default="8", help="8 (IDSSE + Metrica), 28 (all development), or match keys")
     ap.add_argument("--workers", type=int, default=2)
-    ap.add_argument("--variants", default="cur,d2")
+    ap.add_argument("--variants", default="cur,d2,d2j")
     a = ap.parse_args()
     stages = a.stages.split(",")
     if not set(stages) <= set(STAGES):
@@ -101,21 +101,28 @@ def run_stage(stage: str, a) -> None:
         d2.build_all(workers=a.workers)
     elif a.stage == "pools":
         for r in dev:
-            d2.build_pool(r)
-            print("pool", r.key, flush=True)
+            for v in d2.CANDIDATES:
+                d2.build_pool(r, v)
+            print("pools", r.key, flush=True)
     elif a.stage == "lomo":
         d2.run_lomo(d2.folds(a.folds, dev), dev, variants=tuple(a.variants.split(",")))
     elif a.stage == "score":
         fr = d2.folds(a.folds, dev)
-        res = d2.score_folds(fr, dev, variants=tuple(a.variants.split(",")))
+        variants = tuple(a.variants.split(","))
+        res = d2.score_folds(fr, dev, variants=variants)
         d2.save(res, f"scores_{a.folds}.pkl")
-        cmp = d2.compare_worlds(res, fr)
-        verdict = d2.keep_verdict(cmp)
-        taus = {v: [res[("tau", v, r.key)] for r in fr] for v in a.variants.split(",")}
-        print(_fmt_gate(cmp, verdict))
-        print("tau per fold:", {v: dict(zip(*np.unique(t, return_counts=True))) for v, t in taus.items()})
-        out = {"folds": [r.key for r in fr], "verdict": verdict, "taus": taus,
-               "compare": {w: {k: v for k, v in c.items()} for w, c in cmp.items()}}
+        fr8 = d2.dead_label_subset(fr)
+        out = {"folds": [r.key for r in fr], "tau": d2.TAU, "candidates": {}}
+        for cand in (v for v in variants if v != "cur"):
+            cmp = d2.compare_worlds(res, fr, a=cand)
+            cmp8 = d2.compare_worlds(res, fr8, a=cand) if len(fr8) < len(fr) else None
+            verdict = d2.keep_verdict(cmp, cmp8)
+            print(f"\n### {cand} vs cur, {len(fr)} folds, tau {d2.TAU:g}")
+            print(_fmt_gate(cmp, verdict, cand))
+            if cmp8 is not None:
+                print(f"\n### {cand} vs cur, the {len(fr8)} IDSSE + Metrica folds of the same run")
+                print(_fmt_gate(cmp8, d2.keep_verdict(cmp8), cand))
+            out["candidates"][cand] = {"verdict": verdict, "compare": cmp, "compare_8": cmp8}
         p = d2.root() / f"gate_{a.folds}.json"
         p.write_text(json.dumps(out, indent=1, default=float))
         print("wrote", p)
@@ -123,16 +130,6 @@ def run_stage(stage: str, a) -> None:
         tab = d2.m0_table(dev)
         d2.save(tab, "m0.pkl")
         print(_fmt_m0(tab))
-    elif a.stage == "alarm":
-        from katena.sim import alarm
-        ref = d2.alarm_reference(dev)
-        alarm.REF_PATH.write_text(json.dumps(ref, indent=1, sort_keys=True) + "\n")
-        keys = alarm.BALL_KEYS + ("objects_mean", "slot_starts_per_min")
-        print("| world | " + " | ".join(keys) + " |")
-        print("|---|" + "---|" * len(keys))
-        for w, st in ref["worlds"].items():
-            print(f"| {w} | " + " | ".join(f"{st[k][0]:.3f} ({st[k][1]:.3f})" for k in keys) + " |")
-        print("wrote", alarm.REF_PATH)
     print(f"[d2] done in {(time.time() - t0) / 60:.1f} min", flush=True)
 
 

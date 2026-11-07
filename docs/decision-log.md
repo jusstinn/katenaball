@@ -42,6 +42,23 @@ published windows, on the IDSSE and Metrica development matches, and set it besi
 full-match scores (smooth50: macroF1 0.6724, spellF1 0.2433). This is a report only. The kappa levels
 above were fixed before it was computed, and it chooses no world.
 
+**Amendment A1**, also before any gate result. It follows the D5 audit (`docs/audit/d5-bakeoff-audit.md`
+on `david/d5-audit`: A2, A18, A20), relayed by the coordinator.
+
+- **Tau.** Tau is fixed at 2 for every variant. Per-fold tau selection would use folds whose models saw the
+  held-out match.
+- **Folds.** The 8 IDSSE + Metrica folds are reported beside the 28. A decision world gets worse if it is
+  significantly worse on either set. SkillCorner, which has no D, cannot show a dead-ball change.
+- **Smooth worlds.** `{mild,target,severe}_smooth` are the severity's config with player jitter 0 and ball
+  jitter 0.058 m. On D5's 5 Hz second-difference statistic this gives the SkillCorner development
+  matches' 0.046 m per slot and 0.21 m for the ball, against 0.92 m and 1.80 m in `target`
+  (`scripts/d2_calibrate.py --jitter`, `jitter_external.json`). `target_smooth` is a decision world on
+  28 folds.
+- **Second candidate.** `d2j` is the d2 mix with s_smooth added to each severity's list (IDSSE and
+  Metrica 5 worlds, SkillCorner 3). The same rule applies.
+- **Alarm.** There is no D2 alarm. D5 ported David's domain-gap alarm (`katena.diag.domain_gap`), so the
+  D2 one was removed unused.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
