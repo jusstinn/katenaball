@@ -26,8 +26,11 @@ shapes, hashes, run times).
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/). `uv.lock` pins every dependency, and `.python-version` pins Python 3.11.
-- About 25 GB of free disk and 16 GB of RAM. On a 10-core laptop the run takes about 1-2 hours, most of it
-  in the training worlds.
+- About 25 GB of free disk: 5 GB of external data and an 18 GB cache.
+- 16 GB of RAM is enough.
+- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model took 18 minutes:
+  corpus 4.5, worlds 9.5, LightGBM 0.25, TCN 3.5. Labelling the match takes well under a minute. The
+  external download is extra.
 - On macOS without Homebrew's libomp, the scripts load LightGBM through scikit-learn's bundled copy and
   re-execute themselves once (`gbdt.ensure_openmp`).
 
@@ -38,6 +41,8 @@ shapes, hashes, run times).
 - LightGBM runs with `deterministic=True` and the TCN with deterministic torch algorithms and 4 threads.
 - The CSV is built as bytes with LF line endings on every OS.
 - `tests/test_pipeline.py` checks that two caches give byte-identical models and labels.
+- A full rebuild from scratch on one Mac reproduced every corpus file and the model hashes byte for byte
+  (`docs/decision-log.md`, J2).
 - CI checks a synthetic run for byte identity on Linux, macOS and Windows.
 - Expect identical labels across machines but not identical model bytes: torch's last bits depend on the
   CPU. The D3 probe found that this changes no label. To confirm, compare the submission sha256 from two
@@ -52,4 +57,4 @@ rebuilding them:
 uv run python scripts/make_submission.py corpus --seed-from work/bakeoff
 ```
 
-The copied files are the same files the corpus step writes.
+The copied files are byte-identical to what the corpus step writes, which was checked on all 150 files.

@@ -42,21 +42,27 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=REPO / "submissions" / "submission.csv")
     ap.add_argument("--seed-from", type=Path, default=None,
                     help="a finished bake-off cache to copy the corpus files from (default: build them)")
-    ap.add_argument("--workers", type=int, default=1, help="processes for the worlds stage")
+    ap.add_argument("--workers", type=int, default=1, help="processes for the corpus and worlds stages")
     ap.add_argument("--data-dir", type=Path, default=None, help="the data bundle (default: data/)")
     a = ap.parse_args(argv)
     t0 = time.time()
     PL.log(f"cache {P.WORK}; env {json.dumps(PL.env_report(), sort_keys=True)}")
     refs = PL.training_refs() if a.stage != "predict" else None
     if a.stage in ("all", "corpus"):
-        PL.log(f"corpus {PL.stage_corpus(refs, a.seed_from)}")
+        PL.log(f"corpus {PL.stage_corpus(refs, a.seed_from, a.workers)}")
     if a.stage in ("all", "worlds"):
         st = PL.stage_worlds(refs, a.workers)
         PL.log(f"worlds: {len(st)} matches, {sum(s['touch_built'] for s in st)} touch files built")
     if a.stage in ("all", "train"):
         PL.log(f"train {json.dumps(PL.stage_train(refs), sort_keys=True)}")
     if a.stage in ("all", "predict"):
-        rep = PL.stage_predict(a.out, a.data_dir)
+        try:
+            rep = PL.stage_predict(a.out, a.data_dir)
+        except Exception as e:     # an exception message can quote the match file: type and code lines only
+            import traceback
+            where = [f"{Path(f.filename).name}:{f.lineno} {f.name}" for f in traceback.extract_tb(e.__traceback__)]
+            print(f"predict failed: {type(e).__name__} at " + " <- ".join(reversed(where)), flush=True)
+            return 1
         print(json.dumps(rep, indent=1, sort_keys=True), flush=True)
     PL.log(f"done in {time.time() - t0:.0f}s")
     return 0

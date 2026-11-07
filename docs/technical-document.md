@@ -78,7 +78,7 @@ with a degrader before training:
 - **The `d2j` mix:** also trains on ball loss tied to stoppages, identity swaps and smooth positions.
   These came from what external tracking looks like, again never from the provided match.
 
-The final model trains on all 30 external matches (TODO: row count from `work/final/model/manifest.json`).
+The final model trains on all 30 external matches, 657,133 rows.
 
 ## 4. The possession rules we implemented
 

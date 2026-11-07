@@ -74,12 +74,14 @@ def _corpus_files(ref: P.Ref) -> list:
     return [pth["gt"], pth["pool"]] + [pth["feat"](c) for c in C.POOL_CONDS]
 
 
-def stage_corpus(refs: list, seed_from: Path | None = None) -> dict:
+def stage_corpus(refs: list, seed_from: Path | None = None, workers: int = 1) -> dict:
     """Ground truth, base pool and mild/target/severe features of every match. Files from a bake-off cache
-    are copied (they are what ``corpus.build_one`` writes); anything missing is built here."""
+    are copied (they are what ``corpus.build_one`` writes); anything missing is built here, in ``workers``
+    processes. Each match's files depend only on that match, so the worker count does not change them."""
     if seed_from is not None and Path(seed_from).resolve() == P.WORK.resolve():
         raise RuntimeError("the final cache must not be the bake-off cache")
     st = {"copied": 0, "built": 0, "present": 0}
+    build = []
     for r in refs:
         files = _corpus_files(r)
         if all(f.exists() for f in files):
@@ -95,8 +97,17 @@ def stage_corpus(refs: list, seed_from: Path | None = None) -> dict:
                 tmp.replace(dst)
             st["copied"] += 1
         else:
+            build.append(r)
+    if workers <= 1 or len(build) <= 1:
+        for r in build:
             C.build_one(r)
-            st["built"] += 1
+            log(f"corpus built {r.key}")
+    else:
+        import multiprocessing as mp
+        with mp.get_context("spawn").Pool(workers) as pool:
+            for key in pool.imap_unordered(C.build_one, build):
+                log(f"corpus built {key}")
+    st["built"] = len(build)
     return st
 
 

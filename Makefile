@@ -4,6 +4,7 @@
 PY   := uv run python
 TEAM ?= katenaball
 OUT  := submissions/$(TEAM).csv
+WORKERS ?= 3
 
 .PHONY: submit external model predict validate test
 
@@ -13,8 +14,8 @@ external:
 	$(PY) scripts/build_external.py
 
 model:
-	$(PY) scripts/make_submission.py corpus
-	$(PY) scripts/make_submission.py worlds --workers 3
+	$(PY) scripts/make_submission.py corpus --workers $(WORKERS)
+	$(PY) scripts/make_submission.py worlds --workers $(WORKERS)
 	$(PY) scripts/make_submission.py train
 
 predict:

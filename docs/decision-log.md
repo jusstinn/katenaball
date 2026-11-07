@@ -6,6 +6,45 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-07
 
+### J2: final pipeline (Justin + Claude, `j2-final-pipeline`)
+
+**What.** `katena.pipeline` and `scripts/make_submission.py` (`make submit`) train candidate F exactly as
+pre-registered. Every constant comes from `katena.eval.final`, and nothing was tuned. Training uses all 30
+external matches with nothing held out, the two benches included. The model is saved as
+`work/final/model/bundle.pkl`, with its hashes in `manifest.json`. On the real match, `predict` computes
+features from the real 5 Hz grid and touch columns from the real 25 Hz ball, blends the members at
+w = 0.5, decodes with Viterbi at tau 2 and writes the CSV with LF line ends. It runs the official checks on
+the bytes written and prints aggregates only. A crash prints the exception type and code lines only. No
+real-match run yet: the data bundle is not on our machines.
+
+**Training run on this Mac** (M-series arm64, 10 cores, 16 GB):
+
+| Step | Result |
+|---|---|
+| Worlds | 330 touch files in 7.5 min (3 workers); every world's re-run corruption matched its cached features |
+| Pool | 657,133 rows x 213 columns |
+| LightGBM member | 9 s |
+| TCN member | 189 s |
+| Cache size | 16 GB |
+| Hashes | gbdt `b2146150...`, tcn `456fc2c2...`, bundle `16eeaed0...` |
+
+**Prediction smoke test, synthetic only.** A 199,319-frame synthetic match with two 45-minute halves was
+labelled in 17 s, and the official validator accepts the file.
+
+**Reproducibility, same machine: byte-identical from scratch.** A second cache rebuilt everything without
+copying anything (corpus, worlds, train, 3 workers) in 18 min.
+- All 150 corpus files (ground truth, pools, mild/target/severe features) are byte-identical to the
+  bake-off cache's.
+- The model hashes are identical: gbdt, tcn and `bundle.pkl`.
+- `tests/test_pipeline.py` checks the same property on a synthetic corpus.
+- Not yet tested on a second machine.
+
+**Open for the team.**
+- **Kickoff.** The graded second half starts before its kickoff, and those frames are D. F has to find
+  that from the tracking. A kickoff detector must work from the tracking, never from a frame constant.
+- **Cross-machine.** The two-machine hash test (J3) compares submission bytes, because torch's last bits
+  differ by CPU.
+
 ### D5: audit and reconciliation (David's side, `david/d5-audit`)
 
 **M2 reproduces on the Windows machine: 0.5861 on 28 folds**, every per-dataset, per-severity and fixed-tau mean

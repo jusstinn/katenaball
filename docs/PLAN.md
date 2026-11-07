@@ -157,6 +157,25 @@ There is no leaderboard, so this protocol is what makes our decisions real.
 Warning signs of overfitting: gains that vanish on another dataset, large output changes with no external gain, a drifting spell count, or
 results that depend on a narrow parameter band.
 
+## Status, Sat Nov 7
+
+| Package | State |
+|---|---|
+| D0-D5 | Done and merged (PRs 1-7). F (touch + ensemble + `d2j`) passes the gate, +0.016, 22/28 wins: PR 8, open |
+| J2 | Done on branch `j2-final-pipeline`, built on PR 8: `make submit`, trains F on all 30 matches, `tests/test_pipeline.py` |
+| J3 | Started: `docs/REPRODUCE.md`, `docs/technical-document.md` draft. Two-machine hash test not done |
+| J1 | **Blocked: the data bundle is not on any of our machines.** Nothing has run on the real match |
+| J4-J6 | Not started |
+
+**Proposed rebalance.** David finished a week of packages in a day, so the critical path is now the real match:
+
+- **Justin:** J1 first, as soon as the data is here: `probe_schema.py`, `check_target.py`, `check_target_layout.py`,
+  `check_touch_target.py`, then `make predict` for a first file. Then the insurance submission, J3, J5.
+- **David:** J4 gap filling, and a kickoff detector. The graded second half starts before its kickoff, and those
+  frames are D. Detect it from the tracking, never from a frame constant. Then the two-machine hash test from the
+  Windows side.
+- **Both:** decide whether to merge PR 8, given its selection caveat.
+
 ## Work split
 
 The bake-off already built most of the old plan: external loaders, degrader, features, LightGBM, decoder, harness, and target loaders. This is the
