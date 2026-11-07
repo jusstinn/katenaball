@@ -424,6 +424,79 @@ noise levels. Determinism is not the blocker: same-machine regeneration is byte-
 tested second member. Re-gate it, with w = 0.5 declared in advance, on top of any D1 or D2 change. Weighting severe
 noise or the dead-labelled folds more heavily would be a rule change, to be made before looking again, not after.
 
+### Final candidate F (pre-registration)
+
+**Registered before any score of F was computed.** Branch `david/final-candidate`, cut from `origin/main` at
+`be107d1` (PRs #1 to #7, including the `lift_ball` review fix). External development matches only: no `data/`, no
+`evaluation/gt/`, no public window, no locked bench. Code: `katena.eval.final`, `scripts/run_final.py`; cache
+`D:/katena/work-final`. Nothing below changes after a result.
+
+**Candidate.** `F` = `ensemble.blend_heads(lgbm, tcn, w=0.5)`, the logit average per head, decoded by the existing
+3-state Viterbi at fixed tau = 2 with priors fit on the training matches' labels (`bakeoff.priors_for`: the IDSSE and
+Metrica label sequences without the held-out match, as `d3.stage_score`), T = 2 (`protocol.T_MAIN`). In fold k both
+members train on the same 27 development matches. The held-out match is in no model, scaler or prior.
+
+| Member | Input columns | Training data | Model |
+|---|---|---|---|
+| LightGBM (`FG`, F at w = 0) | M2's 160 plus D1's 53 `touch` (213) | The `d2j` pool, built as `d2.build_pool` does: the bake-off pool's rows, orientations and T = 2 labels (stride 4, one residue class per severity), each severity's rows split evenly, interleaved, over `TRAIN_MIXES["d2j"]` for the match's dataset. The touch columns of each row come from the same world (`d2.assemble_pool` run over the touch files). | M2's heads and parameters (`gbdt.fit_heads`, `PARAMS`, 150 trees, through `Pools.fit`) |
+| TCN (`FT`, F at w = 1) | M2's 160 only | One whole-match sequence per (training match, world) for every world in the match's `d2j` mix: 15 per IDSSE or Metrica match (5 worlds x 3 severities), 9 per SkillCorner match. Orientation drawn per sequence as `stages._tcn_seqs` does, from `default_rng(0)`, in the order development match (corpus order), severity (mild, target, severe), world (mix order), over all 28 matches, so the draws do not depend on the fold. Scaler: `tcn.Scaler` on every 6th `d2j` pool row (M2 columns) of the 27 training matches, as `d3.fit_tcn_excluding`. | `katena.models.tcn` unchanged, through `ensemble.fit_tcn`: seed 0, 4 threads, deterministic algorithms, `pin_cpu_env` before torch loads, 1200 steps |
+
+- **Touch columns in every world.** Computed the way `touch_gate` computes its conditions. The 5 Hz world is
+  re-corrupted with the corpus seed (`seed_for(id, world)`) and checked against that world's cached base features:
+  identical in-play rows, M0 predictions and degrader statistics. Its ball corruption is then lifted to the native
+  frames with `lift_ball`, using seed `seed_for(id, world + "|native")` and the world's ball jitter. No world needs an
+  exception. Every D2 world corrupts the ball only by drops, held false detections and i.i.d. jitter, which is what
+  `lift_ball` lifts. Identity switches and fragment cuts move players only.
+- **Evaluation worlds.** `target` and `severe` on 28 folds decide. F and both members are also predicted in every
+  `worlds.EVAL_WORLDS` world that applies to the fold. `target_cpl100_ids` is the one world outside the training mix,
+  so its touch columns are built for the 8 IDSSE + Metrica matches as well.
+- **A consequence of the TCN design, recorded now.** `tcn.train` draws windows in proportion to sequence length.
+  An IDSSE or Metrica match now has 15 sequences against 9 for a SkillCorner match, so per match the TCN sees the 8
+  dead-labelled matches 5/3 as often as D3's TCN did (3 sequences each). By pooled length they give 39% of the
+  windows instead of 28%. The LightGBM pool keeps each match's row count. This is the definition as written, and it stays.
+- **Memory, not a change.** The sequences are held in float16 (as `_tcn_seqs` holds them) and scaled when a window is
+  drawn, instead of all 285 to 291 training sequences up front (about 5 GB of float32). The scaler is elementwise, so
+  the training input is bit-identical. `tests/test_final.py` checks the TCN weight hash both ways.
+
+**Incumbent.** The stored M2 scores in `D:/katena/work-base` (read only; target-like 0.5861 on 28 folds). This code
+re-decodes `work-base/oof/full` at tau 2, and the result must equal the stored scores on every fold and condition.
+`FG` is not M2: it is the LightGBM member with touch and `d2j`.
+
+**Rule** (`katena.eval.bootstrap`, unchanged). Adopt F if and only if both hold on the 28 development folds:
+
+- at `target`, it wins on at least 70% of folds (at least 20 of 28, a win being a strictly higher spellF1) and the
+  paired 95% bootstrap interval of the mean difference (possessions resampled, 2000 draws, seed 0) lies above 0
+  (`adopted`);
+- at `severe`, it is not worse. Worse means, as in D2, a mean difference below 0 with the interval's upper bound also
+  below 0.
+
+The 8 IDSSE + Metrica folds (`stages.FOLDS8`) and the per-dataset means are reported beside the 28 and do not decide.
+Nothing is tuned after the gate. If F fails, M2 stays.
+
+**Information only, never a reason to change F.**
+
+- F in `worlds.EVAL_WORLDS` (the coupled worlds on the 8 folds only), against M2's heads in the same worlds. These
+  are D2's `cur` probabilities re-decoded at tau 2; they must equal the stored M2 at `target` and `severe`.
+- `FG` and `FT` alone, taken from the same runs.
+- macroF1 on IDSSE + Metrica.
+- CPU time and wall time of each stage, and peak memory.
+- Same-machine byte identity of one fold, `DFL-MAT-J03WMX`: two fresh processes train both members and decode, and
+  we compare the SHA-256 of the TCN weights, of both members' and the blended probabilities, and of the labels at
+  `target` and `severe`, also against the LOMO run's files for that fold.
+
+**Reused caches.** These are read only and copied into `work-final`, development matches only.
+
+- From `work-base` (code `8537084`): ground truth, base pools and the `mild`/`target`/`severe` features. `featurize`
+  and `corpus` have changed since only in imports, comments and the optional native-ball hook. The degrader's default
+  path is pinned by D2's frozen-copy test.
+- From `work-d2`: the D2-world features, built 11:04 to 11:49 on 2026-11-07. `degrade.py` has not changed since
+  `8067e59` (10:42), and the world definitions have not changed since they were built.
+
+Every copied (match, world) is checked in the touch build (rows, M0, degrader statistics). The `d2j` pools are rebuilt
+from the copies and compared with `work-d2/pool_d2j`. The first match of each dataset is re-featurized in all of its
+worlds and compared byte for byte. A file that fails a check is rebuilt in `work-final` with the current code, never
+dropped.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
