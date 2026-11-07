@@ -130,6 +130,11 @@ either candidate, so both go on to 28 folds.
 - **The bake-off's dead-coupled worlds.** `target_dead3` and `target_dead15` (IDSSE, 6 folds) do not
   move.
 
+**Amendment A2**, written after the screen and before any 28-fold result. If both candidates are kept, we
+recommend the one with the larger worst-case mean difference over the decision worlds. Each world counts
+on the 28 folds where it runs there, otherwise on the 8. This follows PLAN.md: "prefer changes that help
+in every world". The 8-fold numbers above were known when this was written.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
