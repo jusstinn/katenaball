@@ -446,6 +446,23 @@ def _half_features(det: dict, dh_nat: np.ndarray, da_nat: np.ndarray, focal: int
     return names, cols
 
 
+def count_touches(m: Match, nb: NativeBall) -> dict:
+    """Aggregate event counts over the halves of ``m`` (for logging on the real match: counts only)."""
+    out = {"events": 0, "identified": 0, "minutes": 0.0}
+    step = nb.step
+    for h, a5, b5 in m.half_blocks:
+        j_lo = max(0, a5 * step - step // 2)
+        j_hi = min(nb.n - 1, b5 * step + (step - 1) // 2)
+        fn = lambda fr, _lo=j_lo: players_at(m.P, (fr + _lo) / float(step))   # noqa: E731
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            det = detect_touches(nb.ball[j_lo:j_hi + 1], nb.fps, fn, m.team)
+        out["events"] += int(len(det["t"]))
+        out["identified"] += int((det["who"] >= 0).sum())
+        out["minutes"] += (j_hi - j_lo + 1) / nb.fps / 60.0
+    return out
+
+
 def touch_features(m: Match, nb: NativeBall, focals=(0, 1)) -> tuple[dict, list, np.ndarray]:
     """Touch features of the work-grid match ``m`` (players; usually corrupted) and its native ball.
 
