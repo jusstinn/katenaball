@@ -57,9 +57,23 @@ def probe_xml(path: str) -> None:
         print(f"    {tag}: {count}, {sorted(attributes[tag])}")
 
 
+def _is_number(field: str) -> bool:
+    try:
+        float(field)
+    except ValueError:
+        return False
+    return True
+
+
 def probe_csv_header(path: str) -> None:
-    with open(path) as handle:
-        print("  columns:", handle.readline().strip())
+    """The column names. DATA.md documents a header line, but if the first line turns out to be
+    data (any field is a number), print only its field count: a data row is a frame-level value."""
+    with open(path, encoding="utf-8-sig") as handle:
+        fields = [f.strip() for f in handle.readline().strip().split(",")]
+    if any(_is_number(f) for f in fields):
+        print(f"  first line is not a header ({len(fields)} fields); not printed")
+    else:
+        print("  columns:", ",".join(fields))
 
 
 def probe_video(path: str) -> None:

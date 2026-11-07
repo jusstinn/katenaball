@@ -56,10 +56,16 @@ def locked_idsse(ids: list[str]) -> str:
     return min(ids, key=idsse_hash)
 
 
+IDSSE_IDS = ("DFL-MAT-J03WMX", "DFL-MAT-J03WN1", "DFL-MAT-J03WOH", "DFL-MAT-J03WOY",
+             "DFL-MAT-J03WPY", "DFL-MAT-J03WQQ", "DFL-MAT-J03WR9")
+LOCKED_IDSSE = "DFL-MAT-J03WQQ"          # locked_idsse(IDSSE_IDS), computed before any run; a test pins it
+
+
 def split(refs: list[Ref]) -> tuple[list[Ref], list[Ref]]:
-    """(development, locked benches)."""
-    li = locked_idsse([r.id for r in refs if r.dataset == "idsse"])
-    locked = [r for r in refs if (r.dataset == "idsse" and r.id == li)
+    """(development, locked benches). The benches are pinned by id: with a partial corpus, the
+    smallest hash among the matches present would be a different match, which would quietly
+    become the bench while the real bench, once built, joined the training set."""
+    locked = [r for r in refs if (r.dataset == "idsse" and r.id == LOCKED_IDSSE)
               or (r.dataset == "metrica" and r.id == LOCKED_METRICA)]
     dev = [r for r in refs if r not in locked]
     return dev, locked
