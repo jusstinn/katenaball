@@ -100,6 +100,36 @@ majority window) at 5 Hz, scored at T = 2 on the 6 IDSSE development matches
   fragments and the same object count (20.3) and slots (46).
 - **SkillCorner.** It keeps 15.3 objects (audit A19).
 
+**Result 2: screen, the 8 IDSSE + Metrica folds.** These are LOMO folds, Viterbi at tau 2, scored with the
+official `evaluate`. CI is the paired 95% bootstrap over possessions.
+
+- **Sanity checks.** `cur` reproduces the base cache's M2 exactly: its out-of-fold probabilities are
+  byte-identical, and it scores target 0.5689 (D5's 0.569), mild 0.6122 and severe 0.5149.
+- **Fold sets.** Under A1 these 8 folds are final for both fold sets. Tau is fixed, and the priors leave
+  out only the held-out match, so the 28-fold run gives the same scores on them.
+
+| Decision world | cur | d2 - cur [CI] | wins | d2j - cur [CI] | wins |
+|---|---|---|---|---|---|
+| `mild` | 0.6122 | +0.0007 [-0.0052, +0.0067] | 5/8 | +0.0031 [-0.0029, +0.0092] | 4/8 |
+| `target` | 0.5689 | +0.0004 [-0.0061, +0.0067] | 2/8 | -0.0025 [-0.0084, +0.0034] | 4/8 |
+| `severe` | 0.5149 | -0.0002 [-0.0072, +0.0069] | 4/8 | -0.0019 [-0.0093, +0.0050] | 3/8 |
+| `target_ids` | 0.5791 | +0.0009 [-0.0059, +0.0075] | 5/8 | -0.0013 [-0.0083, +0.0054] | 3/8 |
+| `target_smooth` | 0.5679 | +0.0032 [-0.0040, +0.0105] | 4/8 | **+0.0078 [+0.0005, +0.0152]** | 6/8 |
+| `target_cpl50` | 0.5873 | +0.0086 [+0.0017, +0.0155] | 5/8 | **+0.0160 [+0.0094, +0.0234]** | 8/8 |
+| `target_cpl100` | 0.5951 | **+0.0097 [+0.0032, +0.0163]** | 6/8 | +0.0123 [+0.0055, +0.0195] | 5/8 |
+| `target_cpl100_ids` | 0.5900 | **+0.0133 [+0.0070, +0.0195]** | 7/8 | **+0.0140 [+0.0076, +0.0205]** | 7/8 |
+
+Bold marks a world that passes the adoption rule (wins >= 70% and CI > 0). No decision world is worse for
+either candidate, so both go on to 28 folds.
+
+- **Secondary worlds.** Both candidates gain in every coupled secondary world, by +0.008 to +0.020.
+- **The jitter gap.** `d2j` gains most where positions are smooth: `severe_smooth` +0.024 (8/8) and
+  `mild_smooth` +0.011 (7/8). `cur` itself scores lower on smooth input than on rough
+  (`severe_smooth` 0.504 against `severe` 0.515). The models depend on the jitter they were trained on,
+  and the D5 audit found real tracking far smoother.
+- **The bake-off's dead-coupled worlds.** `target_dead3` and `target_dead15` (IDSSE, 6 folds) do not
+  move.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on
