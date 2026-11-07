@@ -23,7 +23,6 @@ import numpy as np  # noqa: E402
 
 from katena.eval import bakeoff as B  # noqa: E402
 from katena.eval import corpus as C  # noqa: E402
-from katena.eval import lomo as Lm  # noqa: E402
 from katena.eval import protocol as P  # noqa: E402
 from katena.eval import stages as S  # noqa: E402
 from katena.eval.lomo import Pools, Results, timed  # noqa: E402

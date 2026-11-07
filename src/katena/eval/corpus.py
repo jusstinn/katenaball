@@ -5,11 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import warnings
-from pathlib import Path
 
 import numpy as np
 
-import possession_metrics as pm
 from katena.eval import protocol as P
 from katena.featurize.build import featurize, infer_dirs
 from katena.grid import downsample

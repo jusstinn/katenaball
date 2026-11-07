@@ -15,7 +15,6 @@ from katena.eval import protocol as P
 from katena.eval.score import score, to_native_codes
 from katena.models import gbdt
 from katena.models.rules import m1_predict
-from katena.types import X as XL
 
 OOF_DIR = P.WORK / "oof"
 RES_PATH = P.WORK / "results.pkl"
