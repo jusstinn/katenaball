@@ -127,3 +127,23 @@ def test_touch_features_with_no_ball_are_defined():
     col = {n: X[0][:, i] for i, n in enumerate(names)}
     assert (col["t_since_f"] == T.CAP_S).all() and (col["t_last_team"] == 0).all()
     assert (col["t_vis_cell"] == 0).all() and np.isnan(col["t_dminf_cell"]).all()
+
+
+def test_gate_build_lines_up_with_the_corpus_cache(tmp_path, monkeypatch):
+    """corpus.build_one then touch_gate.build_one on a synthetic match: the touch pool has the base pool's
+    rows and orientations, the recovered corruption matches the cache, and the joined pool trains."""
+    from katena.eval import corpus as C
+    from katena.eval import protocol as P
+    from katena.eval import touch_gate as TG
+    from katena.types import save_match
+    m = make_match(seed=4)
+    path = tmp_path / "canonical" / "idsse" / "SYN.npz"
+    save_match(m, path)
+    monkeypatch.setattr(P, "WORK", tmp_path / "work")
+    ref = P.Ref("idsse", "SYN", path)
+    C.build_one(ref)
+    TG.build_one(ref)                                   # raises if anything does not line up
+    base, tp = C.load_pool(ref), np.load(TG.tpaths(ref)["pool"])
+    assert len(tp["A"]) == len(base["X"]) and np.array_equal(tp["o"], base["o"])
+    f, X0, X1 = TG.features(ref, "target")
+    assert X0.shape[1] == f["X0"].shape[1] + len(tp["names"]) and X0.shape[0] == len(f["idx"])
