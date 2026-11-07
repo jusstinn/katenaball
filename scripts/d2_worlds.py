@@ -96,7 +96,8 @@ def score_and_report(fr: list, dev: list, variants: tuple, tag: str) -> dict:
             print(f"\n### {cand} vs cur, the {len(fr8)} IDSSE + Metrica folds of the same run")
             print(_fmt_gate(cmp8, d2.keep_verdict(cmp8), cand))
         out["candidates"][cand] = {"verdict": verdicts[cand], "compare": cmp, "compare_8": cmp8}
-    p = d2.root() / f"gate_{tag}.json"
+    p = d2.root() / f"gate_{tag.replace('/', '_')}.json"       # fold keys look like idsse/<id>
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, indent=1, default=float))
     print("wrote", p, flush=True)
     return verdicts

@@ -167,6 +167,12 @@ SkillCorner folds, so their 8-fold rows above stand.
   - The D2 worlds are built for development matches only so far, so the final 30-match training must
     also build them for the two benches.
   - `katena.eval.corpus` and every cached condition are unchanged.
+- **Calibration is pooled, not left out per fold (review note).** The Metrica coupling constants
+  come from Sample_Game_1 and Sample_Game_3 and the smooth-jitter scale from the 20 SkillCorner
+  matches, all development folds. So a held-out match contributes to a few pooled scalars that
+  define its own fold's training worlds. That is not strict leave-one-match-out; with a handful of
+  pooled scalars the effect is probably small. Recalibrate per fold before relying on the coupled-world
+  gains.
 - **Not done.**
   - The D2 worlds were not added to D5's domain-gap alarm.
   - A 25 Hz identity world for D1 was not built; the options work at any frame rate.

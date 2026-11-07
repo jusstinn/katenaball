@@ -101,7 +101,7 @@ TRAIN_MIXES = {
     "d2j": {"dead_labels": {s: [s, f"{s}_cpl50", f"{s}_cpl100", f"{s}_ids", f"{s}_smooth"] for s in dg.CONFIGS},
             "no_dead_labels": {s: [s, f"{s}_ids", f"{s}_smooth"] for s in dg.CONFIGS}},
 }
-TRAIN_MIX = TRAIN_MIXES["d2"]
+# The recommended final training mix is "d2j" (docs/decision-log.md, 2026-11-07, D2).
 # Worlds every candidate is scored in and gated on. Coupled worlds run on IDSSE and Metrica only.
 # target_smooth was added by amendment A1, before any gate result.
 EVAL_WORLDS = ("mild", "target", "severe", "target_cpl50", "target_cpl100", "target_ids", "target_cpl100_ids",
