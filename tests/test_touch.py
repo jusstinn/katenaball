@@ -147,6 +147,9 @@ def test_gate_build_lines_up_with_the_corpus_cache(tmp_path, monkeypatch):
     assert len(tp["A"]) == len(base["X"]) and np.array_equal(tp["o"], base["o"])
     f, X0, X1 = TG.features(ref, "target")
     assert X0.shape[1] == f["X0"].shape[1] + len(tp["names"]) and X0.shape[0] == len(f["idx"])
+    TG.build_one(ref, kind="touch5")                    # the 5 Hz control lines up the same way
+    _, Y0, _ = TG.features(ref, "target", kind="touch5")
+    assert Y0.shape == X0.shape and not np.array_equal(np.nan_to_num(Y0), np.nan_to_num(X0))
 
 
 def test_ten_hz_source_lifts_and_featurizes():

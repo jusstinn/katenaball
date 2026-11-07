@@ -49,7 +49,7 @@ class _Priors:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stages", nargs="+", choices=("build", "check", "screen", "gate"))
+    ap.add_argument("stages", nargs="+", choices=("build", "check", "screen", "gate", "rate"))
     ap.add_argument("--workers", type=int, default=1)
     a = ap.parse_args()
     for stage in a.stages:
@@ -65,6 +65,24 @@ def run(stage: str, workers: int) -> None:
         Lm.timed("touch build", t0)
         return
     res = Lm.Results()
+    if stage == "rate":
+        # Control for the native frame rate, on the 8 screen folds: the same touch code run on the corrupted
+        # 5 Hz ball ("touch5"), trained and decoded exactly like the native-rate group.
+        f8, sm = S.FOLDS8(dev), TG.SMOOTH
+        TG.build_all(dev, workers=workers, kind="touch5")
+        for r in f8:
+            TG.build_extra(r, sm, kind="touch5")
+        pools = TG.TouchPools(dev, kind="touch5")
+        TG.stage_lomo(pools, f8, variant="touch5", extra=(sm,))
+        del pools
+        TG.decode_fixed(res, _Priors(dev), f8, "touch5", "M2T5_t2", B.ALL_CONDS + (sm,))
+        print("== 8 IDSSE + Metrica folds: touch features from the 5 Hz ball vs M2 ==\n"
+              + TG.summary(res, "M2T5_t2", "M2_t2", f8), flush=True)
+        print("== native rate vs 5 Hz, same features ==\n" + TG.summary(res, "M2T_t2", "M2T5_t2", f8, conds=("target", "severe", "mild", "native", sm)),
+              flush=True)
+        print(f"== {sm}: 5 Hz touch vs M2 refit ==\n" + TG.summary(res, "M2T5_t2", "M2r_t2", f8, conds=(sm,)), flush=True)
+        Lm.timed("rate done", t0)
+        return
     if stage == "check":
         r = S.FOLDS8(dev)[0]
         pools = TG.TouchPools(dev)

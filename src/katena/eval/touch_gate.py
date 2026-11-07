@@ -52,10 +52,23 @@ SMOOTH = "target_smoothball"
 EXTRA_EVAL = {SMOOTH: (dataclasses.replace(dg.TARGET, name=SMOOTH, sigma_ball=0.0), "target")}
 
 
-def tpaths(ref: P.Ref) -> dict:
+# ``kind`` "touch" is the D1 group (native-rate ball lifted from the 5 Hz corruption); "touch5" is the control:
+# the same code on the corrupted 5 Hz ball, so "touch" vs "touch5" isolates the native frame rate.
+KINDS = ("touch", "touch5")
+
+
+def tpaths(ref: P.Ref, kind: str = "touch") -> dict:
+    if kind not in KINDS:
+        raise ValueError(kind)
     d = P.WORK
-    return {"feat": lambda c: d / "touch" / f"{ref.dataset}_{ref.id}__{c}.npz",
-            "pool": d / "touch_pool" / f"{ref.dataset}_{ref.id}.npz"}
+    return {"feat": lambda c: d / kind / f"{ref.dataset}_{ref.id}__{c}.npz",
+            "pool": d / f"{kind}_pool" / f"{ref.dataset}_{ref.id}.npz"}
+
+
+def _ball(kind: str, m, m5, mc, lifted) -> TF.NativeBall:
+    if kind == "touch5":
+        return TF.NativeBall(mc.ball, mc.fps, 1)
+    return TF.NativeBall(lifted, m.fps, int(m5.meta["step"]))
 
 
 def corrupted(ref: P.Ref, m, m5, cond: str):
@@ -69,29 +82,31 @@ def corrupted(ref: P.Ref, m, m5, cond: str):
     return mc, lifted
 
 
-def build_extra(ref: P.Ref, cond: str = SMOOTH, force: bool = False) -> str:
+def build_extra(ref: P.Ref, cond: str = SMOOTH, force: bool = False, kind: str = "touch") -> str:
     """Base and touch features of an evaluation-only condition, written next to the cached ones in the
     corpus format (``feat/<key>__<cond>.npz``) so the shared decode and score code can read them."""
     from katena.featurize.build import featurize, infer_dirs
-    out_b, out_t = C.paths(ref)["feat"](cond), tpaths(ref)["feat"](cond)
+    out_b, out_t = C.paths(ref)["feat"](cond), tpaths(ref, kind)["feat"](cond)
     if not force and out_b.exists() and _fresh(out_t):
         return ref.key
+    out_t.parent.mkdir(parents=True, exist_ok=True)
     m = load_match(ref.path)
     m5 = downsample(m)
     mc, lifted = corrupted(ref, m, m5, cond)
-    dirs = infer_dirs(mc)
-    f0, f1 = featurize(mc, 0, dirs), featurize(mc, 1, dirs)
-    np.savez(out_b, X0=f0.X, X1=f1.X, idx=f0.idx, half=f0.half, m0=m0_predict(mc), names=np.array(f0.names),
-             groups=f0.groups, dirs=np.array([dirs[h] for h, _, _ in m5.half_blocks]),
-             deg=np.array([mc.meta["degrade"]["ball_missing"], mc.meta["degrade"]["mean_objects"]]))
-    X, names, idx = TF.touch_features(mc, TF.NativeBall(lifted, m.fps, int(m5.meta["step"])))
+    if force or not out_b.exists():
+        dirs = infer_dirs(mc)
+        f0, f1 = featurize(mc, 0, dirs), featurize(mc, 1, dirs)
+        np.savez(out_b, X0=f0.X, X1=f1.X, idx=f0.idx, half=f0.half, m0=m0_predict(mc), names=np.array(f0.names),
+                 groups=f0.groups, dirs=np.array([dirs[h] for h, _, _ in m5.half_blocks]),
+                 deg=np.array([mc.meta["degrade"]["ball_missing"], mc.meta["degrade"]["mean_objects"]]))
+    X, names, idx = TF.touch_features(mc, _ball(kind, m, m5, mc, lifted))
     np.savez(out_t, A0=X[0], A1=X[1], idx=idx, names=np.array(names), src=np.array(SRC))
     return ref.key
 
 
-def build_one(ref: P.Ref, force: bool = False, check: bool = True) -> str:
+def build_one(ref: P.Ref, force: bool = False, check: bool = True, kind: str = "touch") -> str:
     """Touch columns for every condition of ``ref`` and for its training-pool rows."""
-    tp = tpaths(ref)
+    tp = tpaths(ref, kind)
     conds = C.conds_for(ref)
     if not force and _fresh(tp["pool"]) and all(_fresh(tp["feat"](c)) for c in conds):
         return ref.key
@@ -104,7 +119,7 @@ def build_one(ref: P.Ref, force: bool = False, check: bool = True) -> str:
     pool_A, pool_o, pool_i, names = [], [], [], None
     for c in conds:
         mc, lifted = corrupted(ref, m, m5, c)
-        X, names, idx = TF.touch_features(mc, TF.NativeBall(lifted, m.fps, step))
+        X, names, idx = TF.touch_features(mc, _ball(kind, m, m5, mc, lifted))
         if check:
             base = C.load_feat(ref, c)
             if not (np.array_equal(base["idx"], idx) and np.array_equal(base["m0"], m0_predict(mc))):
@@ -140,20 +155,20 @@ def _job(args):
     return build_one(*args)
 
 
-def build_all(refs: list, workers: int = 2, force: bool = False) -> None:
+def build_all(refs: list, workers: int = 2, force: bool = False, kind: str = "touch") -> None:
     import multiprocessing as mp
     t0 = time.time()
     if workers <= 1:
         for r in refs:
-            print("touch built", build_one(r, force), f"({time.time() - t0:.0f}s)", flush=True)
+            print(f"{kind} built", build_one(r, force, True, kind), f"({time.time() - t0:.0f}s)", flush=True)
         return
     with mp.get_context("spawn").Pool(workers) as pool:
-        for k in pool.imap_unordered(_job, [(r, force) for r in refs]):
-            print("touch built", k, f"({time.time() - t0:.0f}s)", flush=True)
+        for k in pool.imap_unordered(_job, [(r, force, True, kind) for r in refs]):
+            print(f"{kind} built", k, f"({time.time() - t0:.0f}s)", flush=True)
 
 
-def load_tfeat(ref: P.Ref, cond: str) -> dict:
-    with np.load(tpaths(ref)["feat"](cond)) as z:
+def load_tfeat(ref: P.Ref, cond: str, kind: str = "touch") -> dict:
+    with np.load(tpaths(ref, kind)["feat"](cond)) as z:
         out = {k: z[k] for k in z.files}
     if str(out.get("src", "")) != SRC:
         raise RuntimeError(f"{ref.key} {cond}: touch columns are stale (built by other feature code)")
@@ -163,11 +178,12 @@ def load_tfeat(ref: P.Ref, cond: str) -> dict:
 class TouchPools(Lm.Pools):
     """The base training pool with the touch columns appended (same rows, same order)."""
 
-    def __init__(self, refs: list):
+    def __init__(self, refs: list, kind: str = "touch"):
         super().__init__(refs)
+        self.kind = kind
         parts = []
         for r in refs:
-            with np.load(tpaths(r)["pool"]) as z:
+            with np.load(tpaths(r, kind)["pool"]) as z:
                 parts.append({k: z[k] for k in z.files})
         if any(str(p.get("src", "")) != SRC for p in parts):
             raise RuntimeError("touch pool is stale (built by other feature code)")
@@ -179,10 +195,10 @@ class TouchPools(Lm.Pools):
         self.groups = np.concatenate([self.groups, np.full(A.shape[1], TF.GROUP)])
 
 
-def features(ref: P.Ref, cond: str) -> tuple[dict, np.ndarray, np.ndarray]:
+def features(ref: P.Ref, cond: str, kind: str = "touch") -> tuple[dict, np.ndarray, np.ndarray]:
     """(base feature dict, X0, X1) with the touch columns appended."""
     f = C.load_feat(ref, cond)
-    t = load_tfeat(ref, cond)
+    t = load_tfeat(ref, cond, kind)
     if not np.array_equal(t["idx"], f["idx"]):
         raise RuntimeError(f"{ref.key} {cond}: touch rows do not line up")
     return f, np.concatenate([f["X0"], t["A0"]], 1), np.concatenate([f["X1"], t["A1"]], 1)
@@ -197,7 +213,7 @@ def run_fold(pools: TouchPools, ref: P.Ref, cols: np.ndarray, variant: str = VAR
     heads = pools.fit({ref.key}, T, cols)
     arrays = {}
     for c in (conds or C.conds_for(ref)):
-        _, X0, X1 = features(ref, c)
+        _, X0, X1 = features(ref, c, getattr(pools, "kind", "touch"))
         arrays[f"pa_{c}"], arrays[f"ph_{c}"] = heads.predict(X0, X1)
     np.savez(out, **arrays)
 
