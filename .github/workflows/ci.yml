@@ -160,8 +160,11 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             # LightGBM needs libomp; use the copy bundled with the locked scikit-learn (gbdt.ensure_openmp).
             export DYLD_FALLBACK_LIBRARY_PATH="$PWD/.venv/lib/python3.11/site-packages/sklearn/.dylibs"
+            ls /opt/homebrew/opt/libomp/lib/libomp.dylib >/dev/null 2>&1 \
+              && echo "Homebrew libomp is installed" || echo "no Homebrew libomp: LightGBM uses scikit-learn's copy"
           fi
           uv run --frozen --no-sync python -c "import lightgbm; print('lightgbm', lightgbm.__version__, 'loads')"
+          uv run --frozen --no-sync python -c "import locale, sys; print('text encoding', locale.getpreferredencoding(False), 'utf8_mode', sys.flags.utf8_mode)"
           uv run --frozen --no-sync pytest -q -rs
 
   scorer:
