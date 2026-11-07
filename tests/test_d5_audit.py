@@ -196,3 +196,26 @@ def test_domain_gap_module_fits_nothing_to_its_input():
 def dataclasses_replace_fps(m, fps):
     import dataclasses
     return dataclasses.replace(m, fps=fps)
+
+
+# --- cross-check ported from david/foundation's decoder tests: Viterbi is the exact argmax ---
+
+def test_viterbi_matches_brute_force():
+    import itertools
+
+    from katena.decode import hmm
+    rng = np.random.default_rng(0)
+
+    def path_score(path, le, logA, log_init):
+        return log_init[path[0]] + le[0, path[0]] + sum(
+            logA[path[t - 1], path[t]] + le[t, path[t]] for t in range(1, len(path)))
+
+    for _ in range(25):
+        T = int(rng.integers(1, 8))
+        le = rng.normal(0, 2, (T, 3))
+        logA = np.log(rng.dirichlet(np.ones(3), size=3))
+        log_init = np.log(rng.dirichlet(np.ones(3)))
+        best = max(path_score(p, le, logA, log_init) for p in itertools.product(range(3), repeat=T))
+        out = hmm._viterbi(np.ascontiguousarray(le), logA, log_init)
+        assert out.dtype == np.int8 and len(out) == T
+        assert abs(path_score(tuple(out), le, logA, log_init) - best) < 1e-9
