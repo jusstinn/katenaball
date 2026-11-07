@@ -295,6 +295,15 @@ def test_world_constants_match_the_metrica_calibration_record():
     assert abs(W.WORLDS["target_cpl50"].dead_miss - 0.60) < 1e-9
 
 
+def test_new_worlds_run_at_the_native_frame_rate():
+    m = dead_span_match(seed=12, minutes=8.0, fps=25.0)
+    share = float((m.y[block_mask(m)] == D).mean())
+    c = dg.corrupt(m, W.WORLDS["target_cpl100_ids"], 5)
+    overall, dead, alive = _miss_rates(c, m)
+    assert abs(overall - 0.41) < 0.02 and abs(dead - min(0.79, (0.41 - 0.015 * (1 - share)) / share)) < 0.015
+    assert c.P.shape == (m.n, 46, 2) and c.meta["degrade"]["encounters"] >= 0
+
+
 def test_new_worlds_are_deterministic_and_seed_dependent():
     m = dead_span_match(minutes=8.0)
     for name in ("target_cpl50", "target_cpl100", "target_ids", "target_cpl100_ids"):
