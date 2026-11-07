@@ -14,9 +14,11 @@ gone. This module works on the ball at the source frame rate (25 Hz for IDSSE, M
    within ``R_TOUCH`` and clearly nearer than the other team's nearest player.
 3. **Features** for the focal team, aggregated onto each work-grid sample: time since and until each
    team's last and next touch, who touched last and before that, turnovers between touches, touch counts
-   and balance in short windows (0.5-3 s, shorter than the base group's), the strongest break near the
-   sample and who was near it, each team's closest approach to the ball between work-grid samples, ball
-   speed and flight, and the local jitter estimate.
+   and balance in short windows (0.5-2 s, shorter than the base group's), the strongest break near the
+   sample and who was near it, each team's closest approach to the ball between work-grid samples and the
+   control margin (opponent's minus focal's nearest distance) in 0.2-1 s windows, ball speed and flight,
+   and the local jitter estimate. Distances use the ball smoothed by a short centred line fit (``K_SMOOTH_S``
+   each side), which averages frame-level jitter and leaves a smooth track as it is.
 
 Inputs. The ball comes from ``NativeBall``: for training, the native ball corrupted consistently with the
 5 Hz corruption (``lift_ball``); at inference, the real native ball. Players come from the (corrupted)
@@ -302,7 +304,9 @@ def detect_touches(b: np.ndarray, fps: float, P_nat_fn, team: np.ndarray, k_s: f
     dh0, da0 = np.nan_to_num(d_home, nan=BIG), np.nan_to_num(d_away, nan=BIG)
     who = np.where((dh0 < R_TOUCH) & (dh0 + MARGIN_TOUCH < da0), 0,
                    np.where((da0 < R_TOUCH) & (da0 + MARGIN_TOUCH < dh0), 1, -1)).astype(np.int8)
-    return {"dv": dv, "z": z, "speed": speed, "sigma": sigma, "vis": vis, "ball": bf,
+    # smoothed ball for proximity: the centred fit where it exists, else the (short-gap filled) ball
+    smooth = np.where(np.isfinite(vc[:, :1]), vc, bf)
+    return {"dv": dv, "z": z, "speed": speed, "sigma": sigma, "vis": vis, "ball": bf, "ball_s": smooth,
             "t": cand.astype(np.int64), "pos": pos, "d_home": d_home, "d_away": d_away, "who": who,
             "v_before": sb[cand] * fps, "v_after": sa[cand] * fps}
 
@@ -421,7 +425,7 @@ def _half_features(det: dict, dh_nat: np.ndarray, da_nat: np.ndarray, focal: int
     add("t_ev_df_0.5s", sel_df)
     add("t_ev_do_0.5s", sel_do)
 
-    # closest approach of each team to the ball between work-grid samples
+    # closest approach of each team to the (smoothed) ball between work-grid samples
     add("t_dminf_cell", cell(d_f, "min"))
     add("t_dmino_cell", cell(d_o, "min"))
     with np.errstate(invalid="ignore"):
@@ -430,6 +434,20 @@ def _half_features(det: dict, dh_nat: np.ndarray, da_nat: np.ndarray, focal: int
     add("t_dminf_0.5s", win(d_f, 0.5, "min"))
     add("t_dmino_0.5s", win(d_o, 0.5, "min"))
     add("t_closer_1s", win(closer, 1.0, "mean"))
+
+    # control margin at the native rate: who is nearer the smoothed ball, and how clearly
+    with np.errstate(invalid="ignore"):
+        margin = np.where(np.isfinite(d_f) & np.isfinite(d_o), np.clip(d_o - d_f, -8.0, 8.0), np.nan)
+        tight_f = np.where(np.isfinite(d_f), (d_f < 2.0).astype(float), np.nan)
+        tight_o = np.where(np.isfinite(d_o), (d_o < 2.0).astype(float), np.nan)
+    add("t_margin_cell", cell(margin, "mean"))
+    add("t_margin_0.5s", win(margin, 0.5, "mean"))
+    add("t_margin_1s", win(margin, 1.0, "mean"))
+    w1 = int(round(1.0 * s1))
+    add("t_margin_past1", _roll(margin, w1, 0, "mean")[a])
+    add("t_margin_fut1", _roll(margin, 0, w1, "mean")[a])
+    add("t_tightf_0.5s", win(tight_f, 0.5, "mean"))
+    add("t_tighto_0.5s", win(tight_o, 0.5, "mean"))
 
     # ball speed, flight, visibility, jitter
     sp = det["speed"]
@@ -484,7 +502,7 @@ def touch_features(m: Match, nb: NativeBall, focals=(0, 1)) -> tuple[dict, list,
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
             det = detect_touches(b, nb.fps, fn, m.team)
-            dh, da = _nearest_per_frame(det["ball"], det["vis"], fn, m.team)
+            dh, da = _nearest_per_frame(det["ball_s"], det["vis"], fn, m.team)
             anchors = np.arange(a5, b5 + 1) * step - j_lo
             for f in focals:
                 nm, cols = _half_features(det, dh, da, f, nb.fps, anchors, step)

@@ -21,6 +21,7 @@ is a screen, not the gate (5 training matches instead of 27); it adopts nothing 
 
 from __future__ import annotations
 
+import hashlib
 import pickle
 import sys
 import time
@@ -65,23 +66,31 @@ def dev_idsse() -> list:
     return [r for r in dev if r.dataset == "idsse"]
 
 
-def _cond_arrays(ref, m, m5, c) -> dict:
-    step = int(m5.meta["step"])
-    mc, lifted = TG.corrupted(ref, m, m5, c)
+TOUCH_SRC = hashlib.sha256(Path(TF.__file__).read_bytes()).hexdigest()[:16]   # rebuild touch columns on change
+
+
+def _base_arrays(ref, m, m5, c) -> dict:
+    mc, _ = TG.corrupted(ref, m, m5, c)
     dirs = infer_dirs(mc)
     f0, f1 = featurize(mc, 0, dirs), featurize(mc, 1, dirs)
+    return {f"{c}__X0": f0.X, f"{c}__X1": f1.X, "idx": f0.idx, "half": f0.half}
+
+
+def _touch_arrays(ref, m, m5, c) -> dict:
+    step = int(m5.meta["step"])
+    mc, lifted = TG.corrupted(ref, m, m5, c)
     t25, names, idx = TF.touch_features(mc, TF.NativeBall(lifted, m.fps, step))
     t5, _, _ = TF.touch_features(mc, TF.NativeBall(mc.ball, mc.fps, 1))
-    assert np.array_equal(idx, f0.idx)
-    return {f"{c}__X0": f0.X, f"{c}__X1": f1.X, f"{c}__A0": t25[0], f"{c}__A1": t25[1], f"{c}__B0": t5[0],
-            f"{c}__B1": t5[1], "idx": f0.idx, "half": f0.half,
-            "names": np.array(list(f0.names) + names + [n + "_5hz" for n in names])}
+    return {f"{c}__A0": t25[0], f"{c}__A1": t25[1], f"{c}__B0": t5[0], f"{c}__B1": t5[1], f"{c}__tidx": idx,
+            "touch_names": np.array(names)}
 
 
 def build(ref) -> None:
+    """Base columns per condition (cached once) and touch columns (rebuilt whenever touch.py changes)."""
     OUT.mkdir(parents=True, exist_ok=True)
-    main_p, extra_p = OUT / f"{ref.id}.npz", OUT / f"{ref.id}__extra.npz"
-    if main_p.exists() and extra_p.exists():
+    main_p, extra_p, touch_p = OUT / f"{ref.id}.npz", OUT / f"{ref.id}__extra.npz", OUT / f"{ref.id}__touch.npz"
+    fresh = touch_p.exists() and str(np.load(touch_p)["src"]) == TOUCH_SRC
+    if main_p.exists() and extra_p.exists() and fresh:
         return
     t0 = time.time()
     m = load_match(ref.path)
@@ -89,21 +98,28 @@ def build(ref) -> None:
     if not main_p.exists():
         arrays = {"y_native": relabel(m, T).y, "step": int(m5.meta["step"]), "n_native": m.n}
         for c in CONDS:
-            arrays.update(_cond_arrays(ref, m, m5, c))
+            arrays.update(_base_arrays(ref, m, m5, c))
         np.savez(main_p, **arrays)
     if not extra_p.exists():
         arrays = {}
         for c in EXTRA:
-            arrays.update(_cond_arrays(ref, m, m5, c))
+            arrays.update(_base_arrays(ref, m, m5, c))
         np.savez(extra_p, **arrays)
+    if not fresh:
+        arrays = {"src": np.array(TOUCH_SRC)}
+        for c in CONDS + EXTRA:
+            arrays.update(_touch_arrays(ref, m, m5, c))
+        np.savez(touch_p, **arrays)
     print(f"built {ref.id} in {time.time() - t0:.0f}s", flush=True)
 
 
 def load(ref) -> dict:
     out = {}
-    for p in (OUT / f"{ref.id}.npz", OUT / f"{ref.id}__extra.npz"):
+    for p in (OUT / f"{ref.id}.npz", OUT / f"{ref.id}__extra.npz", OUT / f"{ref.id}__touch.npz"):
         with np.load(p) as z:
-            out.update({k: z[k] for k in z.files})
+            out.update({k: z[k] for k in z.files})      # touch columns override any older cached copy
+    for c in CONDS + EXTRA:
+        assert np.array_equal(out[f"{c}__tidx"], out["idx"])
     return out
 
 
