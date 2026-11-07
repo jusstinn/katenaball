@@ -95,7 +95,7 @@ def main():
         table_scores.append(res[("M2", T, COND, r.key)]["spell_f1"])
 
         rows2 = hmm.decode(oof[f"pa_{COND}"], oof[f"ph_{COND}"], f["half"], pri, TAU, "viterbi")
-        pred = to_native_codes(rows2, f["idx"], g["step"], g["n_native"])
+        pred = to_native_codes(rows2, f["idx"], g["step"], g["n_native"], g["blocks"])
         if r.is_sc:
             pred = np.where(pred == 2, 3, pred).astype(np.int8)
         runs = pm.valid_runs(g["y"])

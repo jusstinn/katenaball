@@ -9,11 +9,24 @@ from katena.grid import to_native
 from katena.types import D, X
 
 
-def to_native_codes(pred_rows: np.ndarray, idx: np.ndarray, step: int, n_native: int) -> np.ndarray:
+def to_native_codes(pred_rows: np.ndarray, idx: np.ndarray, step: int, n_native: int,
+                    blocks=None) -> np.ndarray:
+    """Work-grid predictions (rows at samples ``idx``) to ``n_native`` frames, X elsewhere.
+
+    ``blocks``: native in-play blocks [(half, first, last)], inclusive. Without them, the first or
+    last one or two frames of a block whose edge is not a multiple of ``step`` take the nearest
+    sample, which lies outside the block and is X, so X lands on graded frames. With them, every
+    frame of a block takes the nearest sample inside its own block."""
     n5 = -(-n_native // step)
     p5 = np.full(n5, X, dtype=np.int8)
     p5[idx] = pred_rows
-    return to_native(p5, step, n_native)
+    out = to_native(p5, step, n_native)
+    for _, a, b in (() if blocks is None else blocks):
+        lo, hi = -(-int(a) // step), int(b) // step
+        if hi >= lo:
+            src = np.clip(np.rint(np.arange(a, b + 1) / step).astype(np.int64), lo, hi)
+            out[a:b + 1] = p5[src]
+    return out
 
 
 def score(gt: np.ndarray, pred: np.ndarray, sc_mode: bool = False) -> dict:

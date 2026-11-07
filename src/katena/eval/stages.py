@@ -273,7 +273,7 @@ def stage_census(pools: Pools, res: Results, dev: list, T: int = P.T_MAIN, varia
         g = C.load_gt(r, T)
         pri = B.priors_for(pools, {r.key}, T)
         rows = hmm.decode(oof["pa_target"], oof["ph_target"], f["half"], pri, taus[r.key], "hsmm")
-        pred = to_native_codes(rows, f["idx"], g["step"], g["n_native"])
+        pred = to_native_codes(rows, f["idx"], g["step"], g["n_native"], g["blocks"])
         if r.is_sc:
             pred = np.where(pred == 2, 3, pred).astype(np.int8)
         cen = errors.census(g["y"], pred)
