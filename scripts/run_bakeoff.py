@@ -19,8 +19,6 @@ from katena.models import gbdt  # noqa: E402
 
 gbdt.ensure_openmp()                      # may re-exec once (no libomp without Homebrew)
 
-import numpy as np  # noqa: E402
-
 from katena.eval import bakeoff as B  # noqa: E402
 from katena.eval import corpus as C  # noqa: E402
 from katena.eval import protocol as P  # noqa: E402
@@ -69,8 +67,6 @@ def main() -> None:
     if "tcn" not in a.skip:
         S.stage_tcn(pools, res, dev)
         f8 = S.FOLDS8(dev)
-        m2 = np.mean([res.get(("M2", T, P.HEADLINE, r.key))["spell_f1"] for r in dev])
-        m3 = np.mean([res.get(("M3", T, P.HEADLINE, r.key))["spell_f1"] for r in dev])
         kind = S._kind_m5(res, T)
         B.decode_and_score(res, pools, f8, "M5", T, kind, "M5")
         S.stage_tcn(pools, res, dev, seed=1, variant="M5s1")          # second seed: is M5 vs M3 stable?
