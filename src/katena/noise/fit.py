@@ -56,6 +56,7 @@ LOSS_SPEC = [
     ("slot_jump_rate", 1.0, "log", 0.0005),
     ("player_d2_mad", 1.0, "log", 0.005),
     ("speed_pos_consistency", 0.5, "log", 0.05),
+    ("slots_used", 0.5, "log", 1.0),
     ("slot_occ_q10", 0.5, "abs", 0.05),
     ("slot_occ_q50", 0.5, "abs", 0.05),
     ("slot_occ_q90", 0.5, "abs", 0.05),
