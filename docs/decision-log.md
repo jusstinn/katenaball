@@ -4,6 +4,44 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-07
+
+### D2: degrader realism (David + Claude)
+
+**Registered before any gate result.** Branch `david/d2-degrader`. External development matches only.
+No `data/`, no `evaluation/gt/`, no locked bench.
+
+**New worlds** in `katena.sim.worlds`. They have new names only. The existing `mild`, `target`, `severe`
+and `target_dead*` configs give byte-identical output for the same seed, which
+`tests/test_d2_degrader.py` checks against a frozen copy of the 47a3f4b degrader. The new options in
+`katena.sim.degrade` default to off.
+
+| World | What changes | Source |
+|---|---|---|
+| `{mild,target,severe}_cpl50`, `_cpl100` | P(ball missing \| dead) = r + kappa (0.79 - r), kappa 0.5 or 1. r is the severity's overall rate, which stays put (`target`: 0.41, DATA.md). Alive frames take the rest, at least 0.015. The ball is lost an exponential lag after the stoppage (mean 1.4 s) and stays lost until the restart. | Metrica development games 1 and 3, pooled at 5 Hz: dead 0.79, alive 0.015. Lag median 1.0 s, mean 1.4 s. The ball is back at the restart on 96% of spans. IDSSE and Metrica only, because SkillCorner has no D. |
+| `{mild,target,severe}_ids` | At `target` level: fragment cuts on a crowding clock (0.3 per player within 1.5 m), team-mate slot swaps 0.1 and opponent swaps 0.05 (held 3 s) per encounter under 1 m. Half at `mild`, double at `severe`. Presence, the 46 slots and the object count are unchanged. | Slots and objects: DATA.md. Swap rates are not published and cannot be measured externally. Crowding and team-mate rates are the defaults of David's `katena.noise.sim` (`david/foundation`). The opponent rate is ours. |
+| `target_cpl100_ids` | Both of the above. Evaluation only. | As above |
+
+**Candidates.** `cur` is the bake-off pool: M2 trained on `mild`/`target`/`severe`, stride 4. `d2` uses the
+same rows, focal orientations and labels, but each severity's rows are split evenly, interleaved, over
+{s, s_cpl50, s_cpl100, s_ids} for IDSSE and Metrica, and over {s, s_ids} for SkillCorner. LightGBM
+parameters, Viterbi, T = 2 and the tau rule are unchanged.
+
+**Decision worlds.** `mild`, `target`, `severe` and `target_ids` on 28 folds. `target_cpl50`,
+`target_cpl100` and `target_cpl100_ids` on the 8 IDSSE + Metrica folds. The mild and severe coupled and
+`_ids` worlds are secondary: reported, not decisive.
+
+**Rule** (PLAN bet #2). Keep the d2 mix if and only if no decision world gets worse. A world gets worse
+when mean(d2 - cur) < 0 and the upper bound of the paired 95% bootstrap interval is below 0
+(`katena.eval.bootstrap`: possessions resampled, 2000 draws). For every world we report folds won, mean
+difference and CI, and whether it passes the adoption rule (wins >= 70% and CI > 0). We screen on the 8
+folds first, and the 28-fold gate decides.
+
+**Official-baseline check.** We score the official baseline algorithm in every world with all four
+published windows, on the IDSSE and Metrica development matches, and set it beside the published
+full-match scores (smooth50: macroF1 0.6724, spellF1 0.2433). This is a report only. The kappa levels
+above were fixed before it was computed, and it chooses no world.
+
 ## 2026-11-06
 
 **Baseline architecture: M2.** LightGBM alive/dead and team heads, 5 Hz features, Viterbi, trained at T = 2 s. 0.586 on

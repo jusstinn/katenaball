@@ -280,6 +280,18 @@ def test_crowding_clock_moves_cuts_into_crowds():
     assert counts[2.0] > counts[0.0] + 0.05
 
 
+def test_world_constants_match_the_metrica_calibration_record():
+    import json
+    rec = json.loads((Path(dg.__file__).with_name("coupling_metrica.json")).read_text())
+    assert rec["games"] == ["Sample_Game_1", "Sample_Game_3"]         # development games only
+    assert abs(W.METRICA_DEAD_MISS - rec["p_miss_dead"]) < 0.005
+    assert abs(W.METRICA_ALIVE_MISS - rec["p_miss_alive"]) < 0.001
+    assert abs(W.METRICA_LAG_S - rec["lag_s"]["mean"]) < 0.05
+    t = W.WORLDS["target_cpl100"]
+    assert t.dead_miss == W.METRICA_DEAD_MISS and t.ball_missing == dg.TARGET.ball_missing == 0.41
+    assert abs(W.WORLDS["target_cpl50"].dead_miss - 0.60) < 1e-9
+
+
 def test_new_worlds_are_deterministic_and_seed_dependent():
     m = dead_span_match(minutes=8.0)
     for name in ("target_cpl50", "target_cpl100", "target_ids", "target_cpl100_ids"):

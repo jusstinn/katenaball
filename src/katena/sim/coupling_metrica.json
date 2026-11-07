@@ -1,0 +1,38 @@
+{
+ "games": [
+  "Sample_Game_1",
+  "Sample_Game_3"
+ ],
+ "grid_hz": 5.0,
+ "lag_s": {
+  "mean": 1.3988700564971752,
+  "median": 1.0,
+  "q10_q25_q75_q90": [
+   0.0,
+   0.4,
+   2.0,
+   3.280000000000001
+  ]
+ },
+ "lead_zero_share": 0.96045197740113,
+ "p_miss_alive": 0.014614485262445388,
+ "p_miss_dead": 0.7907823170981065,
+ "per_game": {
+  "Sample_Game_1": {
+   "dead_share": 0.5133204293506951,
+   "dead_spans": 85,
+   "overall": 0.37870842864684146,
+   "p_miss_alive": 0.007520428085906429,
+   "p_miss_dead": 0.7306321129850541,
+   "spans_with_loss": 83
+  },
+  "Sample_Game_3": {
+   "dead_share": 0.34572529782761036,
+   "dead_spans": 94,
+   "overall": 0.31713384723195515,
+   "p_miss_alive": 0.01986825898355915,
+   "p_miss_dead": 0.8797000101347927,
+   "spans_with_loss": 94
+  }
+ }
+}
