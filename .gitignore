@@ -80,3 +80,6 @@ work/
 
 # a stray submission or frame-level export in the repo root
 /*.csv
+
+# agent worktrees (Claude Code)
+.claude/worktrees/
