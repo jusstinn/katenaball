@@ -14,6 +14,12 @@ Probes of what cross-machine identity needs: ``--threads`` (another torch thread
 CPU), ``--save-model`` / ``--load-model`` (the same weights, inference only). Each run also decodes
 copies of the probabilities moved by one float32 ulp, with and without rounding, to test whether
 rounding before decoding makes the labels robust. External matches only; never ``data/``.
+
+``synthetic`` needs no data at all: the real TCN and the blend on a synthetic sequence, so CI can run it
+on every OS and ``compare-json`` the hashes across machines (CI's ``synthetic_e2e.py`` covers M2):
+
+    python scripts/d3_determinism.py synthetic --out tcn_hashes_<os>.json
+    python scripts/d3_determinism.py compare-json tcn_hashes_windows.json tcn_hashes_macos.json
 """
 
 from __future__ import annotations
@@ -148,6 +154,55 @@ def run(a) -> None:
     print(json.dumps(out, indent=1), flush=True)
 
 
+def synthetic(a) -> None:
+    from katena.models import ensemble as E
+    E.pin_cpu_env()
+    import platform
+
+    import numpy as np
+    import torch
+
+    from katena.decode import hmm
+    from katena.models import tcn
+
+    rng = np.random.default_rng(0)
+    n, n_feat = 4000, 16
+    y = np.repeat(rng.integers(0, 3, n // 40), 40).astype(np.int8)        # 8 s spells at 5 Hz: H, A, D
+    sig = np.stack([y == 0, y == 1, y == 2], 1).astype(np.float32)
+    X0 = np.concatenate([sig + rng.normal(0, 1, (n, 3)), rng.normal(0, 1, (n, n_feat - 3))], 1).astype(np.float32)
+    X1 = X0[:, [1, 0] + list(range(2, n_feat))].copy()                     # the other team as focal
+    seqs = [{"X": X0, "y": y, "o": 0, "dead_ok": True, "key": "s0"},
+            {"X": X1, "y": y, "o": 1, "dead_ok": True, "key": "s1"}]
+    t0 = time.time()
+    model = E.fit_tcn(seqs, seed=0, threads=a.threads, steps=a.steps)
+    half = np.repeat(np.array([1, 2], np.int8), n // 2)
+    pa_t, ph_t = tcn.predict(model, X0, X1, half)
+    sig_ = lambda z: (1.0 / (1.0 + np.exp(-z))).astype(np.float32)        # noqa: E731
+    pa_g, ph_g = sig_(X0[:, 0] + X0[:, 1] - X0[:, 2]), sig_(X0[:, 0] - X0[:, 1])   # stand-in LightGBM member
+    pa, ph = E.blend_heads((pa_g, ph_g), (pa_t, ph_t), E.W_MAIN)
+    rows = hmm.decode(pa, ph, half, hmm.fit_priors([y]), TAU, "viterbi")
+    out = {"platform": platform.platform(), "machine": platform.machine(), "torch": torch.__version__,
+           "cpu_capability": torch.backends.cpu.get_cpu_capability(), "threads": a.threads,
+           "steps": a.steps, "seconds": round(time.time() - t0, 1), "agreement": float((rows == y).mean()),
+           "sha": {"tcn_weights": E.model_hash(model), "tcn_probs": E.sha256_arrays(pa_t, ph_t),
+                   "blend_probs": E.sha256_arrays(pa, ph), "labels": E.sha256_arrays(rows)}}
+    if a.out:
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.out).write_text(json.dumps(out, indent=1), encoding="utf-8", newline="\n")
+    print(json.dumps(out, indent=1), flush=True)
+
+
+def compare_json(a) -> None:
+    """Which hashes match across ``synthetic`` outputs (e.g. one per OS); exit 1 if the labels differ."""
+    js = [json.loads(Path(p).read_text(encoding="utf-8")) for p in a.files]
+    for k in js[0]["sha"]:
+        same = all(j["sha"][k] == js[0]["sha"][k] for j in js)
+        print(f"{k}: {'identical' if same else 'DIFFERENT'} across {len(js)} runs")
+    for p, j in zip(a.files, js):
+        print(f"  {p}: {j['platform']} {j['machine']} torch {j['torch']} {j['cpu_capability']}")
+    sys.exit(0 if all(j["sha"]["labels"] == js[0]["sha"]["labels"] for j in js) else 1)
+
+
 def compare(a) -> None:
     import numpy as np
     za, zb = np.load(a.a), np.load(a.b)
@@ -181,8 +236,14 @@ def main() -> None:
     c = sub.add_parser("compare")
     c.add_argument("a")
     c.add_argument("b")
+    y = sub.add_parser("synthetic")
+    y.add_argument("--threads", type=int, default=4)
+    y.add_argument("--steps", type=int, default=200)
+    y.add_argument("--out", default="")
+    j = sub.add_parser("compare-json")
+    j.add_argument("files", nargs="+")
     a = ap.parse_args()
-    run(a) if a.cmd == "run" else compare(a)
+    {"run": run, "compare": compare, "synthetic": synthetic, "compare-json": compare_json}[a.cmd](a)
 
 
 if __name__ == "__main__":
