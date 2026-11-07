@@ -80,6 +80,57 @@ def test_official_baseline_windows():
     assert (inside < 3).all() and ((mw[0] == 2) >= (mw[3] == 2))[m5.y < 3].all()   # wider window, fewer D
 
 
+def _fake_cache(tmp_path, monkeypatch, n5=600, keys=("a", "b", "c")):
+    """A tiny bake-off cache: three IDSSE-like matches with ground truth, world rows and OOF probabilities.
+    ``d2`` gets probabilities close to the truth, ``cur`` noisy ones."""
+    monkeypatch.setattr(P, "WORK", tmp_path)
+    rng = np.random.default_rng(0)
+    refs = [P.Ref("idsse", k, tmp_path / f"{k}.npz") for k in keys]
+    for r in refs:
+        y5 = np.full(n5, 3, np.int8)
+        blocks5 = [(1, 10, 289), (2, 310, 589)]
+        for _, a, b in blocks5:
+            seg = np.repeat(rng.choice([0, 1, 2], size=(b - a + 1) // 20 + 1), 20)[:b - a + 1]
+            y5[a:b + 1] = seg
+        gt = C.paths(r)["gt"]
+        gt.parent.mkdir(parents=True, exist_ok=True)
+        y_nat = np.repeat(y5, 5)
+        np.savez(gt, **{f"y_T{t}": y_nat for t in P.T_SWEEP}, step=5, fps=25.0, n_native=len(y_nat),
+                 blocks=np.array([(h, a * 5, b * 5 + 4) for h, a, b in blocks5]))
+        idx = np.concatenate([np.arange(a, b + 1) for _, a, b in blocks5])
+        half = np.concatenate([np.full(b - a + 1, h, np.int8) for h, a, b in blocks5])
+        yr = y5[idx]
+        for w in d2.eval_worlds(r):
+            f = C.paths(r)["feat"](w)
+            f.parent.mkdir(parents=True, exist_ok=True)
+            np.savez(f, idx=idx, half=half)
+        for v, noise in (("cur", 0.45), ("d2", 0.05)):
+            arrays = {}
+            for w in d2.eval_worlds(r):
+                flip = rng.random(len(yr)) < noise
+                arrays[f"pa_{w}"] = np.where(yr == 2, 0.1, 0.9).astype(np.float32)
+                team = np.where(flip, 1 - np.minimum(yr, 1), np.minimum(yr, 1))
+                arrays[f"ph_{w}"] = np.where(team == 0, 0.9, 0.1).astype(np.float32)
+            p = d2.oof_path(v, r)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            np.savez(p, **arrays)
+    return refs
+
+
+def test_score_stage_end_to_end_on_a_fake_cache(tmp_path, monkeypatch):
+    refs = _fake_cache(tmp_path, monkeypatch)
+    res = d2.score_folds(refs, refs)
+    for r in refs:
+        for w in d2.eval_worlds(r):
+            assert res[("d2", w, r.key)]["spell_f1"] >= res[("cur", w, r.key)]["spell_f1"]
+        assert res[("tau", "d2", r.key)] in P.TAUS
+    cmp = d2.compare_worlds(res, refs)
+    assert set(cmp) == set(W.EVAL_WORLDS) | set(d2.SECONDARY)
+    assert all(c["n"] == 3 and c["mean_diff"] > 0 for c in cmp.values())
+    v = d2.keep_verdict(cmp)
+    assert v["keep"] and not v["worse"] and not v["missing"]
+
+
 def _cmp(mean_diff, lo, hi, win_rate=0.5):
     return {"mean_diff": mean_diff, "lo": lo, "hi": hi, "win_rate": win_rate, "n": 8,
             "worse": mean_diff < 0 and hi < 0, "better": win_rate >= 0.7 and lo > 0}

@@ -287,27 +287,36 @@ def score_folds(fold_refs: list, dev: list, variants=VARIANTS) -> dict:
     res: dict = {}
     gts = {r.key: C.load_gt(r, T) for r in fold_refs}
     pri = {r.key: hmm.fit_priors(label_seqs(dev, {r.key})) for r in fold_refs}
+    oofs = {}
     for v in variants:
-        oofs = {}
         for r in fold_refs:
             with np.load(oof_path(v, r)) as z:
-                oofs[r.key] = {k: z[k] for k in z.files}
+                oofs[(v, r.key)] = {k: z[k] for k in z.files}
+    # tau per variant and fold, from the other folds' target-world scores
+    tf = {}
+    for r in fold_refs:
+        with np.load(C.paths(r)["feat"]("target")) as z:
+            tf[r.key] = {"half": z["half"], "idx": z["idx"]}
+    for v in variants:
         table = np.zeros((len(P.TAUS), len(fold_refs)))
-        feats = {r.key: C.load_feat(r, "target") for r in fold_refs}
         for j, r in enumerate(fold_refs):
-            f = feats[r.key]
+            o = oofs[(v, r.key)]
             for ti, tau in enumerate(P.TAUS):
-                rows = hmm.decode(oofs[r.key]["pa_target"], oofs[r.key]["ph_target"], f["half"], pri[r.key], tau, "viterbi")
-                table[ti, j] = Lm.score_rows(r, T, "target", rows, f["idx"], gts[r.key])["spell_f1"]
+                rows = hmm.decode(o["pa_target"], o["ph_target"], tf[r.key]["half"], pri[r.key], tau, "viterbi")
+                table[ti, j] = Lm.score_rows(r, T, "target", rows, tf[r.key]["idx"], gts[r.key])["spell_f1"]
         for j, r in enumerate(fold_refs):
             others = np.delete(table, j, axis=1).mean(1) if len(fold_refs) > 1 else table[:, j]
-            tau = P.TAUS[int(np.argmax(others))]
-            res[("tau", v, r.key)] = tau
-            for w in eval_worlds(r):
-                f = feats[r.key] if w == "target" else C.load_feat(r, w)
-                rows = hmm.decode(oofs[r.key][f"pa_{w}"], oofs[r.key][f"ph_{w}"], f["half"], pri[r.key], tau, "viterbi")
-                res[(v, w, r.key)] = Lm.score_rows(r, T, w, rows, f["idx"], gts[r.key])
+            res[("tau", v, r.key)] = P.TAUS[int(np.argmax(others))]
         res[("tau_table", v)] = {"table": table, "keys": [r.key for r in fold_refs]}
+    # every world, every variant; a world's rows (half, idx) are loaded once per fold
+    for r in fold_refs:
+        for w in eval_worlds(r):
+            with np.load(C.paths(r)["feat"](w)) as z:
+                half, idx = z["half"], z["idx"]
+            for v in variants:
+                o = oofs[(v, r.key)]
+                rows = hmm.decode(o[f"pa_{w}"], o[f"ph_{w}"], half, pri[r.key], res[("tau", v, r.key)], "viterbi")
+                res[(v, w, r.key)] = Lm.score_rows(r, T, w, rows, idx, gts[r.key])
     return res
 
 

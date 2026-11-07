@@ -75,13 +75,25 @@ def _fmt_m0(tab: dict) -> str:
     return "\n".join(lines)
 
 
+STAGES = ("build", "pools", "lomo", "score", "m0", "alarm")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=("build", "pools", "lomo", "score", "m0", "alarm"))
+    ap.add_argument("stages", help="one or more of " + ", ".join(STAGES) + ", comma-separated, run in order")
     ap.add_argument("--folds", default="8", help="8 (IDSSE + Metrica), 28 (all development), or match keys")
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--variants", default="cur,d2")
     a = ap.parse_args()
+    stages = a.stages.split(",")
+    if not set(stages) <= set(STAGES):
+        ap.error(f"unknown stage in {a.stages}")
+    for stage in stages:
+        run_stage(stage, a)
+
+
+def run_stage(stage: str, a) -> None:
+    a.stage = stage
     t0 = time.time()
     dev = d2.dev_refs()
     print(f"[d2] stage {a.stage}; WORK={P.WORK}; development matches: {len(dev)}", flush=True)
