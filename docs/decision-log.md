@@ -67,15 +67,28 @@ Spell counts and length bins, target-like, 28 folds. Predicted possessions per t
 At severe, predicted possessions per true one go down (0.747 to 0.737), and recall stays within 0.01 of M2's in every bin
 (0-2 s 0.152 to 0.144, 2-4 s 0.187 to 0.195, 32+ s 0.897 to 0.900).
 
-Evaluation-only worlds, never trained on, declared before the gate. The smooth-ball world is the target-like corruption
-with the same seed and no ball jitter: +0.0167 [+0.0083, +0.0251], 8/8. The IDSSE oracle and coupled worlds give
-clean ball +0.029 (6/6), dead_odds 3 +0.015 (5/6) and dead_odds 15 +0.014 (5/6). ROBUSTNESS_PLACEHOLDER
+Evaluation-only worlds, never trained on. The smooth-ball world was declared before the screen: the target-like
+corruption with the same seed and no ball jitter, +0.0167 [+0.0083, +0.0251], 8/8. The IDSSE oracle and coupled worlds give
+clean ball +0.029 (6/6), dead_odds 3 +0.015 (5/6) and dead_odds 15 +0.014 (5/6).
+
+D2's evaluation worlds were added after the gate, on request. They ran on 8 folds with `run_touch_gate.py worlds`, using
+`degrade.py` and `worlds.py` from `origin/david/d2-degrader` 9e55800 placed in the tree and not committed here. M2 + touch
+is ahead in all three: `target_cpl50` +0.0132 [+0.0052, +0.0217] 8/8,
+`target_cpl100` +0.0212 [+0.0121, +0.0304] 8/8, and `target_smooth` (SkillCorner-matched jitter) +0.0268 [+0.0187, +0.0352]
+7/8. With D2's degrader the touch build's recovery check passed on all 28 matches, which confirms on real data that it
+reproduces the old worlds byte for byte.
+
+**Is it the native rate?** `run_touch_gate.py rate` runs the same 53 columns from the corrupted 5 Hz ball, trained and
+decoded the same way (8 folds). The 5 Hz version gains +0.0060 [-0.0007, +0.0131] over M2 at target-like and +0.0118
+at severe. The native rate adds +0.0051 [-0.0019, +0.0121] (6/8) at target-like, +0.0001 at severe, +0.0034 in the
+smooth-ball world, +0.016 at mild and +0.020 on clean input. About half of the target-like gain is the feature design and
+half the frame rate. The frame rate's share grows as the noise falls, and the CI includes 0 at target-like.
 
 **Decision: not adopted under the pre-registered rule.** The paired interval excludes zero at target-like and at severe,
 and nothing gets worse in any world or severity. But the win rate is 19/28 (68%), one fold short of 70%. On the eight
 25 Hz folds alone it passes (7/8). The group stays out of the baseline. Whether to take it anyway is a team call, not
-this gate's: the target is 25 Hz, the losses sit on 10 Hz SkillCorner folds, and the effect is larger in every smoother
-world. Nothing was tuned after the gate.
+this gate's: the target is 25 Hz, 8 of the 9 losses sit on 10 Hz SkillCorner folds, and on the 8 folds the effect is
+larger in every smoother or coupled world than at target-like. Nothing was tuned after the gate.
 
 **Caveat on noise.** Real native ball tracks are smooth frame to frame. The median absolute second difference at 25 Hz is
 0.001 m on Metrica sample games 1 and 3, and consecutive increments correlate +0.6 to +0.9. The degrader's target-like
