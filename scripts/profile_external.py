@@ -139,7 +139,7 @@ def report(label: str, rows: list[dict]) -> None:
     print(f"\nspell duration quantiles (s) {QS}  |  dead-stretch quantiles (s)  |  H<->A direct / via D (team change) / via D (same team)")
     for r in rows:
         print(f"{r['name']:<26}{_q(r['dur'])}  |{_q(r['dead'])}  | {r['direct']:>5} {r['via_d_change']:>5} {r['via_d_same']:>5}")
-    print(f"\nsandwich merge: spells / mean spell (s) after relabelling opponent flips < T s")
+    print("\nsandwich merge: spells / mean spell (s) after relabelling opponent flips < T s")
     print(f"{'match':<26}{'raw':>14}" + "".join(f"{'T=' + str(T):>14}" for T in MERGE_T))
     for r in rows:
         raw = (r["n_spells"], float(r["dur"].mean()) if len(r["dur"]) else float("nan"))

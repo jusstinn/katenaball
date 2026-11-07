@@ -14,7 +14,7 @@ from katena.eval import errors
 from katena.eval import lomo as Lm
 from katena.eval import protocol as P
 from katena.eval.lomo import Pools, Results, timed
-from katena.eval.score import score, to_native_codes
+from katena.eval.score import to_native_codes
 from katena.models import spells as SP
 
 FOLDS8 = lambda dev: [r for r in dev if r.dataset in ("idsse", "metrica")]   # noqa: E731
