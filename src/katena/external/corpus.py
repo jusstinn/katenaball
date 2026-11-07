@@ -35,6 +35,9 @@ EXTERNAL_DATA = Path(os.environ.get("KATENA_EXTERNAL_DATA",
                                     "C:/Users/User/Desktop/barca/external_data"))
 IDSSE_NAMES = [f"idsse-{mid}" for mid in IDSSE_MATCHES]
 CORPUS_NAMES = IDSSE_NAMES + ["metrica-game3"]
+# D4's locked holdout (the last two DFL ids in sorted order). Excluded from load_corpus() unless
+# asked for by name or with include_locked=True, so a default call cannot leak them.
+LOCKED_NAMES = tuple(sorted(IDSSE_NAMES)[-2:])
 
 
 def cache_path(name: str, root=EXTERNAL_DATA) -> Path:
@@ -81,11 +84,14 @@ def build_corpus(root=EXTERNAL_DATA, names=None, keep_raw_tracking: bool = False
 
 
 def load_corpus(root=EXTERNAL_DATA, names=None, harmonise_cfg: dict | None = None,
-                ) -> list[Match]:
+                include_locked: bool = False) -> list[Match]:
     """Cached matches. With `harmonise_cfg`, `y` is harmonised and the raw labels are kept in
-    `meta["y_raw"]`. Matches that are not cached are skipped."""
+    `meta["y_raw"]`. Matches that are not cached are skipped. With `names=None` the locked
+    holdout is left out unless `include_locked=True`."""
     out = []
-    for name in names or CORPUS_NAMES:
+    if names is None:
+        names = [n for n in CORPUS_NAMES if include_locked or n not in LOCKED_NAMES]
+    for name in names:
         p = cache_path(name, root)
         if not p.exists():
             continue
@@ -213,10 +219,10 @@ def main(argv=None):
         build_corpus(args.root, args.names, args.keep_raw_tracking, args.force)
         return 0
     if args.command == "evidence":
-        print(evidence_markdown(load_corpus(args.root, args.names), args.root))
+        print(evidence_markdown(load_corpus(args.root, args.names, include_locked=True), args.root))
         return 0
     cfg = {"min_control_s": args.min_control_s}
-    rows = [match_report(m, cfg) for m in load_corpus(args.root, args.names)]
+    rows = [match_report(m, cfg) for m in load_corpus(args.root, args.names, include_locked=True)]
     print(f"harmonise cfg: {({**DEFAULT_HARMONISE, **cfg})}\n")
     print(report_markdown(rows))
     print(pooled_markdown(rows))

@@ -55,3 +55,17 @@ def test_cached_corpus_match_is_sane(name):
         dead = m.y[g] == D
         nan = np.isnan(m.ball[g, 0])
         assert (dead == nan).mean() > 0.97
+
+
+def test_load_corpus_default_excludes_locked(tmp_path):
+    from katena.external.corpus import CORPUS_NAMES, LOCKED_NAMES, cache_path
+    from katena.external.common import save_match_npz
+    from katena.synth import synthetic_match
+
+    m = synthetic_match(seed=0, half_minutes=0.2)
+    for name in (LOCKED_NAMES[0], CORPUS_NAMES[0]):
+        save_match_npz(m, cache_path(name, tmp_path))
+    from katena.external.corpus import load_corpus
+    assert len(load_corpus(tmp_path)) == 1
+    assert len(load_corpus(tmp_path, include_locked=True)) == 2
+    assert len(load_corpus(tmp_path, names=[LOCKED_NAMES[0]])) == 1
