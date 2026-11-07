@@ -21,8 +21,7 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
-  contents: read
-  pull-requests: read     # the plan job looks for an open pull request
+  contents: read          # every job; the plan job adds pull-requests: read
 
 defaults:
   run:
@@ -48,6 +47,9 @@ jobs:
     name: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read   # looks for an open pull request from this branch
     outputs:
       os: ${{ steps.decide.outputs.os }}
     steps:
@@ -101,16 +103,37 @@ jobs:
     name: firewall
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    env:
+      # Every ref on main, pull requests and tags; the branch's own history on other pushes.
+      SCOPE: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) && 'HEAD' || 'all' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 0          # --history must see every commit, not a shallow tip
           persist-credentials: false
-      - name: Data firewall on tracked files and history
-        env:
-          # Every ref on main, pull requests and tags; the branch's own history on other pushes.
-          SCOPE: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) && 'HEAD' || 'all' }}
-        run: python3 scripts/firewall_check.py --history "$SCOPE"
+      - name: Data firewall on tracked files and history (this branch's rules)
+        run: |
+          if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
+            echo "::error::shallow clone: the history scan needs fetch-depth: 0"; exit 1
+          fi
+          python3 scripts/firewall_check.py --history "$SCOPE"
+      - name: Data firewall with main's rules (a branch cannot loosen its own gate)
+        # A pull request runs its own copy of the scanner above, so one that loosens a rule would pass
+        # its own gate. main's copy runs too, on every ref but main itself (docs/ci.md).
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          # The checkout fetched every branch in full; refresh main in case it moved since. A failed
+          # refresh falls back to that copy; a missing main fails the job rather than skipping it.
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main" \
+            || echo "::warning::could not refresh origin/main; using the checkout's copy"
+          if ! git rev-parse -q --verify "refs/remotes/origin/main^{commit}" >/dev/null; then
+            echo "::error::origin/main is missing, so main's firewall rules cannot run"; exit 1
+          fi
+          if ! git cat-file -e origin/main:scripts/firewall_check.py 2>/dev/null; then
+            echo "main has no scripts/firewall_check.py yet: skipped"; exit 0
+          fi
+          echo "main's scanner: blob $(git rev-parse origin/main:scripts/firewall_check.py)"
+          git show origin/main:scripts/firewall_check.py | python3 - --history "$SCOPE"
 
   lint:
     name: lint
