@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -106,22 +107,58 @@ def read_raw(raw_path: str | Path, n_frames: int, n_slots: int, pitch: tuple[flo
     return P, speed, ball, report
 
 
-def load_target(data_dir: str | Path | None = None, source: str = "tactical") -> Match:
-    """The provided match as a Match, with no labels. Half blocks exist for tactical only."""
+@dataclass(frozen=True)
+class Timeline:
+    """What ``load_target`` takes from ``games.py`` rather than from the files: the frame count, the graded
+    half blocks (video frames, inclusive), the pitch in metres and the frame rate."""
+
+    n_frames: int
+    half_blocks: tuple            # ((half, first_frame, last_frame), ...)
+    pitch: tuple                  # (length, width) metres
+    fps: float
+    name: str
+
+    def to_json(self) -> dict:
+        return {"n_frames": int(self.n_frames), "half_blocks": [[int(h), int(a), int(b)] for h, a, b in self.half_blocks],
+                "pitch": [float(v) for v in self.pitch], "fps": float(self.fps), "name": self.name}
+
+    @classmethod
+    def from_json(cls, d: dict) -> "Timeline":
+        return cls(n_frames=int(d["n_frames"]), half_blocks=tuple((int(h), int(a), int(b)) for h, a, b in d["half_blocks"]),
+                   pitch=(float(d["pitch"][0]), float(d["pitch"][1])), fps=float(d["fps"]), name=str(d["name"]))
+
+
+def official_timeline(source: str = "tactical") -> Timeline:
+    """The competition match's timeline, from ``games.py`` (DATA.md): 199,319 tactical frames, the two graded
+    halves, 105.3 x 68.0 m, 25 fps."""
+    games = _games()
+    blocks = games.half_video_blocks(games.GAME) if source == "tactical" else []
+    return Timeline(n_frames=games.source_frames(source), half_blocks=tuple(tuple(b) for b in blocks),
+                    pitch=tuple(float(v) for v in games.GAMES[games.GAME]["pitch"]),
+                    fps=float(games.GAMES[games.GAME]["fps"]), name=f"{games.GAME}_{source}")
+
+
+def load_target(data_dir: str | Path | None = None, source: str = "tactical",
+                timeline: Timeline | None = None) -> Match:
+    """The provided match as a Match, with no labels. Half blocks exist for tactical only.
+
+    ``timeline`` replaces the ``games.py`` constants, for an external match exported in this format
+    (``katena.target.dress``). The competition match is always read with the default, ``official_timeline``."""
     games = _games()
     paths = games.asset_paths(data_dir=str(data_dir) if data_dir else None, source=source)
-    pitch = tuple(float(v) for v in games.GAMES[games.GAME]["pitch"])
-    n_frames = games.source_frames(source)
+    tl = official_timeline(source) if timeline is None else timeline
+    pitch = tuple(float(v) for v in tl.pitch)
+    n_frames = int(tl.n_frames)
 
     team = read_slot_teams(paths["atd_meta"])
     P, speed, ball, report = read_raw(paths["atd_raw"], n_frames, len(team), pitch)
 
-    blocks = games.half_video_blocks(games.GAME) if source == "tactical" else []
+    blocks = [tuple(int(v) for v in b) for b in tl.half_blocks]
     attack_dir = {h: infer_attack_dir(P, team, a, b, pitch[0]) for h, a, b in blocks}
 
     match = Match(P=P, team=team, speed=speed, ball=ball, half_blocks=blocks,
-                  attack_dir=attack_dir, y=None, pitch=pitch, fps=float(games.GAMES[games.GAME]["fps"]),
-                  name=f"{games.GAME}_{source}", source="competition_atd",
+                  attack_dir=attack_dir, y=None, pitch=pitch, fps=float(tl.fps),
+                  name=tl.name, source="competition_atd",
                   meta={"read_report": report})
     match.validate()
     return match

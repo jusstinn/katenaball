@@ -78,8 +78,9 @@ external_data/
 # bake-off caches: derived from external matches, large
 work/
 
-# a stray submission or frame-level export in the repo root
+# a stray submission or frame-level export in the repo root; make_submission.py writes to submissions/
 /*.csv
+submissions/
 
 # agent worktrees (Claude Code)
 .claude/worktrees/

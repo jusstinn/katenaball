@@ -1,8 +1,13 @@
 # katenaball
 
 Frame-level ball possession for **More than a Hack 2027, Phase 1**: label every frame of one football match
-`H`, `A`, or `D`, ranked on `spellF1`. The pipeline is under construction.
+`H`, `A`, or `D`, ranked on `spellF1`.
 
+```bash
+make submit TEAM=<team_name>     # external data -> model -> submissions/<team_name>.csv, validated
+```
+
+- Reproduction: [`docs/REPRODUCE.md`](docs/REPRODUCE.md). Approach and results: [`docs/technical-document.md`](docs/technical-document.md), [`docs/decision-log.md`](docs/decision-log.md)
 - Rules, data, and metric: [`docs/upstream/`](docs/upstream/)
 - Setup for contributors: [`CLAUDE.md`](CLAUDE.md) has the data rules everyone must follow
 
