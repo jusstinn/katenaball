@@ -6,6 +6,50 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-08
 
+### Locked-bench sanity read of F (registered before the read)
+
+Written before any bench score of F was computed. Branch `david/bench-read`, cut from `origin/david/j2-tests` at
+`8bbd252` (PR #12 is still open). External matches only: no `data/`, no `evaluation/gt/`, no public window. Script
+`scripts/run_bench_read.py`, cache `D:/katena/work-bench`.
+
+**What is read.** F trained once on the 28 development matches. Both benches are left out of every model, scaler and
+prior. The recipe is `katena.eval.final` unchanged, run as a gate fold with no development match held out:
+- the LightGBM member on `FinalPools(dev)` (213 columns, the `d2j` pool);
+- the TCN member from `tcn_seqs(dev)` and `fit_tcn` (seed 0, 4 threads, the deterministic settings, 1200 steps);
+- `blend_heads` at w = 0.5, Viterbi at tau 2, T = 2, and priors from `priors_for` on the 28 matches' labels.
+
+So the TCN's orientation draws run over the 28 matches, as in the gate, not over all 30 as in `pipeline.stage_train`.
+Each bench is scored with `final.decode_score` (`lomo.score_rows`, the official `evaluate`), for spellF1 and macroF1.
+
+**Conditions.** `target` and `severe` on both benches. The other `worlds.EVAL_WORLDS` are information only:
+`mild`, `target_cpl50`, `target_cpl100`, `target_ids`, `target_cpl100_ids` and `target_smooth`. Their features and
+touch columns come from `work-submit`. The exception is `target_cpl100_ids`, an evaluation-only world, which is built
+here for the two benches with `d2.build_ref` and `final.build_touch`, recovery checks included.
+
+**Compared with M2's stored bench scores.** These are in bakeoff.md Table 8, from `stages.stage_bench`: M2 trained on
+the 28 development matches, Viterbi at tau 2 (the argmax of M2's tau table), priors from the 28, T = 2.
+- No bench probabilities were stored. `work-base` never ran `stage_bench`, and no cache on this PC holds a bench
+  score, so there is nothing to re-decode.
+- Table 8 prints 3 decimals, and its scorer predates D5's block-edge fix.
+- So M2 is also retrained here on the same 28 matches, the way `stage_bench` does it (`Pools(dev)`, all 160 columns).
+  It is decoded and scored exactly as F, in every condition read.
+- This M2 must reproduce Table 8's M2 at `native`, `mild`, `target` and `severe` on both benches, to the 3 decimals
+  printed. If it does, the table compares F with this M2 at full precision. If it does not, the gap is reported and
+  explained before any F - M2 difference is read.
+
+**Inputs.**
+- Development files come from `work-final`, the gate's own inputs. Each is compared byte for byte with its copy in
+  `work-submit`.
+- Bench files come from `work-submit`. Their ground truth and their `native`, `mild`, `target` and `severe` features
+  are compared with `work-base`.
+- Every bench world that F reads is re-corrupted and re-featurized, and its touch columns are recomputed. Both must
+  be byte-identical to the copies.
+
+**Report only.** The read changes no decision, whatever the result. F stays adopted, and no constant, seed, weight,
+world or tau changes. Two matches give no usable interval. A gross failure means F below M2 by more than 0.05
+spellF1 on either bench at `target` or `severe`, about three times the worst development-fold loss (-0.018). It is
+treated as a possible bug to investigate, not as a model choice.
+
 ### J2 checks and J3 on Windows (David + Claude, `david/j2-tests`)
 
 External matches and synthetic files only. Nothing ran on the real match. Windows 10, i7-7700 (AVX2), torch
