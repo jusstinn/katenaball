@@ -329,7 +329,8 @@ def label_match(model: Model, m, threads: int | None = None) -> tuple[np.ndarray
 
 
 def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
-    """Write the file, then run the official checks on the bytes written. Raises if they fail."""
+    """Write the file, then run the official checks on the bytes written. Raises if they fail, and then leaves no
+    file at ``path`` from this run (the bytes are checked in a temporary file and moved into place only if valid)."""
     root = P.REPO / "evaluation"
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
@@ -339,10 +340,13 @@ def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
     data = submission_bytes(np.array(LABEL_NAMES)[codes])
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    reason = pm.validate_submission(pm.read_label_csv(path), n_expected)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    reason = pm.validate_submission(pm.read_label_csv(tmp), n_expected)
     if reason:
+        tmp.unlink()
         raise RuntimeError(f"the submission fails the official checks: {reason}")
+    tmp.replace(path)
     return {"path": str(path), "rows": int(len(codes)), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 

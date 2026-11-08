@@ -204,3 +204,14 @@ def _gt_csv(tmp: Path, ref) -> Path:
     path = tmp / "gt_T2.csv"
     path.write_bytes(PL.submission_bytes(np.array(LABEL_NAMES)[C.load_gt(ref, P.T_MAIN)["y"]]))
     return path
+
+
+def test_a_file_that_fails_the_official_checks_is_not_left_behind(tmp_path):
+    from katena import pipeline as PL
+    codes = np.array([3, 0, 1, 2, 3], dtype=np.int8)
+    with pytest.raises(RuntimeError):
+        PL.write_submission(codes, tmp_path / "bad.csv", 6)
+    assert sorted(p.name for p in tmp_path.iterdir()) == []
+    sub = PL.write_submission(codes, tmp_path / "ok.csv", 5)
+    assert (tmp_path / "ok.csv").read_bytes() == b"frame,label\n0,X\n1,H\n2,A\n3,D\n4,X\n"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["ok.csv"] and sub["rows"] == 5
