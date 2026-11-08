@@ -32,6 +32,33 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def components(bundle: Path) -> dict:
+    """Hashes of each part of a ``katena.pipeline.Model`` bundle: LightGBM strings, TCN weights, scaler, priors."""
+    import pickle
+
+    import numpy as np
+    repo = Path(__file__).resolve().parents[1]
+    sys.path[:0] = [str(repo / "src"), str(repo / "evaluation"), str(repo)]
+    with open(bundle, "rb") as fh:
+        m = pickle.load(fh)
+
+    def h(*arrays) -> str:
+        g = hashlib.sha256()
+        for x in arrays:
+            x = np.ascontiguousarray(x)
+            g.update(f"{x.dtype.str}{x.shape}".encode())
+            g.update(x.tobytes())
+        return g.hexdigest()
+    p = m.priors
+    return {"part_gbdt_alive": hashlib.sha256(m.gbdt_alive.encode()).hexdigest(),
+            "part_gbdt_team": hashlib.sha256(m.gbdt_team.encode()).hexdigest(),
+            "part_tcn_state": h(*[m.tcn_state[k] for k in sorted(m.tcn_state)]),
+            "part_scaler": h(m.scaler_mu, m.scaler_sd),
+            "part_priors_viterbi": h(p.logA, p.log_init, p.log_class),
+            "part_priors_hsmm": h(p.logT, p.logdur, p.dur_params),
+            "part_names": hashlib.sha256("\n".join(map(str, m.names)).encode()).hexdigest()}
+
+
 def dump(a) -> None:
     ext = Path(os.environ.get("KATENA_EXTERNAL") or a.external)
     work = Path(os.environ.get("KATENA_WORK") or a.work)
@@ -46,7 +73,7 @@ def dump(a) -> None:
     for d in sorted(work.glob("model*")):
         man = d / "manifest.json"
         if man.exists():
-            models[d.name] = json.loads(man.read_text(encoding="utf-8"))["sha256"]
+            models[d.name] = {**json.loads(man.read_text(encoding="utf-8"))["sha256"], **components(d / "bundle.pkl")}
     out["models"] = models
     Path(a.out).write_text(json.dumps(out, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {a.out}: {sum(len(v) for v in out['stages'].values())} files, models {sorted(models)}")

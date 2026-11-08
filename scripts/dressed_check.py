@@ -10,6 +10,7 @@ scores for the same held-out model?
         --out $D/run1/dressed.csv
     $PY scripts/dressed_check.py compare --match $K --dir $D --csv $D/run1/dressed.csv
     $PY scripts/dressed_check.py diff --gt $D/gt_T2.csv $D/run1/dressed.csv $D/run2/dressed.csv
+    $PY scripts/dressed_check.py label --bundle other_machine/bundle.pkl --dir $D --out $D/other.csv
 
 ``export`` writes the canonical match in the competition's ATD format (``katena.target.dress``) with the timeline
 ``load_target`` would otherwise take from games.py, and the match's own labels at T = 2 as a ``frame,label`` CSV,
@@ -22,7 +23,8 @@ probabilities and labels agree, and scores the CSV ``predict`` wrote with the of
 label, so the evaluation path turns a predicted D into X (``score(sc_mode=True)``); the CSV is scored as written and
 with that mapping.
 
-``diff`` counts graded frames on which two CSVs differ and scores both. External matches only; output is
+``diff`` counts graded frames on which two CSVs differ and scores both. ``label`` labels the exported match with any
+``bundle.pkl`` (``pipeline.label_match``), e.g. one trained on another machine, to compare labels across machines. External matches only; output is
 aggregates and hashes.
 """
 
@@ -168,6 +170,23 @@ def diff(a) -> None:
               f"of {int(graded.sum())} graded")
 
 
+def label(a) -> None:
+    import pickle
+
+    from katena import pipeline as PL
+    from katena.target.atd import Timeline, load_target
+    from katena.types import LABEL_NAMES
+    d = Path(a.dir)
+    with open(a.bundle, "rb") as fh:
+        model = pickle.load(fh)
+    tl = Timeline.from_json(json.loads((d / "timeline.json").read_text(encoding="utf-8")))
+    codes, rep = PL.label_match(model, load_target(d / "bundle", timeline=tl))
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(a.out).write_bytes(PL.submission_bytes(np.array(LABEL_NAMES)[codes]))
+    print(f"bundle {hashlib.sha256(Path(a.bundle).read_bytes()).hexdigest()[:16]} -> {a.out} "
+          f"(sha256 {hashlib.sha256(Path(a.out).read_bytes()).hexdigest()[:16]})")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -182,10 +201,14 @@ def main() -> None:
     f = sub.add_parser("diff")
     f.add_argument("--gt", required=True)
     f.add_argument("csvs", nargs="+")
+    lb = sub.add_parser("label")
+    lb.add_argument("--bundle", required=True)
+    lb.add_argument("--dir", required=True)
+    lb.add_argument("--out", required=True)
     a = ap.parse_args()
-    if a.cmd != "diff" and os.environ.get("KATENA_WORK") is None:
+    if a.cmd not in ("diff", "label") and os.environ.get("KATENA_WORK") is None:
         sys.exit("set KATENA_WORK to the submission cache")
-    {"export": export, "compare": compare, "diff": diff}[a.cmd](a)
+    {"export": export, "compare": compare, "diff": diff, "label": label}[a.cmd](a)
 
 
 if __name__ == "__main__":

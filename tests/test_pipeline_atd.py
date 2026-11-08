@@ -215,3 +215,27 @@ def test_a_file_that_fails_the_official_checks_is_not_left_behind(tmp_path):
     sub = PL.write_submission(codes, tmp_path / "ok.csv", 5)
     assert (tmp_path / "ok.csv").read_bytes() == b"frame,label\n0,X\n1,H\n2,A\n3,D\n4,X\n"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["ok.csv"] and sub["rows"] == 5
+
+
+def test_cache_digests_name_the_first_stage_that_differs(trained, tmp_path, monkeypatch, capsys):
+    import argparse
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import shutil
+
+    import cache_digests as CD
+    shutil.copytree(P.CANON, tmp_path / "ext" / "canonical")          # the corpus layout: <root>/canonical/<ds>
+    monkeypatch.setenv("KATENA_EXTERNAL", str(tmp_path / "ext"))
+    monkeypatch.setenv("KATENA_WORK", str(P.WORK))
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    CD.dump(argparse.Namespace(out=str(a), external="", work=""))
+    CD.dump(argparse.Namespace(out=str(b), external="", work=""))
+    assert a.read_bytes() == b.read_bytes()
+    d = json.loads(a.read_text(encoding="utf-8"))
+    assert len(d["stages"]["canonical"]) == 4 and len(d["stages"]["touch"]) == 15 + 15 + 15 + 9
+    assert {"gbdt", "tcn", "bundle.pkl", "part_tcn_state", "part_priors_viterbi"} <= set(d["models"]["model"])
+    assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 0
+    d["stages"]["pool_d2j"][sorted(d["stages"]["pool_d2j"])[0]] = "0" * 64
+    b.write_text(json.dumps(d), encoding="utf-8")
+    capsys.readouterr()
+    assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 1
+    assert "earliest stage that differs: pool_d2j" in capsys.readouterr().out

@@ -58,3 +58,34 @@ uv run python scripts/make_submission.py corpus --seed-from work/bakeoff
 ```
 
 The copied files are byte-identical to what the corpus step writes, which was checked on all 150 files.
+
+## Without `make` (Windows)
+
+`make` is not on every machine (it is not on the team's Windows PC). The same steps, from the repository root:
+
+```bash
+python scripts/build_external.py                       # skips matches that are up to date (see below)
+python scripts/make_submission.py corpus --workers 2
+python scripts/make_submission.py worlds --workers 2
+python scripts/make_submission.py train
+python scripts/make_submission.py predict --out submissions/<team_name>.csv
+python evaluation/validate_submission.py submissions/<team_name>.csv
+sha256sum submissions/<team_name>.csv                  # shasum -a 256 on macOS
+```
+
+`build_external.py` decides whether a match is up to date from the loader-code digest in its sidecar. The
+sidecars of the current corpus carry digests that no LF checkout reproduces (CRLF line endings, or code edited
+after the build), so the first run rebuilds all 30 matches. The rebuild was checked on Windows: all 30 canonical
+files come out byte-identical to the existing ones, so the training data does not change.
+
+## Checking the submission path without the match
+
+- `tests/test_pipeline_atd.py` writes a synthetic ATD bundle in the real file format on the competition's own
+  timeline (199,319 frames, the graded halves of `games.py`) and runs `predict` on it through
+  `katena.target.atd.load_target`; the CSV must pass `evaluation/validate_submission.py` unchanged.
+- `scripts/dressed_check.py` exports an external match in the ATD format, trains F without it
+  (`make_submission.py train --hold-out <key>`, saved to `model_without_<key>/`, never `model/`), labels it with
+  `predict --hold-out <key> --data-dir <bundle> --timeline <timeline.json>`, and compares the official score of
+  that CSV with the evaluation path's score for the same model. Both options refuse the competition data.
+- `scripts/cache_digests.py dump` hashes every training input and the model stage by stage; `diff` on two
+  machines' dumps names the first stage where they part (J3).
