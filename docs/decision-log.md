@@ -6,6 +6,121 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-08
 
+### Locked-bench sanity read of F (registered before the read)
+
+Written before any bench score of F was computed. Branch `david/bench-read`, cut from `origin/david/j2-tests` at
+`8bbd252` (PR #12 is still open). External matches only: no `data/`, no `evaluation/gt/`, no public window. Script
+`scripts/run_bench_read.py`, cache `D:/katena/work-bench`.
+
+**What is read.** F trained once on the 28 development matches. Both benches are left out of every model, scaler and
+prior. The recipe is `katena.eval.final` unchanged, run as a gate fold with no development match held out:
+- the LightGBM member on `FinalPools(dev)` (213 columns, the `d2j` pool);
+- the TCN member from `tcn_seqs(dev)` and `fit_tcn` (seed 0, 4 threads, the deterministic settings, 1200 steps);
+- `blend_heads` at w = 0.5, Viterbi at tau 2, T = 2, and priors from `priors_for` on the 28 matches' labels.
+
+So the TCN's orientation draws run over the 28 matches, as in the gate, not over all 30 as in `pipeline.stage_train`.
+Each bench is scored with `final.decode_score` (`lomo.score_rows`, the official `evaluate`), for spellF1 and macroF1.
+
+**Conditions.** `target` and `severe` on both benches. The other `worlds.EVAL_WORLDS` are information only:
+`mild`, `target_cpl50`, `target_cpl100`, `target_ids`, `target_cpl100_ids` and `target_smooth`. Their features and
+touch columns come from `work-submit`. The exception is `target_cpl100_ids`, an evaluation-only world, which is built
+here for the two benches with `d2.build_ref` and `final.build_touch`, recovery checks included.
+
+**Compared with M2's stored bench scores.** These are in bakeoff.md Table 8, from `stages.stage_bench`: M2 trained on
+the 28 development matches, Viterbi at tau 2 (the argmax of M2's tau table), priors from the 28, T = 2.
+- No bench probabilities were stored. `work-base` never ran `stage_bench`, and no cache on this PC holds a bench
+  score, so there is nothing to re-decode.
+- Table 8 prints 3 decimals, and its scorer predates D5's block-edge fix.
+- So M2 is also retrained here on the same 28 matches, the way `stage_bench` does it (`Pools(dev)`, all 160 columns).
+  It is decoded and scored exactly as F, in every condition read.
+- This M2 must reproduce Table 8's M2 at `native`, `mild`, `target` and `severe` on both benches, to the 3 decimals
+  printed. If it does, the table compares F with this M2 at full precision. If it does not, the gap is reported and
+  explained before any F - M2 difference is read.
+
+**Inputs.**
+- Development files come from `work-final`, the gate's own inputs. Each is compared byte for byte with its copy in
+  `work-submit`.
+- Bench files come from `work-submit`. Their ground truth and their `native`, `mild`, `target` and `severe` features
+  are compared with `work-base`.
+- Every bench world that F reads is re-corrupted and re-featurized, and its touch columns are recomputed. Both must
+  be byte-identical to the copies.
+
+**Report only.** The read changes no decision, whatever the result. F stays adopted, and no constant, seed, weight,
+world or tau changes. Two matches give no usable interval. A gross failure means F below M2 by more than 0.05
+spellF1 on either bench at `target` or `severe`, about three times the worst development-fold loss (-0.018). It is
+treated as a possible bug to investigate, not as a model choice.
+
+**Result.** Computed after the registration commit `4aa8bf1`, with `scripts/run_bench_read.py seed worlds train score`
+(code `2cea318`), in one slot on the i7-7700. Nothing was changed after a score.
+
+**Checks.**
+- **Inputs.** 476 files (12.85 GB) were copied. All 422 that have a second copy are byte-identical to it:
+  - from the 28 development matches (`work-final` against `work-submit`): ground truth, base and `d2j` pools, touch
+    pools, and 300 training-world features;
+  - from the benches (`work-submit` against `work-base`): ground truth and the `native`, `mild`, `target` and
+    `severe` features.
+- **Bench worlds.** `target_cpl100_ids` was built for both benches and passed the recovery check. All 16 bench worlds
+  that F reads (8 per bench) re-corrupt to the cached rows, M0 and degrader statistics. They re-featurize byte for
+  byte, and their touch columns recompute byte for byte.
+- **M2 is comparable.** M2 was retrained here on the 28 development matches (614,802 rows x 160 columns). It
+  reproduces all 8 M2 cells of Table 8 to the 3 decimals printed, in spellF1 and macroF1: `native`, `mild`, `target`
+  and `severe` on both benches. So the stored numbers used T = 2, tau 2 and the same conditions. The tables below use
+  this M2 at full precision.
+
+**F against M2 on the benches** (official scorer, T = 2, Viterbi at tau 2; the registered conditions).
+
+| bench | condition | F spellF1 | M2 spellF1 | diff | F macroF1 | M2 macroF1 | diff |
+|---|---|---|---|---|---|---|---|
+| IDSSE `DFL-MAT-J03WQQ` | target | 0.6092 | 0.5669 | +0.0422 | 0.8912 | 0.8848 | +0.0064 |
+| IDSSE `DFL-MAT-J03WQQ` | severe | 0.5605 | 0.5478 | +0.0126 | 0.8662 | 0.8625 | +0.0037 |
+| Metrica `Sample_Game_2` | target | 0.6820 | 0.6311 | +0.0509 | 0.8958 | 0.8837 | +0.0121 |
+| Metrica `Sample_Game_2` | severe | 0.5945 | 0.5371 | +0.0574 | 0.8640 | 0.8447 | +0.0193 |
+
+**Information: the other evaluation worlds** (M2's heads in the same world).
+
+| bench | world | F spellF1 | M2 spellF1 | diff | F macroF1 | M2 macroF1 | diff |
+|---|---|---|---|---|---|---|---|
+| IDSSE | `mild` | 0.6299 | 0.6126 | +0.0173 | 0.9123 | 0.9036 | +0.0086 |
+| IDSSE | `target_cpl50` | 0.6206 | 0.6045 | +0.0162 | 0.9031 | 0.8934 | +0.0098 |
+| IDSSE | `target_cpl100` | 0.6197 | 0.5934 | +0.0263 | 0.9098 | 0.8935 | +0.0163 |
+| IDSSE | `target_ids` | 0.6034 | 0.6064 | -0.0030 | 0.8953 | 0.8972 | -0.0019 |
+| IDSSE | `target_cpl100_ids` | 0.6414 | 0.6193 | +0.0221 | 0.9118 | 0.8976 | +0.0142 |
+| IDSSE | `target_smooth` | 0.6281 | 0.5915 | +0.0366 | 0.9050 | 0.8892 | +0.0158 |
+| Metrica | `mild` | 0.7202 | 0.6622 | +0.0580 | 0.9009 | 0.8857 | +0.0152 |
+| Metrica | `target_cpl50` | 0.6991 | 0.6585 | +0.0406 | 0.8937 | 0.8846 | +0.0091 |
+| Metrica | `target_cpl100` | 0.6970 | 0.6685 | +0.0285 | 0.8971 | 0.8833 | +0.0137 |
+| Metrica | `target_ids` | 0.6836 | 0.6341 | +0.0495 | 0.8932 | 0.8833 | +0.0099 |
+| Metrica | `target_cpl100_ids` | 0.6890 | 0.6488 | +0.0402 | 0.8946 | 0.8840 | +0.0105 |
+| Metrica | `target_smooth` | 0.7116 | 0.6667 | +0.0450 | 0.9006 | 0.8873 | +0.0133 |
+
+- **The members alone, spellF1.** At `target`: IDSSE `FG` 0.5695 and `FT` 0.6064; Metrica `FG` 0.6691 and `FT`
+  0.6787. At `severe`: IDSSE `FG` 0.5278 (M2 0.5478) and `FT` 0.5694; Metrica `FG` 0.5749 and `FT` 0.6037. The
+  LightGBM member falls below M2 only on IDSSE at `severe`, where D2 already saw `d2j` cost IDSSE.
+- **Spell counts.** Predicted possessions per true one at `target`: IDSSE F 0.663 against M2 0.689, Metrica F 0.847
+  against M2 0.804.
+- **Hashes, this PC.** The 28-match models: LightGBM member `c2ec4827...`, TCN `5cb5928e...`, M2 `7db0d235...`. This
+  is not the submission model, which also trains on the benches.
+
+**Reading.** F scores above M2 on both benches at `target` and `severe`: +0.013 to +0.057 spellF1 and +0.004 to
++0.019 macroF1. That is nowhere near the registered gross-failure line, so nothing needs to be investigated. The gaps
+look like the development folds. There, F gained +0.023 (IDSSE) and +0.052 (Metrica) at `target`, and +0.019 and
++0.053 at `severe`. Here the gains are +0.042 and +0.051 at `target`, and +0.013 and +0.057 at `severe`. In 15 of
+16 bench worlds F is ahead. The exception is IDSSE `target_ids` (-0.003), smaller than the worst development-fold loss at
+`target` (-0.018).
+The read also checks the path end to end. A model that never saw the benches labels them in all 8 worlds through the
+gate's code, and the M2 reproduction ties the comparison to the bake-off's own bench numbers. Two matches give no
+interval, so this read is consistent with the gate and is not more evidence for F. It changes no decision.
+
+**Cost.** Copying took 8.2 min (disk bound). The worlds stage and checks took 3.5 min. Training took 13.0 min:
+LightGBM 56 s, TCN 660 s, M2 66 s. Scoring took 5 s. The total in the slot was 24.9 min, with a 3.5 GB peak. The TCN
+took 3x its time in J2's `train`, while the train stage's CPU time (749 s) was about its wall time (782 s), so torch
+got well under its 4 threads. The cause was not investigated.
+
+**Kept.** In `D:/katena/work-bench`: `bench_read.json` (every score and check), `bench_results.pkl`,
+`final_cost.jsonl`, `logs/bench.log`, and `oof/` (the bench probabilities of `FG`, `FT` and M2, 11 MB). The copied and
+built inputs (12.8 GB) were deleted. They are copies of `work-final` and `work-submit`, and `target_cpl100_ids` is
+rebuilt by the `worlds` stage.
+
 ### J2 checks and J3 on Windows (David + Claude, `david/j2-tests`)
 
 External matches and synthetic files only. Nothing ran on the real match. Windows 10, i7-7700 (AVX2), torch

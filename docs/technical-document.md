@@ -116,7 +116,20 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   result. We report the 8 IDSSE and Metrica folds beside the 28, because the 20 SkillCorner folds cannot
   show a dead-ball change.
 - **Two locked benches**, `DFL-MAT-J03WQQ` (chosen by hash) and Metrica `Sample_Game_2`, were scored once
-  in the bake-off. No choice was made from them.
+  in the bake-off and no choice was made from them. After F was adopted, F was read on them once, trained on
+  the 28 development matches only. The read was registered before any score, as a sanity check that
+  changes no decision. F beat M2 on both benches in both registered conditions:
+
+  | Bench | Noise | F | M2 | Difference |
+  |---|---|---|---|---|
+  | IDSSE `DFL-MAT-J03WQQ` | target-like | 0.6092 | 0.5669 | +0.0422 |
+  | IDSSE `DFL-MAT-J03WQQ` | severe | 0.5605 | 0.5478 | +0.0126 |
+  | Metrica `Sample_Game_2` | target-like | 0.6820 | 0.6311 | +0.0509 |
+  | Metrica `Sample_Game_2` | severe | 0.5945 | 0.5371 | +0.0574 |
+
+  F is ahead in 15 of the 16 bench-and-world pairs; the exception loses 0.003. M2 retrained here
+  reproduces the bake-off's recorded bench scores to the 3 decimals printed. The final model also trains
+  on these two matches, so this read is of the 28-match model, not the submitted one.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
   on it. We used only DATA.md's published aggregates (46 slots, 20.5 tracked objects, 41% ball missing)
   and the published half boundaries. Human-run checks on the real file (loader, slot layout, domain-gap
@@ -297,8 +310,9 @@ every frame in between is D. The model must find this from the tracking, with no
   `Sample_Game_2` included. The effect is probably small but unmeasured.
 - **The development estimate is optimistic.** D1, D2 and D3 were gated on the same 28 folds before F
   combined them. F was registered before its own score, but its parts were chosen knowing their results.
-  Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. F has not been read on the
-  locked benches. `TODO(bench read)`: report that single read.
+  Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. The two locked benches are
+  the only matches no choice was made on. F's one read there gains about as much as on the development
+  folds (section 3.1). With two matches, that read is a sanity check, not a second estimate.
 - **The TCN seed matters.** F's TCN uses seed 0, fixed in advance. Averaging in a second seed lowered the
   8-fold score by 0.005 (1 of 8 folds won), so seed 0 does unusually well on those folds. With seed 1, F is
   still about +0.02 above M2 there, so roughly a quarter of the 8-fold gain depends on the seed. The 28-fold
