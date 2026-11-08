@@ -39,6 +39,16 @@ severe 0.5426). Any difference is a cross-machine reproducibility finding for J3
   (+0.030) may be seed luck. The 28-fold gate (+0.016, CI [+0.011, +0.021]) is the better guide. This
   changes no rule outcome. It is a caution for the team's decision on PR 8, and an argument for keeping
   seed 0 fixed rather than re-drawing it.
+- **How large the seed effect is (information only; F's seed stays 0).** On the same cached probabilities,
+  with M2 for reference:
+
+  | Condition | M2 | LightGBM member alone | F, seed 0 | F, seed 1 |
+  |---|---|---|---|---|
+  | target | 0.5689 | 0.5839 | 0.5991 | 0.5914 |
+  | severe | 0.5149 | 0.5221 | 0.5426 | 0.5326 |
+
+  With the other seed, F is still about +0.02 above M2 on these folds. Roughly a quarter of the 8-fold gain
+  depends on the seed, and the rest holds.
 
 ### J4 gap filling: deprioritised, not run
 
