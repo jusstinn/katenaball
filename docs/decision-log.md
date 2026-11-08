@@ -97,6 +97,33 @@ Otherwise it is dropped. The screen decides nothing for the submission by itself
 **Side check.** F recomputed here should match David's Windows means on the same 8 folds (target 0.5991,
 severe 0.5426). Any difference is a cross-machine reproducibility finding for J3.
 
+**Result (`scripts/screen_tcn_seeds.py`, about 35 min on the Mac): drop F2.**
+
+| Condition | F | F2 | F2 - F [95% paired CI] | F2 wins |
+|---|---|---|---|---|
+| target | 0.5991 | 0.5939 | -0.0052 [-0.0089, -0.0018] | 1/8 |
+| severe | 0.5426 | 0.5375 | -0.0051 [-0.0099, -0.0003] | 1/8 |
+
+- **Cross-machine reproduction.** F recomputed on macOS arm64 gives the same 8-fold means as David's Windows
+  x86 run, to the 4 decimals reported: 0.5991 and 0.5426. Torch's bytes can differ across CPUs, but the
+  scores did not move.
+- **What it says about F.** Averaging seed 1 into the TCN lowers the score on 7 of 8 folds. So seed 0 does
+  unusually well on these folds, and seed 1 does not (D3 also saw a lower seed-1 ensemble gain, +0.0084
+  against +0.0120). F was assembled with seed 0 after seeing these folds, so part of its 8-fold gain over M2
+  (+0.030) may be seed luck. The 28-fold gate (+0.016, CI [+0.011, +0.021]) is the better guide. This
+  changes no rule outcome. It is a caution for the team's decision on PR 8, and an argument for keeping
+  seed 0 fixed rather than re-drawing it.
+- **How large the seed effect is (information only; F's seed stays 0).** On the same cached probabilities,
+  with M2 for reference:
+
+  | Condition | M2 | LightGBM member alone | F, seed 0 | F, seed 1 |
+  |---|---|---|---|---|
+  | target | 0.5689 | 0.5839 | 0.5991 | 0.5914 |
+  | severe | 0.5149 | 0.5221 | 0.5426 | 0.5326 |
+
+  With the other seed, F is still about +0.02 above M2 on these folds. Roughly a quarter of the 8-fold gain
+  depends on the seed, and the rest holds.
+
 ### J4 gap filling: deprioritised, not run
 
 M2's base features already carry possession across ball gaps:
