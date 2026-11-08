@@ -1,8 +1,8 @@
 # <team_name>: technical document
 
 More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Draft of 2026-11-08,
-against `main` at `7d1a4ad`. Every number comes from `docs/decision-log.md` and the evidence pages it
-links. `TODO(confirm)` marks what waits for the final pipeline.
+against `main` at `d2ce418`. Every number comes from `docs/decision-log.md` and the evidence pages it
+links. `TODO(after the real run)` marks what only the final run on the provided match can fill in.
 
 ## 1. Summary
 
@@ -29,8 +29,9 @@ links. `TODO(confirm)` marks what waits for the final pipeline.
 5. Average the members in logit space, per head, with weight 0.5.
 6. Decode each half with a 3-state Viterbi.
 7. Expand to frames: each frame takes the label of the nearest sample in its own half. Graded frames get
-   H, A or D; frames outside the graded halves get X. `TODO(confirm)`: this is the development
-   pipeline's expansion (`katena.eval.score.to_native_codes`); check `make_submission.py` matches.
+   H, A or D; frames outside the graded halves get X. The submission path (`katena.pipeline.label_match`)
+   calls the same function as the development folds (`katena.eval.score.to_native_codes`, with the half
+   blocks), and writes the CSV as bytes with LF line ends on every OS.
 
 ### 2.2 Features
 
@@ -120,9 +121,22 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   on it. We used only DATA.md's published aggregates (46 slots, 20.5 tracked objects, 41% ball missing)
   and the published half boundaries. Human-run checks on the real file (loader, slot layout, domain-gap
   alarms) print aggregates only and never choose between versions.
-- **The public 5 minutes are a pipeline check only.** The decision log records no look at them. CI reads
-  them only to check that the official scorer still reproduces the published scores of the published
-  baseline files. `TODO(confirm)`: log the final file's alignment check.
+- **The public 5 minutes are a pipeline check only.** CI reads them only to check that the official scorer
+  still reproduces the published scores of the published baseline files. The final file is checked on the
+  window by `scripts/check_public_window.py`, which prints pass or fail only, never a score. It checks four
+  things: the official file checks pass; swapping H and A lowers team accuracy (home and away are the right
+  way round); shifting the labels by 5 or 10 s lowers spellF1 (the frames line up); and the file beats the
+  published smooth50 baseline. A fail means a bug to find, not something to tune, and every run is logged.
+  `TODO(after the real run)`: the result of that run.
+- **The submission path equals the evaluation path.** We exported an external development match
+  (IDSSE `DFL-MAT-J03WMX`) in the provided ATD file format and read it back bit-identical through the real
+  loader (`katena.target.atd.load_target`). We trained F without it and labelled it with
+  `make_submission.py predict`. Scored with the official scorer, the CSV gives spellF1 0.650611 and
+  macroF1 0.930641, exactly what the evaluation code gives for the same model. Every probability and graded
+  label is bit-identical on both paths. A SkillCorner match (10 Hz) also agrees, once the evaluation's
+  "predicted D counts as X" rule for SkillCorner is applied (`scripts/dressed_check.py`). A synthetic
+  bundle on the provided match's own timeline (199,319 frames, the graded halves of `games.py`) runs
+  through the same path in CI, and the official validator accepts its CSV (`tests/test_pipeline_atd.py`).
 
 ### 3.2 Bake-off (2026-11-06)
 
@@ -224,8 +238,8 @@ against 0.009), and it loses against the 5 s and event-defined conventions, the 
 - **No hand labels.** Nobody on the team labelled or corrected any frame of any game. Every label is a
   provider field or an algorithm over provider data, and none comes from the provided match.
 - **Use.** The alive head and the decoder priors use IDSSE and Metrica. The team head uses all three. In
-  the development folds each model trains on the 27 other development matches. `TODO(confirm)`: the final
-  model trains on all 30, benches included, as the decision log plans.
+  the development folds each model trains on the 27 other development matches. The final model trains
+  once on all 30, benches included (`katena.pipeline.training_refs`): 657,133 LightGBM rows of 213 columns.
 - **Integrity.** All 111 raw files are SHA-256 pinned in `scripts/external_manifest.json`.
   `scripts/build_external.py` downloads and rebuilds the corpus.
 - **Frame counts** are frames inside each half's in-play block at the native rate, from the corpus
@@ -260,8 +274,9 @@ under-segments, with 0.738 predicted possessions per true one at target-like. On
 never writes X on a graded frame.
 
 **Second-half kickoff.** The second half is graded from frame 110,808 but kicks off later (FAQ.md), and
-every frame in between is D. The model must find this from the tracking, with no frame constant.
-`TODO(confirm)`: how `make_submission.py` handles it.
+every frame in between is D. The model must find this from the tracking, with no frame constant, and
+`make_submission.py` adds none. Its report prints, as an aggregate, the share of D over the first 60 and
+120 s of each half, so a human can see whether that span was read as dead ball without seeing any frame.
 
 ## 7. Limitations
 
@@ -283,16 +298,25 @@ every frame in between is D. The model must find this from the tracking, with no
 - **The development estimate is optimistic.** D1, D2 and D3 were gated on the same 28 folds before F
   combined them. F was registered before its own score, but its parts were chosen knowing their results.
   Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. F has not been read on the
-  locked benches. `TODO(confirm)`: report that single read.
+  locked benches. `TODO(bench read)`: report that single read.
+- **The TCN seed matters.** F's TCN uses seed 0, fixed in advance. Averaging in a second seed lowered the
+  8-fold score by 0.005 (1 of 8 folds won), so seed 0 does unusually well on those folds. With seed 1, F is
+  still about +0.02 above M2 there, so roughly a quarter of the 8-fold gain depends on the seed. The 28-fold
+  gate is the better guide.
 - **Unknown label convention.** The absolute score is uncertain by about 0.15. About 35 touch-then-out
   flips per IDSSE match (11% of spells) remain in our labels.
 - **Assumed identity-switch rates.** No external source measures them.
 - **Short possessions.** At IoU 0.5 and target-like noise, M2 matched 0.167 of true possessions under
   2 s, and M2 with touch features 0.169.
-- **Cross-machine byte identity is untested.** On one machine (Windows 10, i7-7700, torch 2.15.0+cpu,
-  LightGBM 4.7.0), two fresh processes reproduce every model, probability and label byte for byte. On one
-  probed fold, other thread counts and CPU kernels moved probabilities by at most 1.2e-6 and changed no
-  label. Expect identical labels on another machine, not identical probability bytes.
+- **Cross-machine byte identity is not guaranteed.** On one machine, two fresh processes reproduce every
+  model, probability and label byte for byte, and the CSV too. Between Windows x86 (i7-7700) and macOS arm64:
+  - the LightGBM model is byte-identical;
+  - the TCN's weights differ in their last bits, because torch picks different CPU kernels;
+  - F's 8-fold development means agree to the 4 decimals reported.
+
+  Retraining the TCN with other CPU kernels moved probabilities by at most 5e-7 and left a dressed-match CSV
+  byte-identical. Expect the same labels on another machine, though this has not been shown on the provided
+  match itself.
 
 **With more time** we would recalibrate the D2 worlds inside each fold, and make native-ball noise as
 smooth and correlated as real tracking. We would also re-run the `tail` gate after its label fix, add a
@@ -300,25 +324,40 @@ head aimed at the team label (where the oracle puts the points), and test Smart 
 
 ## 8. Reproduction
 
-> `TODO(confirm)`: written around the command a team member is finishing. Update the flags, paths,
-> runtime and hashes when it lands.
+One command, from a clone and the data bundle (`docs/REPRODUCE.md` has the details):
 
 ```bash
 git clone https://github.com/jusstinn/katenaball && cd katenaball
-git checkout <submission_tag>                    # TODO(confirm)
+git checkout <submission_tag>                    # TODO(after the real run): the tagged commit
 uv sync --frozen                                 # Python 3.11, dependencies pinned in uv.lock
-uv run python scripts/build_external.py          # downloads the 30 external matches, checks SHA-256
 export MTAH_DATA_DIR=/path/to/data/bundle        # the unpacked competition bundle (default: data/)
-uv run python scripts/make_submission.py --team <team_name>
-python evaluation/validate_submission.py <team_name>.csv
+make submit TEAM=<team_name>                     # writes submissions/<team_name>.csv, validates it, prints its sha256
 ```
+
+`make submit` runs five steps:
+- `scripts/build_external.py` downloads the 30 external matches and checks every file's SHA-256;
+- `scripts/make_submission.py corpus` builds the base features;
+- `scripts/make_submission.py worlds` builds the `d2j` worlds, touch columns and pools;
+- `scripts/make_submission.py train` trains F's two members and saves `bundle.pkl` with its hashes;
+- `scripts/make_submission.py predict` labels the provided match, writes the CSV and runs the official checks
+  on the exact bytes written.
+
+Without `make` (the team's Windows PC), run the same steps one by one; `docs/REPRODUCE.md` lists them.
+`predict` is the only step that opens the provided match, and it prints aggregates only.
 
 - **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (CPU), numpy 2.2.6, pandas 2.3.3, numba
   0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
-  import (`ensemble.pin_cpu_env`). `TODO(confirm)`: the CSV is written with LF line ends.
-- **Reference machine:** Windows 10, i7-7700, CPU only. `TODO(confirm)`: runtime, peak memory, and the
-  SHA-256 of `<team_name>.csv` with its commit.
+  import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
+- **Cost:**
+
+  | Machine | Cache build (corpus, worlds) | Train | Predict | Disk and memory |
+  |---|---|---|---|---|
+  | Windows 10, i7-7700, CPU only, 2 workers | 18 + 34 min | 4.5 min | about a minute | 19 GB cache, 4.0 GB peak |
+  | Apple-silicon laptop, 3 workers | 18 min, corpus to trained model | included | under a minute | |
+
+  The external download (about 5 GB) is extra.
+- **The submitted file:** `TODO(after the real run)`: SHA-256 of `<team_name>.csv` and its commit.
 - **No match data in the repository.** CI fails any commit that holds it (`docs/ci.md`).
 
 ## 9. How this was built
@@ -334,5 +373,5 @@ python evaluation/validate_submission.py <team_name>.csv
 | Decoder | `src/katena/decode/hmm.py` |
 | Gates | `src/katena/eval/` (`lomo`, `bootstrap`, `score`, `d2`, `d3`, `touch_gate`, `tmix`, `final`), `scripts/run_*.py` |
 | Target reader and checks | `src/katena/target/`, `scripts/check_target.py`, `check_target_layout.py`, `check_domain_gap.py`, `check_touch_target.py` |
-| Submission | `scripts/make_submission.py` (`TODO(confirm)`) |
+| Submission | `src/katena/pipeline.py`, `scripts/make_submission.py`, `Makefile`, `docs/REPRODUCE.md`; checks: `scripts/dressed_check.py`, `scripts/check_public_window.py`, `tests/test_pipeline_atd.py` |
 | Firewall and CI | `scripts/firewall_check.py`, `.github/workflows/`, `docs/ci.md` |
