@@ -4,6 +4,80 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-08
+
+### J2 checks and J3 on Windows (David + Claude, `david/j2-tests`)
+
+External matches and synthetic files only. Nothing ran on the real match. Windows 10, i7-7700 (AVX2), torch
+2.15.0+cpu, LightGBM 4.7.0, cache `D:/katena/work-submit`, built from scratch with `j2-final-pipeline`'s code.
+
+**The ATD reader is now in the tests.** J2's smoke test labelled a hand-built `Match`, so `load_target` was never on
+the tested path. `tests/test_pipeline_atd.py` writes a synthetic bundle in the real format: EPTS metadata that
+passes `layout.assumptions_hold`, and raw lines with frame ids 1..199,319. It uses `games.py`'s timeline and graded
+halves and runs `stage_predict` on it through `load_target`. `evaluation/validate_submission.py` accepts the CSV
+unchanged: one LF row per frame in order, no X in the halves, X outside. The test takes about 45 s.
+
+**Dressed match: the submission path scores exactly what the evaluation path scores.**
+- `katena.target.dress` writes a canonical match in the ATD format. `load_target` gets an optional `Timeline` for
+  the match's own frame count, half blocks, pitch and frame rate. The competition match still uses `games.py`.
+- `IDSSE DFL-MAT-J03WMX` (25 Hz, 173,528 frames, 32 slots) reads back identical in every field, bitwise: positions,
+  speed, ball, teams, half blocks, pitch, fps, and the attack directions inferred from positions.
+- F trained without it on the other 29 (`train --hold-out`, saved to `model_without_*/`, never `model/`).
+  `predict --hold-out --timeline` labelled the bundle. The cache's `native` features, the `touch_gate` native touch
+  columns and every probability of both members and the blend are bitwise equal on both paths. All 29,123 work-grid
+  labels and every graded frame agree.
+
+| match | official scorer on the CSV | evaluation path (`lomo.score_rows`, native) | difference |
+|---|---|---|---|
+| IDSSE J03WMX, model without it | spellF1 0.650611, macroF1 0.930641, 232 / 341 possessions | 0.650611, 0.930641, 232 / 341 | 0 |
+| SkillCorner 1874553 (10 Hz), model without it | 0.640625 as written; 0.652756 with D -> X | 0.652756, macroF1 0.573902 | -0.012131 as written, 0 with D -> X |
+
+- The SkillCorner gap is the scoring convention, not plumbing. SkillCorner has no dead-ball label, so the evaluation
+  path turns a predicted D into X (`score(sc_mode=True)`), which the scorer fills with the previous team. On the
+  CSV, the official scorer reads a D on an alive frame as a break. With the same mapping the two agree exactly.
+- The only other difference is 5 frames (1 on SkillCorner) just outside the halves. `to_native_codes` labels them
+  from the nearest sample and `predict` writes X. They are not graded.
+
+**J3: Windows against Justin's Mac (only 8-character prefixes of the Mac hashes are recorded).**
+
+| hash | Mac (arm64) | Windows (x86-64) | |
+|---|---|---|---|
+| gbdt | `b2146150...` | `b2146150e006ead3b543f2ee424c84d9a12446ff551dd505f9480eb6a582ec0e` | same |
+| tcn | `456fc2c2...` | `01488c84721327147b3975886e3b758a13f049531146bc54985b88976e8f6eb3` | differs |
+| bundle.pkl | `16eeaed0...` | `cb0ea4fc546014665888a69ae86e4ba83f79cf7ff10dacc051f54b00f105a85c` | differs (holds the TCN) |
+
+- **Where they part.** The LightGBM member is the same on both machines (657,133 pool rows x 213 columns on both), so
+  its inputs almost certainly are too: the corpus, the worlds, and the `d2j` pools with their touch columns. The
+  TCN weights differ, as D3 predicted (torch kernels per CPU). The scaler and the priors are inside the bundle and
+  are not separately confirmed.
+- **Windows is self-consistent.** The from-scratch cache equals the gate's own Windows cache (`work-final`) on every
+  common file: 30 canonical matches, 28 ground truth and base pools, 300 feature and 300 touch files, 28 `d2j` pools
+  and 28 touch pools.
+- **To finish the localisation,** Justin runs `scripts/cache_digests.py dump` on the Mac and `diff`s it against
+  Windows. That compares each model part. For labels, `scripts/dressed_check.py label --bundle <Mac bundle.pkl>`
+  labels the exported match with his model. The bundle is derived from external data only.
+- **What the labels do across kernels, measured on Windows.** The held-out TCN was retrained with other torch kernels
+  (`ATEN_CPU_CAPABILITY=default`, `ONEDNN_MAX_CPU_ISA=SSE41`, `MKL_CBWR=COMPATIBLE`). The TCN hash changes and its
+  probabilities move by at most 4e-7 (blend 5e-7). The dressed CSV is byte-identical: no graded frame of 145,608
+  changes. That is a proxy, not the Mac.
+
+**Same machine, fresh processes.** `train` on all 30 and then `predict` on the dressed bundle, run twice: the same
+`bundle.pkl` (`cb0ea4fc...`), and a byte-identical CSV (`909f4ffa...`). The manifests differ only in run times.
+
+**Cost on this PC** (2 workers): corpus 18.0 min, worlds 33.7 min, cache 19 GB. `train` takes 4.5 min alone
+(LightGBM 34 s, TCN 222 s), 6.8 min beside another run, and peaks at 4.0 GB. `predict` takes 40-50 s on the
+173,528-frame bundle and peaks at 0.7 GB.
+
+**Fixed.** `write_submission` left a file that failed the official checks at the output path. It now checks a
+temporary file and moves it into place only when valid. Test added.
+
+**Found, not code bugs.**
+- `make` is not installed on the Windows PC, so `make submit` does not run there. `docs/REPRODUCE.md` lists the
+  plain commands.
+- `build_external.py` (the first `make submit` step) will rebuild all 30 matches once. No LF checkout reproduces the
+  sidecars' loader digests: IDSSE was built from a CRLF checkout, and Metrica and SkillCorner by code edited after
+  the build. The rebuild was run in memory on Windows, and all 30 canonical files come out byte-identical.
+
 ## 2026-11-07
 
 ### Screen: F2, two TCN seeds (pre-registration, written before any score)

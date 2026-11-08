@@ -92,8 +92,12 @@ def diff(a) -> int:
               + (f"; first differing: {', '.join(bad[:5])}" if bad else ""))
         if bad and first is None:
             first = st
-    for name in sorted(set(x.get("models", {})) | set(y.get("models", {}))):
-        hx, hy = x.get("models", {}).get(name, {}), y.get("models", {}).get(name, {})
+    mx, my = x.get("models", {}), y.get("models", {})
+    for name in sorted(set(mx) | set(my)):
+        if name not in mx or name not in my:
+            print(f"model {name}: in one only")
+            continue
+        hx, hy = mx[name], my[name]
         print(f"model {name}: " + ", ".join(f"{k} {'identical' if hx.get(k) == hy.get(k) else 'DIFFERENT'}"
                                             for k in sorted(set(hx) | set(hy))))
     print(f"earliest stage that differs: {first or 'none'}")
