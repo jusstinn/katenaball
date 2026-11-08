@@ -6,6 +6,115 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-07
 
+### Screen: F2, two TCN seeds (pre-registration, written before any score)
+
+**Candidate F2.** F with its TCN member replaced by the logit-space mean (`ensemble.blend`, w = 0.5) of two
+TCNs trained identically except for the seed: 0 and 1. Then F2 blends exactly as F does, with the LightGBM
+member at w = 0.5 and Viterbi at tau 2. Nothing else changes: worlds, pool, columns, priors, steps and
+threads are all the same.
+
+**Screen.** The 8 IDSSE + Metrica development folds at `target` and `severe`, LOMO on the 27 other
+development matches (benches excluded), on this Mac. F (seed 0 only) is recomputed here the same way.
+
+**Rule, fixed now.** F2 is promising, and goes to David's 28-fold gate, if at `target` it wins at least 6
+of 8 folds with a paired 95% CI above 0, and it is not worse at `severe` (mean < 0 and CI upper bound < 0).
+Otherwise it is dropped. The screen decides nothing for the submission by itself.
+
+**Side check.** F recomputed here should match David's Windows means on the same 8 folds (target 0.5991,
+severe 0.5426). Any difference is a cross-machine reproducibility finding for J3.
+
+**Result (`scripts/screen_tcn_seeds.py`, about 35 min on the Mac): drop F2.**
+
+| Condition | F | F2 | F2 - F [95% paired CI] | F2 wins |
+|---|---|---|---|---|
+| target | 0.5991 | 0.5939 | -0.0052 [-0.0089, -0.0018] | 1/8 |
+| severe | 0.5426 | 0.5375 | -0.0051 [-0.0099, -0.0003] | 1/8 |
+
+- **Cross-machine reproduction.** F recomputed on macOS arm64 gives the same 8-fold means as David's Windows
+  x86 run, to the 4 decimals reported: 0.5991 and 0.5426. Torch's bytes can differ across CPUs, but the
+  scores did not move.
+- **What it says about F.** Averaging seed 1 into the TCN lowers the score on 7 of 8 folds. So seed 0 does
+  unusually well on these folds, and seed 1 does not (D3 also saw a lower seed-1 ensemble gain, +0.0084
+  against +0.0120). F was assembled with seed 0 after seeing these folds, so part of its 8-fold gain over M2
+  (+0.030) may be seed luck. The 28-fold gate (+0.016, CI [+0.011, +0.021]) is the better guide. This
+  changes no rule outcome. It is a caution for the team's decision on PR 8, and an argument for keeping
+  seed 0 fixed rather than re-drawing it.
+- **How large the seed effect is (information only; F's seed stays 0).** On the same cached probabilities,
+  with M2 for reference:
+
+  | Condition | M2 | LightGBM member alone | F, seed 0 | F, seed 1 |
+  |---|---|---|---|---|
+  | target | 0.5689 | 0.5839 | 0.5991 | 0.5914 |
+  | severe | 0.5149 | 0.5221 | 0.5426 | 0.5326 |
+
+  With the other seed, F is still about +0.02 above M2 on these folds. Roughly a quarter of the 8-fold gain
+  depends on the seed, and the rest holds.
+
+### J4 gap filling: deprioritised, not run
+
+M2's base features already carry possession across ball gaps:
+- `interp_short` fills short gaps.
+- Control and margin windows of 1-6 s (past, future and centred) average over the visible samples.
+- `since_tight` and `until_tight` (30 s cap) and `last_ctrl_sign` / `next_ctrl_sign` hold who last and next
+  controlled the ball.
+- The miss group has the time since and until the ball was seen.
+- D1's touch features hold the last and next touching team.
+
+A J4 gate would need F's TCN out-of-fold probabilities rebuilt on this machine (about 100 min) for a small
+expected gain. We dropped it before computing anything, so no score informed this.
+
+### Public-window check: `scripts/check_public_window.py` (pipeline check only)
+
+It prints PASS/FAIL only, never a score:
+- the official file checks;
+- home/away orientation: swapping H and A must lower team accuracy;
+- frame alignment: shifts of ±5 and ±10 s must lower spellF1;
+- better than the published smooth50 baseline.
+
+A FAIL points at a bug (slot order, home team, offsets), never at tuning. `tests/test_check_public_window.py`
+checks, on public files only, that it catches a swap and a 10 s shift. Log every run here.
+
+### J2: final pipeline (Justin + Claude, `j2-final-pipeline`)
+
+**What.** `katena.pipeline` and `scripts/make_submission.py` (`make submit`) train candidate F exactly as
+pre-registered. Every constant comes from `katena.eval.final`, and nothing was tuned. Training uses all 30
+external matches with nothing held out, the two benches included. The model is saved as
+`work/final/model/bundle.pkl`, with its hashes in `manifest.json`. On the real match, `predict` computes
+features from the real 5 Hz grid and touch columns from the real 25 Hz ball, blends the members at
+w = 0.5, decodes with Viterbi at tau 2 and writes the CSV with LF line ends. It runs the official checks on
+the bytes written and prints aggregates only. A crash prints the exception type and code lines only. No
+real-match run yet: the data bundle is not on our machines.
+
+**Training run on this Mac** (M-series arm64, 10 cores, 16 GB):
+
+| Step | Result |
+|---|---|
+| Worlds | 330 touch files in 7.5 min (3 workers); every world's re-run corruption matched its cached features |
+| Pool | 657,133 rows x 213 columns |
+| LightGBM member | 9 s |
+| TCN member | 189 s |
+| Cache size | 16 GB |
+| Hashes | gbdt `b2146150...`, tcn `456fc2c2...`, bundle `16eeaed0...` |
+
+**Prediction smoke test, synthetic only.** A 199,319-frame synthetic match with two 45-minute halves was
+labelled in 17 s, and the official validator accepts the file.
+
+**Reproducibility, same machine: byte-identical from scratch.** A second cache rebuilt everything without
+copying anything (corpus, worlds, train, 3 workers) in 18 min.
+- All 150 corpus files (ground truth, pools, mild/target/severe features) are byte-identical to the
+  bake-off cache's.
+- The model hashes are identical: gbdt, tcn and `bundle.pkl`.
+- `tests/test_pipeline.py` checks the same property on a synthetic corpus.
+- Not yet tested on a second machine.
+
+**Open for the team.**
+- **Kickoff.** The graded second half starts before its kickoff, and those frames are D. F has to find
+  that from the tracking. `predict` reports the D share over the first 60 s and 120 s of each half, an
+  aggregate. If the second half's share is high, F already handles it. If it is low, build a kickoff
+  detector from the tracking, never from a frame constant.
+- **Cross-machine.** The two-machine hash test (J3) compares submission bytes, because torch's last bits
+  differ by CPU.
+
 ### D5: audit and reconciliation (David's side, `david/d5-audit`)
 
 **M2 reproduces on the Windows machine: 0.5861 on 28 folds**, every per-dataset, per-severity and fixed-tau mean

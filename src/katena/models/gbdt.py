@@ -16,6 +16,8 @@ def ensure_openmp() -> None:
     start, so re-exec once. Call this first thing in a script (not from library code)."""
     if lgb is not None:
         return
+    if "pytest" in sys.modules:      # re-exec would replace the test runner; LightGBM tests skip instead
+        return
     import sklearn
     d = os.path.join(os.path.dirname(sklearn.__file__), ".dylibs")
     if not glob.glob(os.path.join(d, "libomp*")) or os.environ.get("_KATENA_REEXEC"):
