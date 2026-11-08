@@ -12,7 +12,7 @@ Workflows: [.github/workflows/ci.yml](../.github/workflows/ci.yml) and
 | Job | What it checks | OS | Blocks merge |
 |---|---|---|---|
 | `plan` | Chooses the OS matrix (below) | Ubuntu | yes |
-| `firewall` | `scripts/firewall_check.py` on tracked files, plus the history of every ref (main, pull requests, tags) or of the branch (other pushes) | Ubuntu | yes |
+| `firewall` | `scripts/firewall_check.py` on tracked files, plus the history of every ref (main, pull requests, tags) or of the branch (other pushes). Everywhere but main it runs twice: the branch's own copy, then main's copy (`git show origin/main:scripts/firewall_check.py \| python3 -`), so a branch cannot loosen the rules it is checked by | Ubuntu | yes |
 | `lint` | `ruff check --select F,E9` (real errors only), `uv lock --check`, and a report of text files opened without `encoding=` (ruff PLW1514, warnings only) | Ubuntu | yes, except the report |
 | `test` | `uv sync --frozen`, LightGBM loads, `pytest -q`, in Python's default text encoding (no `PYTHONUTF8`, so Windows cp1252 bugs surface) | matrix | yes |
 | `scorer` | `scripts/check_scorer.py`: the scorer files match the published ones, the official scorer reproduces EVALUATION.md's public-window spellF1 for the baselines, and `validate_submission.py` accepts and rejects synthetic files per SUBMISSION.md | matrix | yes |
@@ -33,11 +33,15 @@ cancels a run when a newer push arrives. Tag runs are never cancelled.
 **Pinned tools.** Actions by commit SHA, uv 0.13.1, ruff 0.17.3, Python 3.11.17 (`UV_PYTHON`, the
 version on the team machines; `.python-version` only says 3.11).
 
+**Least privilege.** Every job gets `contents: read`. Only `plan` also gets `pull-requests: read`, to
+look for an open pull request from the branch.
+
 ## Run it locally
 
 ```bash
 python scripts/firewall_check.py                  # the index: what is tracked or about to be committed
 python scripts/firewall_check.py --history HEAD   # plus every blob in this branch's history
+git show origin/main:scripts/firewall_check.py | python - --history HEAD   # main's rules, as CI runs them
 uvx ruff@0.17.3 check --select F,E9 .
 uv lock --check
 uv run pytest -q
@@ -71,7 +75,11 @@ sizes and row counts, so the output is safe to paste. `tracked` means the file i
 `git rm --cached -- <path>` keeps your local copy, then make sure `.gitignore` covers it. `history
 <commit>` means an earlier commit holds it. If that commit was never pushed, rewrite it before pushing.
 If it was pushed, it is public now: stop and tell the team. Removing it takes a history rewrite and a
-force push, which only the repository owner should do. The rules:
+force push, which only the repository owner should do.
+
+Path rules come first; a file whose path fails one is never opened. Content rules read every other
+blob up to 5 MiB, whatever its extension, and look for structure, never for values: code is full of
+small integers, so a file is never flagged for how many numbers it holds. The rules:
 
 | Rule | Meaning |
 |---|---|
@@ -79,18 +87,34 @@ force push, which only the repository owner should do. The rules:
 | `submission` | a CSV in `evaluation/results/` other than the four published baselines |
 | `published-modified` | a baseline or the public ground truth differs from the published file (pinned by blob id) |
 | `private-gt` | `*_possession_gt.csv`, `*_possession_gt_meta.json`, `*_possession_gt_reference.csv`, `possession_by_frame.pkl` |
-| `binary` | npz, npy, parquet, feather, h5, pkl, joblib, weights (pt, pth, ckpt, onnx, safetensors), archives, video, pl3container, pdf |
+| `binary` | by extension: array and table caches (npz, npy, parquet, feather, arrow, h5, hdf5, mat), pickles (pkl, pickle, joblib), weights (pt, pth, ckpt, onnx, safetensors), archives, video, pl3container, pdf, images (png, jpg, jpeg, gif, webp, bmp, tif, tiff), spreadsheets (xlsx, xlsm, xls, ods) and databases (sqlite, sqlite3, db, duckdb). Frame images and crops are match data. An image may be committed only by exact path in `ALLOWED_IMAGES`; none is today |
+| `binary-content` | a blob holding NUL bytes under any other name: a renamed image, array or archive |
+| `lfs` | a Git LFS pointer, or a `filter=lfs` line in any `.gitattributes`: LFS content is published but stored outside git, where this scan cannot read it |
 | `generated-dir` | a path inside `artifacts/`, `cache/`, `features/`, `runs/`, `external_data/` or `work/` |
 | `root-csv` | a CSV in the repository root |
 | `bundle-file` | a file named like the data bundle (`BAR-ATH_tactical*`, `BAR-ATH_broadcast*`) |
 | `large` | a blob over 5 MiB |
 | `submission-format` | a `frame,label` CSV with 1,000 rows or more |
-| `frame-export` | a CSV with a frame column and one row per frame of this match (199,319, 164,488 or 158,857 rows, or the 5 Hz equivalents), or holding this match's tracking frame numbers |
+| `frame-export` | any text file, with or without a header, whatever its columns are called, with one line per frame of this match; or a line, a JSON array or object, or a run of label or digit characters with one value per frame. The lengths are 199,319 (tactical), 164,488 (broadcast), 158,857 (graded), 79,467 and 79,390 (the halves), and each of them on the 5 Hz grid, all within 2%. Also: a CSV frame column holding this match's tracking frame numbers (IdFrame 1,713,242 to 1,892,255), or any file listing 10 or more of them in increasing order |
+| `frame-labels` | 25 or more consecutive frame,label-style rows: one `H`, `A`, `D` or `X` among numbers, as in a per-frame export or a spell list |
+| `frame-run` | 100 or more consecutive lines whose leading integers step evenly by 1 to 25: a run of frame ids |
+| `atd-raw` | three or more records in the ATD raw format (`frame_id:x,y,s;...;x,y,s:ball`), or one record with this match's track-slot count (46 tactical, 51 broadcast) |
+| `atd-meta` | an ATD metadata XML with 22 or more `<Player ... teamId=...>` entries |
+| `homography` | three or more homography rows (frame, `h00`..`h22` with `h22` = 1, `reprojection_error`, `valid`), comma- or space-separated, with or without the frame |
+| `tagging` | ten or more Smart Tagging records: `<instance>` intervals with a start and an end, or delimited rows holding one of the match's tagging codes and a time |
 | `notebook-output` | a notebook with saved outputs: clear them before committing |
 | `settings`, `claude-md` | `.claude/settings.json` no longer denies `Read(./data/**)`, or CLAUDE.md lost its Data firewall section |
 
-A false positive means the rule needs changing in `scripts/firewall_check.py` (and its tests), not a
-bypass.
+The thresholds leave room for what the repository legitimately holds: DATA.md shows one homography
+row, `tests/test_target.py` holds one ATD record and three tagging intervals, and the longest numbered
+run in any tracked file is six lines. Test fixtures in the bundle's formats are generated at test time
+into a temporary directory, never committed as literal lines.
+
+**A false positive is not fixed on the branch that hits it.** The branch is also checked by main's
+copy of the scanner, so a rule loosened there changes nothing until it is on main. Report the
+false positive (rule and path only), and change the rule in a pull request of its own, with a test
+for the case it now allows, reviewed as described under [Rule changes need review](#rule-changes-need-review).
+Never rename, split or encode a file to get it past a rule.
 
 **lint.** Ruff errors appear as annotations on the offending lines. `uv lock --check` failing means
 `pyproject.toml` changed without `uv lock`. The PLW1514 report never fails the job.
@@ -126,7 +150,9 @@ The submission cannot be built in hosted CI. CD here is two things:
    git push origin submission-2026-11-12
    ```
 
-   `release.yml` re-runs the whole CI on that commit, then publishes a GitHub release with the
+   Tag a commit that is already on main: merge through a pull request first, then tag the merge
+   commit. `release.yml` first checks that the tagged commit is an ancestor of `origin/main` and
+   stops otherwise, then re-runs the whole CI on that commit, then publishes a GitHub release with the
    commit, the sha256 of the committed `uv.lock`, the Python and uv versions, and the synthetic
    determinism hashes per OS. No data, no CSV, no assets. Record the real submission's sha256 in the
    technical document; the release note records what makes that file reproducible.
@@ -157,3 +183,38 @@ Settings, then Branches, then a rule for `main`:
 Settings, then Actions, then General: keep workflow permissions read-only by default. `release.yml`
 asks for `contents: write` in its own job. If publishing a release fails with a 403, the repository
 or organisation limits workflow permissions and an admin has to allow it.
+
+## Rule changes need review
+
+The firewall's rules are what keep the match data out of a public repository, so changing one is a
+decision for a reviewer, not for the branch that runs into it. CI already makes a loosened rule inert
+until it reaches main (main's copy of the scanner checks every other ref). What it cannot do alone is
+make sure someone other than the author reads the change before it lands on main. That takes code
+owners plus branch protection, and only the repository owner can switch those on.
+
+Proposed `.github/CODEOWNERS`. It is a proposal only and is not committed: without the branch
+protection setting below it would request reviews but enforce nothing.
+
+```text
+# The data firewall and everything that decides what reaches this public repository.
+/scripts/firewall_check.py     @jusstinn
+/tests/test_firewall_check.py  @jusstinn
+/.githooks/                    @jusstinn
+/.github/                      @jusstinn
+/.gitignore                    @jusstinn
+/.gitattributes                @jusstinn
+/.claude/settings.json         @jusstinn
+/CLAUDE.md                     @jusstinn
+/evaluation/                   @jusstinn
+/docs/ci.md                    @jusstinn
+```
+
+To enforce it (repository owner, once):
+
+1. Add the file above as `.github/CODEOWNERS` through a pull request. Add a second owner on each
+   line, so that the owner's own rule changes also get a review: GitHub never lets authors approve
+   their own pull request.
+2. In the branch protection rule for `main`, also tick "Require review from Code Owners",
+   "Dismiss stale pull request approvals when new commits are pushed" and "Require approval of the
+   most recent reviewable push".
+3. Tick "Do not allow bypassing the above settings", or accept that an admin merge skips the review.

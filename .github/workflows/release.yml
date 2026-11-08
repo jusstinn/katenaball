@@ -1,7 +1,7 @@
-# CD for a submission candidate (docs/ci.md). Pushing a tag named submission-* re-runs the whole CI
-# on the tagged commit, then publishes a GitHub release note with the commit, the uv.lock sha256 and
-# the synthetic determinism hashes per OS. The release has no assets: hosted CI never sees the match
-# data, so the real submission is only ever built locally from the data bundle.
+# CD for a submission candidate (docs/ci.md). Pushing a tag named submission-* checks that the tagged
+# commit is on main, re-runs the whole CI on it, then publishes a GitHub release note with the commit,
+# the uv.lock sha256 and the synthetic determinism hashes per OS. The release has no assets: hosted CI
+# never sees the match data, so the real submission is only ever built locally from the data bundle.
 name: Release
 
 on:
@@ -16,16 +16,39 @@ permissions:
   contents: read
 
 jobs:
+  on-main:
+    # A release names a submission candidate, so it must be a reviewed commit: one merged into main,
+    # not the tip of an unmerged branch.
+    name: tagged commit is on main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tagged commit is an ancestor of origin/main
+        run: |
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          commit=$(git rev-parse "$GITHUB_SHA^{commit}")
+          if git merge-base --is-ancestor "$commit" refs/remotes/origin/main; then
+            echo "$GITHUB_REF_NAME ($commit) is on main"
+          else
+            echo "::error::$GITHUB_REF_NAME points at $commit, which is not on main. Merge it into main through a pull request, then tag the merge commit."
+            exit 1
+          fi
+
   ci:
     name: CI
+    needs: on-main
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read   # ci.yml's plan job asks for it; a called workflow gets no more than this
 
   release-note:
     name: release note
-    needs: ci
+    needs: [on-main, ci]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
