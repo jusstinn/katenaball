@@ -50,3 +50,19 @@ Every workstream works on its own branch and opens a PR. The coordinator verifie
 - **Justin:** on the Mac, run `python scripts/cache_digests.py dump`, and
   `python scripts/dressed_check.py label --bundle <your bundle.pkl>`. Send the hashes (not the data) so the
   cross-machine label check covers macOS. Send or confirm the organiser questions in `docs/PLAN.md`.
+
+## Status, 2026-11-10 evening (every workstream finished the same day)
+
+| # | Result | PR |
+|---|---|---|
+| W1 | A fresh clone with an empty cache rebuilt every stage byte for byte, including both models and the dressed CSV. 1 h 39 min with the download | #20 |
+| W2 | The dressed CSV is byte-identical in 11 trainings on 7 OS/CPU combinations. TCN bytes differ by OS and CPU vendor; LightGBM, scaler and priors are identical. `repro.yml` can be dispatched from main | #21 |
+| W3 | G1 fails: +0.0017 [-0.0014, +0.0047], 16/28 | #19 |
+| W4a | Kickoff from Smart Tagging, in `katena.pipeline`. The human check fails only on a late tag | #18 |
+| W4b | G2 fails: +0.0046 [+0.0014, +0.0079], 16/28. On the 8 tagged folds +0.0229, 8/8, but the gate was registered on 28; see the decision log's design note | #18 |
+| W5 | `scripts/real_run.py --team <name>`: the whole real run in one command | #17 |
+| W6 | Not needed: nothing was adopted, so **F stays the submission model**. The kickoff rule changes `predict`, not the model hashes | |
+
+**Left for the humans:** the team name (registration closes today), then the real run on David's PC with
+`.venv\Scripts\python.exe scripts\real_run.py --team <team_name>`, the three disclosure choices in the technical
+document, the `submission-v1` tag, and the form.
