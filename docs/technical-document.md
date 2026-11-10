@@ -331,8 +331,11 @@ D over the first 60 and 120 s of each half, as an aggregate.
 - **Assumed identity-switch rates.** No external source measures them.
 - **Short possessions.** At IoU 0.5 and target-like noise, M2 matched 0.167 of true possessions under
   2 s, and M2 with touch features 0.169.
-- **Cross-machine byte identity is not guaranteed.** On one machine, two fresh processes reproduce every
-  model, probability and label byte for byte, and the CSV too. Between Windows x86 (i7-7700) and macOS arm64:
+- **Cross-machine byte identity is not guaranteed.** On one machine the rebuild is exact. A fresh clone,
+  with a fresh download of the external corpus and an empty cache, reproduced every stage byte for byte:
+  corpus, features, worlds, pools, both models and a dressed-match CSV (`docs/decision-log.md`, J3 W1). Two
+  fresh processes also reproduce every model, probability and label. Between Windows x86 (i7-7700) and
+  macOS arm64:
   - the LightGBM model is byte-identical;
   - the TCN's weights differ in their last bits, because torch picks different CPU kernels;
   - F's 8-fold development means agree to the 4 decimals reported.
@@ -370,6 +373,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 
 - **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (CPU), numpy 2.2.6, pandas 2.3.3, numba
   0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
+- **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and the
+  model byte for byte in 1 h 39 min, including the download.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
   import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
 - **Cost:**
