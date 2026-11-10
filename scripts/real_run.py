@@ -166,6 +166,9 @@ def verdict_lines(key: str, rc: int, shown: list[str]) -> list[str]:
             out.append(f"{m.group(1)}  {section}{m.group(2)}".rstrip())
         elif m_after:
             out.append(f"{m_after.group(2)}  {section}{m_after.group(1)}")
+        elif key == "check_touch_target" and s.startswith("reference") and EXCEPTION_LINE.search(line):
+            # The reference worlds come from an external match, not the provided one: an alarm, never a stop.
+            out.append(f"WARN  {section}{s}")
         elif s.startswith("raised ") or EXCEPTION_LINE.search(line):
             out.append(f"FAIL  {section}{s}")
         elif key == "check_touch_target" and TOUCH_SHAPE.match(line):
@@ -382,6 +385,7 @@ def checks(run: Run) -> None:
         say(f"  {n_pass} PASS, {n_fail} FAIL ({secs:.0f} s)")
         run.report["checks"].append({"script": path.name, "result": "PASS" if ok else "FAIL", "pass": n_pass,
                                      "fail": n_fail, "exit_status": rc, "seconds": secs, "lines": lines})
+        run.report["warnings"] += [f"{path.name}: {x[6:]}" for x in lines if x.startswith("WARN")]
         if not ok:
             first = next((x for x in lines if x.startswith("FAIL")), "FAIL")
             raise Stop(f"{path.name}: {first}")

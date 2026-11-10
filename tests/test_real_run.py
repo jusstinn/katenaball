@@ -257,12 +257,24 @@ def test_a_check_that_prints_no_verdict_fails(box):
     assert rc == 1 and rep["checks"][0]["lines"] == ["FAIL  printed no PASS line"]
 
 
-def test_the_touch_check_fails_when_the_reference_raises(box):
+def test_the_touch_check_only_warns_when_the_external_reference_raises(box):
+    # The reference worlds come from an external match, so their failure is an alarm, not a stop.
     box.check("check_touch_target", [TOUCH_LINE, "reference: skipped (FileNotFoundError; needs the external "
                                                  "corpus, KATENA_EXTERNAL)"])
     rc, out, rep = box.run()
+    assert rc == 0, out
+    touch = next(c for c in rep["checks"] if c["script"] == "check_touch_target.py")
+    assert touch["result"] == "PASS"
+    assert "WARN  reference: skipped (FileNotFoundError" in out and "touches/min" not in out
+    assert any(w.startswith("check_touch_target.py: reference: skipped") for w in rep["warnings"])
+    assert box.ran("make_submission")
+
+
+def test_the_touch_check_fails_when_the_real_match_raises(box):
+    box.check("check_touch_target", ["target: failed (ValueError)"])       # check_touch_target.py's own wording
+    rc, out, rep = box.run()
     assert rc == 1 and rep["failed_step"] == "checks"
-    assert "FAIL  reference: skipped (FileNotFoundError" in out and "touches/min" not in out
+    assert not box.ran("make_submission")
 
 
 @pytest.mark.parametrize("verdict, rc_expected", [("PASS", 0), ("FAIL", 1)])
