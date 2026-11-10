@@ -75,6 +75,105 @@ Nov 14 18:00 CET. Integration is W6, not this workstream.
   same seed. So `G1T` against `FT` includes a fresh initialization, not only the touch columns. The F2 screen
   (2026-11-07) found that seed 0 did unusually well for F on the 8 folds. This changes nothing in the rule.
 
+### Gate G1: result
+
+Everything below was computed after the pre-registration commit `115f7e2` (pushed 2026-11-10 10:56 UTC), with the
+code at `752d170` (`scripts/run_g1.py seed`, then `tcn score gate` in one `heavy.py` slot). Nothing was changed or
+tuned after a score. External development matches only.
+
+**Checks.**
+
+- **Copied inputs.** All 757 files (15.0 GB) were copied from `work-final` and are byte-identical to their sources
+  by SHA-256. Nothing was rebuilt.
+- **Width.** The joined pool and all 300 sequences have 213 columns, and every fold's TCN has 213 input channels.
+- **F reproduced.** F, `FG` and `FT`, re-decoded from the copied probabilities with this code, equal F's stored
+  scores (spellF1, macroF1, spell counts and flags) on all 164 (fold, evaluation world) pairs. So G1 and F are
+  decoded and scored by the same path.
+
+**Gate** (28 development folds, fixed tau 2, paired 95% bootstrap over possessions, 2000 draws, seed 0).
+
+| comparison | folds | noise | G1 | F | diff | 95% paired CI | wins | rule |
+|---|---|---|---|---|---|---|---|---|
+| G1 vs F | 28 | target | 0.6036 | 0.6019 | +0.0017 | [-0.0014, +0.0047] | 16/28 (57%) | **fails** (needs 20/28 and CI above 0) |
+| G1 vs F | 28 | severe | 0.5668 | 0.5696 | -0.0028 | [-0.0062, +0.0006] | 8/28 (29%) | not worse (CI upper bound above 0) |
+| G1 vs F | 8 IDSSE + Metrica | target | 0.6013 | 0.5991 | +0.0022 | [-0.0037, +0.0080] | 5/8 | fails |
+| G1 vs F | 8 IDSSE + Metrica | severe | 0.5396 | 0.5426 | -0.0030 | [-0.0091, +0.0035] | 3/8 | not worse |
+
+| noise | dataset | folds | G1 | F | diff | wins |
+|---|---|---|---|---|---|---|
+| target | IDSSE | 6 | 0.5679 | 0.5670 | +0.0009 | 3/6 |
+| target | Metrica | 2 | 0.7016 | 0.6955 | +0.0061 | 2/2 |
+| target | SkillCorner | 20 | 0.6044 | 0.6030 | +0.0015 | 11/20 |
+| severe | IDSSE | 6 | 0.5111 | 0.5107 | +0.0004 | 3/6 |
+| severe | Metrica | 2 | 0.6250 | 0.6382 | -0.0133 | 0/2 |
+| severe | SkillCorner | 20 | 0.5777 | 0.5804 | -0.0027 | 5/20 |
+
+At target-like, G1 loses on 11 folds (8 SkillCorner, 3 IDSSE) and ties on 1. The worst loss is -0.0128, and the
+median fold gains +0.0033. At severe, it loses on 20 folds. The worst loss is -0.0231, and the median fold loses
+-0.0036.
+
+**Information only (none of it changes the decision).**
+
+- **The TCN member alone, `G1T` against F's `FT`.**
+
+  | folds | noise | G1T | FT | diff | 95% paired CI | wins |
+  |---|---|---|---|---|---|---|
+  | 28 | target | 0.6002 | 0.5961 | +0.0041 | [-0.0001, +0.0085] | 17/28 |
+  | 28 | severe | 0.5730 | 0.5708 | +0.0022 | [-0.0027, +0.0072] | 18/28 |
+  | 8 | target | 0.5993 | 0.5969 | +0.0023 | [-0.0060, +0.0107] | 5/8 |
+  | 8 | severe | 0.5575 | 0.5477 | +0.0097 | [+0.0007, +0.0183] | 7/8 |
+
+  The member gains more than the blend does. On 28 folds it would not pass the rule on its own at target-like
+  either (17/28, and the interval touches 0). One reading, not tested here: once both members read the touch
+  columns, their errors overlap more, so blending them helps less. The fresh initialization noted in the
+  pre-registration is also part of every `G1T` difference.
+- **D2's evaluation worlds.** G1 against F, and `G1T` against `FT`, in the same world:
+
+| world | folds | F | G1 | diff [95% CI] | wins | G1T - FT [95% CI] | wins |
+|---|---|---|---|---|---|---|---|
+| `mild` | 28 | 0.6236 | 0.6273 | +0.0036 [+0.0005, +0.0068] | 19/28 | +0.0079 [+0.0035, +0.0124] | 18/28 |
+| `target` | 28 | 0.6019 | 0.6036 | +0.0017 [-0.0014, +0.0047] | 16/28 | +0.0041 [-0.0001, +0.0085] | 17/28 |
+| `severe` | 28 | 0.5696 | 0.5668 | -0.0028 [-0.0062, +0.0006] | 8/28 | +0.0022 [-0.0027, +0.0072] | 18/28 |
+| `target_ids` | 28 | 0.6037 | 0.6003 | -0.0035 [-0.0068, -0.0003] | 8/28 | +0.0020 [-0.0022, +0.0062] | 14/28 |
+| `target_smooth` | 28 | 0.6000 | 0.6007 | +0.0007 [-0.0024, +0.0038] | 15/28 | +0.0068 [+0.0024, +0.0111] | 19/28 |
+| `target_cpl50` | 8 | 0.6240 | 0.6286 | +0.0046 [-0.0012, +0.0106] | 4/8 | +0.0147 [+0.0056, +0.0242] | 6/8 |
+| `target_cpl100` | 8 | 0.6300 | 0.6372 | +0.0072 [+0.0014, +0.0130] | 8/8 | +0.0169 [+0.0085, +0.0257] | 8/8 |
+| `target_cpl100_ids` (never trained on) | 8 | 0.6325 | 0.6367 | +0.0042 [-0.0024, +0.0113] | 6/8 | +0.0225 [+0.0137, +0.0319] | 7/8 |
+
+- **What the worlds show.** G1 passes the full rule only in `target_cpl100`, on 8 folds. In `target_ids` it is
+  worse than F by D2's test. The TCN member gains in every world, most in the coupled ones.
+- **macroF1, 8 IDSSE + Metrica folds.** At target-like: G1 0.8793, `G1T` 0.8794, F 0.8781, `FG` 0.8721, `FT`
+  0.8754. At severe: G1 0.8589, `G1T` 0.8592, F 0.8549, `FG` 0.8493, `FT` 0.8486.
+- **Spell counts.** Predicted possessions per true one, pooled over 28 folds: G1 0.736 against F 0.738 at
+  target-like, and G1 0.711 against F 0.723 at severe.
+
+**CPU** (i7-7700, 4 cores / 8 threads; torch 4 threads).
+
+| stage | wall | CPU | peak memory |
+|---|---|---|---|
+| copy F's inputs (757 files, 15.0 GB), SHA-256 of source and copy | 6.9 min | 1.8 min | 0.2 GB |
+| TCN member, 28 folds: pool and 28 scalers (20 s), 300 sequences of 213 columns (3.47 GB in float16, 4.8 min to load), training 141-253 s per fold (mean 179 s), prediction 3.6 min in all | 92.2 min | 305.9 min | 4.1 GB |
+| decode and score (G1 and `G1T`, plus F, `FG` and `FT` re-decoded) | 1.2 min | 0.9 min | (same process) |
+| gate tables (bootstrap) | 1.6 min | 1.6 min | (same process) |
+| **`heavy.py` slot, TCN through gate** | **95.0 min** | | |
+
+W1 held the other slot when this run started. The scalers are fitted before training, so the pool is freed
+before the sequences load: the peak is 4.1 GB, against 3.7 GB for F's 160-column member.
+
+**Decision: G1 fails.** At target-like on 28 folds it wins 16 (57%, below 70%), and the paired interval includes 0
+(+0.0017 [-0.0014, +0.0047]). At severe it is not worse by the rule (-0.0028 [-0.0062, +0.0006]), but that does not
+rescue the target-like failure. F stays. Under the plan's fixed order, G12 is not gated. G2 is adopted if it
+passes its own gate, and otherwise F stays.
+
+**Not done, or not verified.**
+
+- **Determinism.** No second fresh-process run of a G1 fold was made, so G1's same-machine byte identity is
+  untested. F's determinism run covers the same code path at 160 columns.
+- **Other machines.** Untested, as for F.
+- **The cache.** Only G1's outputs are kept in `D:/katena/work-g1`: `oof/g1_tcn`, `g1_results.pkl`,
+  `g1_gate.json`, `final_cost.jsonl` and `logs/`. The copied inputs were deleted, since they are byte-identical to
+  `work-final`. `scripts/run_g1.py seed` restores them before `score` or `gate` can be re-run.
+
 ## 2026-11-08
 
 ### Locked-bench sanity read of F (registered before the read)
