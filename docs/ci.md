@@ -4,8 +4,9 @@ Hosted CI never sees the competition data. The firewall job fails if any of it i
 other job uses published files (the four baselines, the public 5-minute ground truth) and synthetic
 matches only. The real submission is only ever built on a machine with the data bundle.
 
-Workflows: [.github/workflows/ci.yml](../.github/workflows/ci.yml) and
-[.github/workflows/release.yml](../.github/workflows/release.yml).
+Workflows: [.github/workflows/ci.yml](../.github/workflows/ci.yml),
+[.github/workflows/release.yml](../.github/workflows/release.yml), and the on-demand
+[.github/workflows/repro.yml](../.github/workflows/repro.yml) ([below](#cross-os-reproduction-repro)).
 
 ## What runs
 
@@ -138,6 +139,27 @@ test (docs/PLAN.md, J3). If only the inner hashes differ, the CSV still matched,
 real match could flip.
 
 **ci-ok** lists each job's result. It fails when any blocking job failed, was cancelled or was skipped.
+
+## Cross-OS reproduction (repro)
+
+`repro.yml` answers J3 on GitHub's runners: does F train and label identically on another OS? It runs only
+when dispatched (Actions, then Repro, then Run workflow, or `gh workflow run repro.yml -f os=all`), never on
+pushes or pull requests, because it takes hours. It never sees the competition match.
+
+Each runner (`ubuntu-24.04`; `windows-2025` and `macos-15` are optional, so their failure does not fail the
+run) frees disk, then: `uv sync --frozen`; restores the raw external downloads from `actions/cache` (keyed on
+`scripts/external_manifest.json`); `build_external.py`, which checks every raw file against its pinned SHA-256
+(a new pin fails the step); `make_submission.py corpus`, `worlds` (workers = CPU count) and `train`;
+`cache_digests.py dump`; `dressed_check.py export` of IDSSE `DFL-MAT-J03WMX`; and `predict` of that bundle
+with the all-30 model, as the Windows reference was made. `scripts/repro_ci.py report` then writes one JSON:
+model and part hashes, stage digests, the dressed bundle's and CSV's sha256, versions, CPU facts, stage
+timings and label aggregates (counts, one score, one hash per 1,000 frames). The CSV is never uploaded.
+
+The `compare` job (non-blocking) puts every runner beside `docs/repro/windows-reference.json` (David's PC,
+from the J2/J3 entry of the decision log) in the run summary: per item same or differs, per stage how many
+files agree, and the earliest item that differs. If two dressed CSVs differ, the block hashes say how many
+1,000-frame blocks hold the difference. To compare two machines by hand, `cache_digests.py diff` works on the
+uploaded `digests-<os>.json`.
 
 ## CD
 

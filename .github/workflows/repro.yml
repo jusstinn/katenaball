@@ -1,0 +1,242 @@
+# Cross-OS reproduction of the submission model (J3). What it runs and how to read it: docs/ci.md.
+#
+# It never sees the competition match. Each runner builds the public external corpus from its SHA-256-pinned
+# sources (scripts/build_external.py), builds the cache from empty, trains F on all 30 external matches, exports
+# one external match (IDSSE DFL-MAT-J03WMX) in the competition's ATD format, and labels it with that model, exactly
+# as the Windows reference in docs/repro/windows-reference.json was made. Uploads hashes, digests, versions, CPU
+# facts, timings and aggregates only: never a CSV, never a frame-level output. It takes hours: on demand only.
+name: Repro
+
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Runners to use
+        type: choice
+        default: all
+        options: [all, ubuntu-24.04, windows-2025, macos-15]
+  # TEMPORARY, for developing this file before it is on the default branch (a workflow_dispatch workflow cannot
+  # be dispatched until then). Remove this trigger before merging.
+  push:
+    branches: [ci/repro-workflow]
+    paths: [.github/workflows/repro.yml, scripts/repro_ci.py]
+
+concurrency:
+  group: repro-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  UV_VERSION: "0.13.1"
+  UV_PYTHON: "3.11.17"
+  MATCH: idsse/DFL-MAT-J03WMX     # the dressed external match of the Windows reference
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - name: Choose the runners (Ubuntu required; Windows and macOS optional)
+        id: m
+        env:
+          ONLY: ${{ inputs.os || 'all' }}
+        run: |
+          all='[{"os":"ubuntu-24.04","optional":false},{"os":"windows-2025","optional":true},{"os":"macos-15","optional":true}]'
+          if [ "$ONLY" = all ]; then m=$all; else m=$(jq -c --arg os "$ONLY" '[.[] | select(.os == $os)]' <<<"$all"); fi
+          echo "matrix={\"include\":$m}" >> "$GITHUB_OUTPUT"
+          echo "Runners: $m" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  repro:
+    name: repro (${{ matrix.os }})
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional }}
+    timeout-minutes: 345
+    env:
+      KATENA_EXTERNAL: ${{ github.workspace }}/external_data
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Free disk space; put the 19 GB cache on the roomiest disk
+        run: |
+          df -h
+          t0=$SECONDS
+          case "$RUNNER_OS" in
+            Linux)
+              # Toolchains this job never uses. torch with its CUDA wheels needs about 3 GB on Linux.
+              sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift /usr/local/share/powershell \
+                /usr/local/share/chromium /opt/microsoft /opt/google /opt/az
+              sudo docker image prune --all --force >/dev/null 2>&1 || true
+              { sudo mkdir -p /mnt/katena && sudo chown "$(id -u):$(id -g)" /mnt/katena; } || true
+              cands="$RUNNER_TEMP /mnt/katena" ;;
+            macOS)
+              rm -rf "${ANDROID_HOME:-$HOME/Library/Android/sdk}" "$HOME/hostedtoolcache/CodeQL" "$HOME/.dotnet" || true
+              cands="$RUNNER_TEMP" ;;
+            Windows)
+              mkdir -p /c/katena || true
+              cands="$(cygpath -u "$RUNNER_TEMP") /c/katena" ;;
+          esac
+          echo "cleanup took $((SECONDS - t0)) s"
+          best="" bestkb=0
+          for d in $cands; do
+            [ -d "$d" ] && [ -w "$d" ] || continue
+            kb=$(df -Pk "$d" | awk 'NR==2 {print $4}')
+            echo "$d: $((kb / 1048576)) GB free"
+            if [ "${kb:-0}" -gt "$bestkb" ]; then best=$d bestkb=$kb; fi
+          done
+          out="$RUNNER_TEMP/repro"
+          if [ "$RUNNER_OS" = Windows ]; then
+            best=$(cygpath -m "$best"); out=$(cygpath -m "$out")
+            echo "PY=$(cygpath -m "$GITHUB_WORKSPACE")/.venv/Scripts/python.exe" >> "$GITHUB_ENV"
+          else
+            echo "PY=$GITHUB_WORKSPACE/.venv/bin/python" >> "$GITHUB_ENV"
+          fi
+          mkdir -p "$out"
+          {
+            echo "KATENA_WORK=$best/work"
+            echo "DRESSED=$best/dressed"
+            echo "OUT=$out"
+            echo "T=$out/timings.json"
+          } >> "$GITHUB_ENV"
+          echo "cache on $best ($((bestkb / 1048576)) GB free)" | tee -a "$GITHUB_STEP_SUMMARY"
+          df -h
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: full                         # the same environment as ci.yml's test job
+          prune-cache: ${{ runner.os == 'Linux' }}   # Linux wheels are too big to cache (CUDA)
+
+      - name: Install the locked environment
+        run: |
+          t0=$SECONDS
+          uv sync --frozen
+          "$PY" scripts/repro_ci.py time --out "$T" --name uv_sync --seconds $((SECONDS - t0))
+
+      - name: Versions and CPU
+        run: |
+          "$PY" scripts/repro_ci.py env --out "$OUT/env.json"
+          echo "WORKERS=$("$PY" -c 'import os; print(os.cpu_count())' | tr -d '\r')" >> "$GITHUB_ENV"
+
+      - name: Restore the external raw downloads
+        id: raw
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            external_data/idsse/raw
+            external_data/metrica/repo
+            external_data/skillcorner/repo
+          key: external-raw-v1-${{ runner.os }}-${{ hashFiles('scripts/external_manifest.json') }}
+
+      - name: External corpus (download, verify SHA-256, build the 30 canonical matches)
+        run: |
+          "$PY" scripts/repro_ci.py time --out "$T" --name build_external -- "$PY" scripts/build_external.py
+          # Every raw file was already pinned: a new pin would mean the sources changed.
+          git diff --exit-code --stat -- scripts/external_manifest.json
+
+      - name: Save the external raw downloads
+        if: steps.raw.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            external_data/idsse/raw
+            external_data/metrica/repo
+            external_data/skillcorner/repo
+          key: ${{ steps.raw.outputs.cache-primary-key }}
+
+      - name: corpus
+        run: |
+          echo "workers $WORKERS, cache $KATENA_WORK"
+          "$PY" scripts/repro_ci.py time --out "$T" --name corpus -- \
+            "$PY" scripts/make_submission.py corpus --workers "$WORKERS"
+
+      - name: worlds
+        run: |
+          "$PY" scripts/repro_ci.py time --out "$T" --name worlds -- \
+            "$PY" scripts/make_submission.py worlds --workers "$WORKERS"
+
+      - name: train (F on all 30)
+        run: |
+          "$PY" scripts/repro_ci.py time --out "$T" --name train -- "$PY" scripts/make_submission.py train
+
+      - name: Stage digests
+        run: |
+          "$PY" scripts/repro_ci.py time --out "$T" --name digests -- \
+            "$PY" scripts/cache_digests.py dump --out "$OUT/digests-${{ matrix.os }}.json"
+
+      - name: Export the dressed external match as an ATD bundle
+        run: |
+          "$PY" scripts/repro_ci.py time --out "$T" --name export -- \
+            "$PY" scripts/dressed_check.py export --match "$MATCH" --dir "$DRESSED"
+
+      - name: Label it with the all-30 model
+        run: |
+          set -o pipefail
+          "$PY" scripts/repro_ci.py time --out "$T" --name predict -- \
+            "$PY" scripts/make_submission.py predict --data-dir "$DRESSED/bundle" \
+              --timeline "$DRESSED/timeline.json" --out "$DRESSED/run/dressed.csv" | tee "$OUT/predict.log"
+
+      - name: Report (hashes and aggregates only)
+        if: ${{ !cancelled() }}
+        run: |
+          "$PY" scripts/repro_ci.py report --label "${{ matrix.os }}" --out "$OUT/repro-${{ matrix.os }}.json" \
+            --dressed "$DRESSED" --csv "$DRESSED/run/dressed.csv" --digests "$OUT/digests-${{ matrix.os }}.json" \
+            --manifest "$KATENA_WORK/model/manifest.json" --predict-log "$OUT/predict.log" --timings "$T" \
+            --env "$OUT/env.json" --work "$KATENA_WORK" --external "$KATENA_EXTERNAL"
+          df -h
+
+      - name: Upload the report (JSON only, no CSV)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: repro-${{ matrix.os }}
+          path: |
+            ${{ env.OUT }}/repro-${{ matrix.os }}.json
+            ${{ env.OUT }}/digests-${{ matrix.os }}.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  compare:
+    name: compare with each other and with Windows (non-blocking)
+    needs: repro
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: repro-*
+          path: ${{ runner.temp }}/reports
+          merge-multiple: true
+      - name: Compare (warns, never fails)
+        run: |
+          shopt -s nullglob
+          python3 scripts/repro_ci.py compare --reference docs/repro/windows-reference.json \
+            --summary "$GITHUB_STEP_SUMMARY" --out "$RUNNER_TEMP/comparison.json" "$RUNNER_TEMP"/reports/repro-*.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: comparison
+          path: ${{ runner.temp }}/comparison.json
+          retention-days: 90
