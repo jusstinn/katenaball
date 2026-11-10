@@ -6,6 +6,201 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-10
 
+### Gate G2: set-piece tag features (pre-registration)
+
+**Registered before any G2 score was computed.** Candidate G2 is fixed by `docs/plan-final-week.md` (W4b, commit
+`ff2e0b1`, merged in `c9be514`). Branch `david/w4-tags`, cut from `origin/main` at `28450b4`, with `c9be514` merged
+in. External development matches only: no `data/`, no `evaluation/gt/`, no public window, no locked bench. Code:
+`katena.featurize.tags`, `katena.external.setpieces`, `katena.eval.g2`, `scripts/run_g2.py`. Cache
+`D:/katena/work-g2`. F's cache `D:/katena/work-final` is read only. Nothing below changes after a result.
+
+**Candidate.** G2 is F with one change: the LightGBM member reads F's 213 columns plus 9 tag columns (222). Its rows,
+labels, `d2j` pool, parameters and 150 trees are F's (`final.FinalPools` with the tag columns of the same rows
+appended, through `Pools.fit`). Everything else is F's: the TCN member, `blend_heads` at w = 0.5, Viterbi at tau 2,
+T = 2, and priors from `priors_for` without the held-out match. The TCN member is not retrained. Its stored
+out-of-fold probabilities are read from `work-final/oof/final_tcn/T2`. In fold k, G2's LightGBM member trains on the
+same 27 development matches as F's. The held-out match's tags are in no model.
+
+**The 9 tag columns** (`katena.featurize.tags`), per 5 Hz sample and focal team, from the `SET PIECES` intervals.
+Times are in seconds, computed at the sample's native frame (`idx * step`).
+
+| column | definition |
+|---|---|
+| `tag_since_out`, `tag_until_out` | time since the start of the latest, and until the start of the next, `out` set piece: throw-in, corner kick or goal kick (a restart after the ball went out). "Latest" starts at or before the sample, "next" strictly after it. NaN when there is none in the match. Capped at 300 s. |
+| `tag_since_fk`, `tag_until_fk` | the same for free kicks |
+| `tag_since_ko`, `tag_until_ko` | the same for kick-offs, `Kick Off (Start)` and `Kick Off (After Goal)` |
+| `tag_last_team`, `tag_next_team` | the tagged team of the latest and of the next set piece of any type: +1 the focal team, -1 the other team, 0 `N/A`. NaN when there is none. |
+| `tag_inside` | 1 when the sample lies inside a tagged interval `[start, end)`, else 0 |
+
+A match without tagging (SkillCorner, which has no events) gets NaN in all 9, `tag_inside` included. Real tags are
+read with `katena.target.tagging.read_tags`. An instance counts when its code is `SET PIECES` and its Type is one of
+the six above (both compared case-insensitively). Each one becomes a `SetPiece` on the frame grid, at
+`round(seconds * 25)`.
+
+**Imitation tags on external matches** (`katena.external.setpieces`). They come from each match's own real event
+data, never from possession labels.
+- **IDSSE / DFL** (`DFL_03_02_events_raw`): `ThrowIn`, `CornerKick`, `GoalKick`, `FreeKick` and `KickOff`. A kick-off
+  with a `GameSection` is a `Kick Off (Start)`, one without is a `Kick Off (After Goal)`. The time is the event's
+  `EventTime`, on the canonical grid (row = `round((EventTime - t0_utc) * 25)`). The team is the event's `Team`, or
+  for a kick-off the team of its nested `Play`. Penalties and referee balls have no Smart Tagging Type and are left
+  out. The DFL event clock is used as it is: no offset is estimated, because that estimate (`control_evidence.align_dfl`)
+  uses the labels.
+- **Metrica** (Sample_Game_1 CSV, Sample_Game_3 JSON): `SET PIECE` events with subtype `THROW IN`, `CORNER KICK`,
+  `FREE KICK` or `KICK OFF`. The first kick-off of a period is the start, later ones follow a goal. Goal kicks are any
+  other event whose subtype contains `GOAL KICK`. The time is the event's start frame minus 1.
+- **SkillCorner:** no events, so the tag columns are NaN.
+- The raw event files are the ones the canonical matches were built from (SHA-256 checked against the canonical
+  record).
+
+**Simulating the real tags' character.** These are stated assumptions, fixed now.
+- **Recall per Type.** DATA.md publishes 26 throw-ins, 12 corners, 10 goal kicks, 5 free kicks, 4 kick-offs after a
+  goal and 2 at the start. Of an external match's n events of a Type, min(published count, n) are kept, drawn
+  uniformly without replacement. So the external match's own count stands in for the real match's true count, which
+  is unknown. Free kicks are kept at about 5 in 20 to 32, throw-ins at 26 in 28 to 54, goal kicks at 10 in 11 to 22.
+- **Timing.** Where the restart sits inside a real interval is unknown. `starter/load_smart_tagging.py` says the
+  intervals are windows of about 5 s around the restart. Assumed: each interval starts U(0, 5) s before its event and
+  ends U(0, 5) s after it (at least 1 frame after), independently per event.
+- **Team.** Every throw-in is `N/A` (DATA.md). Every other Type carries the team that takes it. The real file has 36
+  `N/A` instances: the 26 throw-ins and 10 others, of any code. Which of those 10 are set pieces is unknown, so no
+  other `N/A` is simulated.
+- **No false positives** are added. The real file's false-positive rate is unknown.
+- **Seeds.** Every draw comes from `default_rng(protocol.seed_for(match_id, "g2_tags"))`. So the tags depend only on
+  the match id: one realisation per match, the same in every training world, every fold and evaluation.
+- Tag columns do not depend on the world. The degrader corrupts tracking, not tags.
+
+**Known optimism, recorded now.** External events and external labels come from the same provider, so restart timing
+is cleaner in training than it will be on the real match.
+- **IDSSE.** The labels are DFL's `BallStatus`/`BallPossession` and the events are DFL's own. The dead-to-alive edges
+  of the labels and the set-piece `EventTime`s are two readings of the same restarts. The DFL event clock is offset
+  from the tracking clock by up to about 2 s per match (`control_evidence`), and that is all that separates them.
+- **Metrica.** The labels are derived from these very events (`metrica.derive_labels`: every `SET PIECE` is a
+  restart for its team). So on Metrica the tags and the label transitions coincide, up to the simulated timing noise.
+- **The real tags** are Metrica's automatic output from the same video and tracking. Their recall per Type is matched
+  only in count, and their timing, false positives and team errors are not matched at all. Any gain measured here is
+  therefore an upper bound on the gain on the real match.
+
+**An expectation, recorded before the result.** 20 of the 28 folds are SkillCorner, where the tag columns are NaN.
+There G2's member can differ from F's only through the trees: column sampling (`feature_fraction` 0.5) and splits
+learned on the 7 tagged training matches. The 70% rule needs 20 wins out of 28, so G2 must also beat F on most
+SkillCorner folds without any tag information. That is a hard bar for this candidate, and it stays the bar.
+
+**Checks, before the gate is read** (they decide nothing, but if one fails the gate is not read until it is explained):
+- **F's inputs reproduced.** On fold `idsse/DFL-MAT-J03WMX`, the pool copied here, without its tag columns, trains F's
+  LightGBM member byte for byte: the model hash stored with F's out-of-fold file, and its probabilities at target
+  and severe.
+- **F re-decoded.** F re-decoded here from its two stored members (`F_check`) equals F's stored spellF1, macroF1,
+  spell counts and bootstrap flags on all 56 (fold, condition) pairs.
+
+**Rule** (`katena.eval.bootstrap`, unchanged; the plan's gate). Adopt G2 if and only if both hold, on the 28
+development folds against F's stored per-fold scores (`work-final/final_results.pkl`):
+- at `target`: it wins on at least 70% of folds (at least 20 of 28, a win being a strictly higher spellF1), and the
+  paired 95% bootstrap interval of the mean difference lies above 0 (possessions resampled, 2000 draws, seed 0);
+- at `severe`: it is not worse. Worse means a mean difference below 0 with the interval's upper bound also below 0.
+
+**Reported, deciding nothing.** The 8 IDSSE + Metrica folds, per-dataset means and wins, G2's LightGBM member alone
+(`G2G`) against F's (`FG`), macroF1 on the 8 folds, predicted possessions per true one, and the run time. Only `target`
+and `severe` are predicted. D2's other worlds are not run.
+
+**What follows.** The plan fixes the order: G12 if G1 and G2 both pass and G12 passes, otherwise G1 if it passed,
+otherwise G2 if it passed, otherwise F. The plan's cut rule applies: if G2 is not gated by Nov 13, it is dropped.
+Nothing is adopted after Nov 14 18:00 CET. G2 is not switched on in `katena.pipeline` whatever the result. A separate
+step (W6) integrates it if it is adopted. `katena.pipeline` can already read the real file's tags into the same
+columns (`stage_predict(tag_columns=True)`, off by default). F refuses that option, because its columns do not match.
+
+### Gate G2: set-piece tag features: result
+
+Everything below was computed after the pre-registration commit `95e97d1`, pushed at 12:20 CET on 2026-11-10. The
+code is unchanged from that commit (`scripts/run_g2.py seed tags check`, then `gbdt score gate`, both through
+`heavy.py`). Nothing was changed or tuned after a score. External development matches only.
+
+**Checks (both hold).**
+- **F's inputs reproduced.** On fold `idsse/DFL-MAT-J03WMX`, the copied pool without its tag columns trains F's
+  LightGBM member byte for byte: the model hash, and the probabilities at target and severe.
+- **F re-decoded.** `F_check` equals F's stored scores on all 56 (fold, condition) pairs.
+
+**Inputs.** 196 files (3.1 GB) were copied from `work-final`. The 8 IDSSE + Metrica matches got 49 to 58 imitation
+set pieces each, 428 in all, and about 4 to 5% of their samples lie inside a tagged interval. The kept counts per
+Type follow the rule: throw-ins 26, free kicks 5, goal kicks 10, every corner (2 to 11), and every kick-off. The 20
+SkillCorner matches are NaN in all 9 columns.
+
+**Gate** (28 development folds, against F's stored per-fold scores, paired 95% bootstrap over possessions, 2000
+draws, seed 0).
+
+| comparison | folds | noise | G2 | F | diff | 95% paired CI | wins | rule |
+|---|---|---|---|---|---|---|---|---|
+| G2 vs F | 28 | target | 0.6065 | 0.6019 | +0.0046 | [+0.0014, +0.0079] | 16/28 (57%) | **fails** (wins below 70%) |
+| G2 vs F | 28 | severe | 0.5728 | 0.5696 | +0.0032 | [-0.0000, +0.0063] | 16/28 (57%) | not worse |
+| G2 vs F | 8 IDSSE + Metrica | target | 0.6220 | 0.5991 | +0.0229 | [+0.0148, +0.0309] | 8/8 | (information) |
+| G2 vs F | 8 IDSSE + Metrica | severe | 0.5636 | 0.5426 | +0.0210 | [+0.0141, +0.0279] | 8/8 | (information) |
+
+| noise | dataset | folds | G2 | F | diff | wins | fold diffs: min / median / max |
+|---|---|---|---|---|---|---|---|
+| target | IDSSE | 6 | 0.5894 | 0.5670 | +0.0224 | 6/6 | +0.0063 / +0.0183 / +0.0570 |
+| target | Metrica | 2 | 0.7196 | 0.6955 | +0.0241 | 2/2 | +0.0238 / +0.0241 / +0.0244 |
+| target | SkillCorner | 20 | 0.6003 | 0.6030 | -0.0027 | 8/20 | -0.0190 / -0.0010 / +0.0082 |
+| severe | IDSSE | 6 | 0.5320 | 0.5107 | +0.0213 | 6/6 | +0.0111 / +0.0214 / +0.0357 |
+| severe | Metrica | 2 | 0.6583 | 0.6382 | +0.0201 | 2/2 | +0.0130 / +0.0201 / +0.0273 |
+| severe | SkillCorner | 20 | 0.5765 | 0.5804 | -0.0039 | 8/20 | -0.0233 / -0.0022 / +0.0086 |
+
+The severe interval's lower end is -0.00004.
+
+**Decision: G2 fails; F stays.** At target the interval lies above 0, but G2 wins only 16 of 28 folds, below the 20
+the rule needs. It is not worse at severe. This is the outcome the pre-registration expected. Every tagged fold gains,
+by about +0.02. The 20 untagged SkillCorner folds lose a little on average (-0.003 at target, 8 wins of 20). There
+the tag columns are NaN and can only reshuffle the trees. Under the plan's adoption order, G2 is not adopted, and
+G12 is not gated, since that needs both G1 and G2 to pass.
+
+**Information only (none of it changes the decision).**
+- **The LightGBM members alone.** `G2G` against `FG`: +0.0087 [+0.0043, +0.0130], 17/28 at target, and +0.0013
+  [-0.0032, +0.0061], 13/28 at severe. On the 8 folds: +0.0308 (7/8) and +0.0224 (7/8).
+- **macroF1, 8 IDSSE + Metrica folds.** At target: G2 0.8824, F 0.8781 (`G2G` 0.8789, `FG` 0.8721). At severe: G2
+  0.8599, F 0.8549.
+- **Spell counts.** Predicted possessions per true one, 28 folds: G2 0.737 against F 0.738 at target, and 0.721
+  against 0.723 at severe.
+- **The 8-fold gain is an upper bound**, as registered. The imitation tags come from the same provider's events as
+  the labels, and on Metrica the labels are derived from those very events. The real tags' timing, false positives
+  and team errors are not simulated. So the +0.02 says the columns can carry information when tags are good. It
+  does not say what they carry on the real match.
+
+**Cost** (i7-7700, sharing the machine with W1 and G1). Seeding, tags and the check took 1.8 min in a slot: 69 s of
+copying, 4 s of tags, and 28 s for the check fit, at a peak of 2.0 GB. The gate stage took 12.1 min in a slot: the
+28 LightGBM folds 11.1 min wall and 47 min CPU (fit 18 to 22 s per fold), scoring 17 s, the gate tables 34 s, at a
+peak of 2.1 GB. The TCN member was not retrained. Cache `D:/katena/work-g2`: 3.3 GB, almost all of it copies.
+
+**Not done, or not verified.**
+- **The real tags.** No test can say how Metrica's automatic `SET PIECES` intervals sit around the real restarts,
+  how many are false positives, or whether a non-throw-in Team tag names the taking side. The imitation fixes all
+  of these by assumption.
+- **The pipeline option.** `katena.pipeline` can read the real file into the same 9 columns
+  (`stage_predict(tag_columns=True)`). It is tested on synthetic XML only, and it stays off, since G2 is not adopted.
+
+### W4a: kickoff from Smart Tagging (adopted by the plan, no gate)
+
+FAQ.md: the second half is graded from before its kickoff, and those frames are all D. External matches have no
+graded pre-kickoff frames, so there is nothing to gate on, and the plan adopts the rule directly. It is
+`katena.pipeline.apply_kickoff_rule`, applied in `stage_predict` after decoding.
+- **The rule.** In each graded half block, take that half's one Smart Tagging instance whose Type is
+  `Kick Off (Start)`. Type and Half are compared case-insensitively, and Half is a string. Map its start time to a
+  video frame with `round(seconds * 25)` (DATA.md), and set the block's frames before it to D.
+  `Kick Off (After Goal)` never matches.
+- **When nothing changes.** There is no such tag, there are several, the tag lies outside the block, or it lies more
+  than `KICKOFF_MAX_S` = 180 s into the block. That bound was fixed in the code before the rule ever ran on the match,
+  from no frame of it: a half block can open while the teams line up, but much later a kickoff tag is more likely an
+  error than a long wait. No frame constant of the match is used.
+- **Report.** `predict`'s report gains `kickoff_rule`. For each half it gives whether the rule applied, how many
+  frames it changed, and a status (`applied`, `no_tag`, `several_tags`, `before_block`, `after_block`,
+  `beyond_bound`, `no_tagging_file`, `unreadable_<type>`). Counts and flags only.
+- **Using the start time is the safe direction.** The tag is a window around the restart. When it starts before the
+  real kickoff, a few pre-kickoff frames keep the model's label, and no frame of play becomes D.
+- **The human check, `scripts/check_kickoff_tags.py`.** It prints PASS/FAIL only, two lines per half. The first says
+  whether the tag-derived kickoff lies within 2 s of the published kickoff: for the first half that is the first
+  graded frame, 11,185 (DATA.md), and for the second half 113,742 (FAQ.md). The second says whether it is not more
+  than 2 s after the published kickoff, so the rule cannot turn play into D. The published numbers are check
+  references only. Nothing in the pipeline reads them.
+- **Tests** (`tests/test_kickoff.py`, `tests/test_pipeline_atd.py`). They run on synthetic SportsCode XML and a
+  synthetic ATD bundle on the competition timeline. A bundle without a tagging file, such as a dressed external
+  match, is unchanged, so the dressed-match check still compares like with like.
+
 ### Gate G1: TCN reads the touch columns (pre-registration)
 
 **Registered before any G1 score was computed.** Workstream W3 of `docs/plan-final-week.md`, which fixes the
@@ -173,6 +368,22 @@ passes its own gate, and otherwise F stays.
 - **The cache.** Only G1's outputs are kept in `D:/katena/work-g1`: `oof/g1_tcn`, `g1_results.pkl`,
   `g1_gate.json`, `final_cost.jsonl` and `logs/`. The copied inputs were deleted, since they are byte-identical to
   `work-final`. `scripts/run_g1.py seed` restores them before `score` or `gate` can be re-run.
+
+### Final-week gates: outcome (coordinator)
+
+Both candidates the plan fixed before any score failed their gate against F on the 28 folds:
+- G1 (TCN reads the touch columns): +0.0017 [-0.0014, +0.0047], 16/28.
+- G2 (set-piece tag features): +0.0046 [+0.0014, +0.0079], 16/28.
+
+So G12 is not gated, and under the plan's fixed order **F stays the submission model**. The kickoff rule (W4a),
+adopted by the plan without a gate, is the only change to the submission. It changes `predict`, not the model, so
+the expected model hashes in `docs/repro/expected-windows.json` stand.
+
+**A design note for the record (2026-11-10).** G2's columns exist only where external events exist. That is the 8
+IDSSE + Metrica folds, where G2 gained +0.0229 (8/8). The 20 SkillCorner folds cannot gain, so a 70%-of-28 rule
+could hardly be met. The gate should have been registered on the 8 tagged folds, as D2 reports dead-ball changes.
+That is a mistake in the plan, found after the result. Re-gating G2 on 8 folds now would be choosing after seeing
+the scores, so G2 stays out.
 
 ## 2026-11-08
 
