@@ -331,18 +331,20 @@ D over the first 60 and 120 s of each half, as an aggregate.
 - **Assumed identity-switch rates.** No external source measures them.
 - **Short possessions.** At IoU 0.5 and target-like noise, M2 matched 0.167 of true possessions under
   2 s, and M2 with touch features 0.169.
-- **Cross-machine byte identity is not guaranteed.** On one machine the rebuild is exact. A fresh clone,
-  with a fresh download of the external corpus and an empty cache, reproduced every stage byte for byte:
-  corpus, features, worlds, pools, both models and a dressed-match CSV (`docs/decision-log.md`, J3 W1). Two
-  fresh processes also reproduce every model, probability and label. Between Windows x86 (i7-7700) and
-  macOS arm64:
-  - the LightGBM model is byte-identical;
-  - the TCN's weights differ in their last bits, because torch picks different CPU kernels;
-  - F's 8-fold development means agree to the 4 decimals reported.
+- **Model bytes differ across machines; the labels did not.** On the reference machine the rebuild is exact.
+  A fresh clone, with a fresh download of the external corpus and an empty cache, reproduced every stage byte
+  for byte: corpus, features, worlds, pools, both models and a dressed-match CSV (`docs/decision-log.md`, J3 W1).
+  Across machines we trained F 11 times on 7 OS and CPU combinations (`.github/workflows/repro.yml`):
+  - Windows 10 and Windows Server on Intel, Windows on AMD, Ubuntu on AMD and on Intel, macOS on Apple M1.
+  - Every training input is equal in content everywhere. On macOS only NaN sign bits differ, and nothing reads them.
+  - The LightGBM model, the scaler and the decoder priors are identical everywhere.
+  - The TCN's weights differ in their last bits whenever the OS or the CPU vendor differs, because torch picks
+    different kernels. Windows on two other Intel CPUs reproduced the reference machine bit for bit.
+  - The dressed external match (IDSSE `DFL-MAT-J03WMX`, 173,528 frames, in the provided ATD format) got a
+    byte-identical CSV in all 11 trainings.
 
-  Retraining the TCN with other CPU kernels moved probabilities by at most 5e-7 and left a dressed-match CSV
-  byte-identical. Expect the same labels on another machine, though this has not been shown on the provided
-  match itself.
+  So expect the same file on another machine. That has been shown on an external match in the provided format,
+  not on the provided match itself, where a near-tie could still flip a label.
 
 **With more time** we would recalibrate the D2 worlds inside each fold, and make native-ball noise as
 smooth and correlated as real tracking. We would also re-run the `tail` gate after its label fix, add a

@@ -451,6 +451,87 @@ could hardly be met. The gate should have been registered on the 8 tagged folds,
 That is a mistake in the plan, found after the result. Re-gating G2 on 8 folds now would be choosing after seeing
 the scores, so G2 stays out.
 
+### J3: cross-OS reproduction in CI (`ci/repro-workflow`, plan W2)
+
+External matches only. CI never has the match. `.github/workflows/repro.yml` (on demand, `docs/ci.md`) makes every
+runner rebuild the external corpus from its SHA-256-pinned sources (no new pin: the manifest is unchanged). It then
+builds the cache from empty (workers = CPU count), trains F on all 30, and dumps the stage digests. Finally it exports
+IDSSE `DFL-MAT-J03WMX` as an ATD bundle and labels it with the all-30 model, exactly as David's Nov 8 reference was
+made (`docs/repro/windows-reference.json`, from "J2 checks and J3 on Windows"). Only hashes and aggregates leave a
+runner. Three runs, all with uv 0.13.1, Python 3.11.17, numpy 2.2.6, LightGBM 4.7.0 and torch 2.15.0:
+[run 1](https://github.com/jusstinn/katenaball/actions/runs/42805119378),
+[run 2](https://github.com/jusstinn/katenaball/actions/runs/42811511848),
+[run 3](https://github.com/jusstinn/katenaball/actions/runs/42814879839).
+
+**Answer: the labels agree on every machine; the models do not.**
+- **Dressed CSV.** Byte-identical everywhere: `909f4ffa6aac5705d5269af5b7072a424afe6ca81c02e565bf904e1147aeb788`
+  from every training below: 11 trainings on 7 combinations of OS and CPU, giving 5 different TCNs. So all 173,528
+  labels agree, including the 145,608 graded frames.
+- **Training inputs.** The arrays of all 861 cache files are equal on every OS. That covers 30 canonical matches,
+  30 ground truth files, 30 base pools, 381 feature files, 330 touch files, 30 `d2j` pools and 30 touch pools. The
+  one exception is on macOS arm64: the base features and pools (`X`, `X0`, `X1`) differ only in NaN sign bits. An
+  arithmetic NaN has its sign bit set on x86-64 and clear on arm64, and nothing in the pipeline reads it.
+- **Models.** These parts are identical everywhere: the LightGBM member (`b2146150...`, both heads), the feature
+  names, the TCN scaler and the Viterbi priors.
+- **Where they part.** Two parts differ.
+  - **The TCN fit.** This is the first stage whose values differ. Its weights depend on the OS and on the CPU
+    vendor. The HSMM `logdur` prior also differs by OS. F decodes with Viterbi and never reads it.
+  - **File bytes.** Between Windows and Unix, the files differ from the first stage on. Python's `zipfile`
+    records the writing OS in every `.npz` entry (`create_system`).
+
+| machine | OS | CPU | TCN | bundle.pkl | HSMM `logdur` | CSV |
+|---|---|---|---|---|---|---|
+| David's PC (reference, Nov 8, twice) | Windows 10 | Intel i7-7700 (AVX2) | `01488c84` | `cb0ea4fc` | `7c7d25a0` | `909f4ffa` |
+| `windows-2025`, runs 1 and 3 | Windows Server 2025 | Intel Xeon 8370C (AVX-512) | `01488c84` | `cb0ea4fc` | `7c7d25a0` | `909f4ffa` |
+| `windows-2025`, run 2 | Windows Server 2025 | AMD EPYC 9V45 | `6d5ce4da` | `fe340e71` | `7c7d25a0` | `909f4ffa` |
+| `ubuntu-24.04`, runs 1 and 2 | Ubuntu 24.04 | AMD EPYC 9V74, then 9V45 | `2b273d3f` | `7d25a18a` | `80a0e444` | `909f4ffa` |
+| `ubuntu-24.04`, run 3 | Ubuntu 24.04 | Intel Xeon 8573C | `a7623330` | `12621be3` | `80a0e444` | `909f4ffa` |
+| `macos-15`, runs 1, 2 and 3 | macOS 15 | Apple M1 (virtual, 3 cores, 7 GB) | `a4e9a8e1` | `eb817ccf` | `0e80d4de` | `909f4ffa` |
+
+- **Windows on Intel is bit-exact.** David's PC and a different Intel CPU, twice, reproduce every file, the bundle
+  and the CSV byte for byte, so the `CPU_ENV` pinning works there. Repeated runs on the same OS and CPU vendor give
+  the same TCN each time.
+- **Elsewhere, the TCN depends on both the OS and the CPU vendor.** The torch builds differ: GCC with MKL (`+cu132`)
+  on Linux, MSVC with MKL (`+cpu`) on Windows, and Accelerate without MKL or oneDNN on macOS. Windows and Linux
+  differ even on the same CPU model (EPYC 9V45). Intel and AMD differ on both OSes, and two AMD models agree on
+  Linux. Justin's Mac (Nov 8, TCN `456fc2c2...`) differs from the macOS runner, too.
+- **What an organiser would see.** On Windows with an Intel CPU, the same submission bytes and model bytes. On
+  anything else, the same labels on this external match, with a different TCN.
+
+**Found and fixed on the way.**
+- **Cross-OS digests.** `cache_digests.py` compared file bytes, which can never match between Windows and Unix
+  (run 1: 0 of 861 files equal, while the dressed bundle and LightGBM matched). The Nov 8 claim "equal arrays give
+  equal file bytes" holds within one OS family only. `dump` now also hashes each file's arrays, exactly and with
+  NaNs made canonical, plus a short digest per member. `diff` judges a stage by content and reports a NaN-bits-only
+  stage as `nan_payload`. The HSMM part hash is split into `logT`, `logdur` and `dur_params`. The reference was
+  re-read from the unchanged `D:/katena/work-submit` (every file's bytes as on Nov 8). Tests cover the container,
+  NaN and old-dump cases.
+- **Report crash on Windows.** The report step crashed when it sized a cache-restored SkillCorner clone on Windows
+  (run 2): one entry there refuses `stat`. The step now skips unreadable entries. Run 2's Windows hashes come from
+  its uploaded digests and its log.
+
+**Cost per runner** (minutes, wall; peak RSS of the largest process in brackets, Unix only):
+
+| | uv sync | corpus download and build | corpus | worlds | train | digests | export and predict | job |
+|---|---|---|---|---|---|---|---|---|
+| `ubuntu-24.04` (4 vCPU, 16 GB), run 1 | 0.4 | 6.6 (0.7 GB) | 5.1 (0.9) | 11.2 (0.9) | 2.1 (4.7) | 0.8 | 0.4 (1.2) | 28.6 |
+| `windows-2025` (4 vCPU, 16 GB), run 1 | 0.1 | 6.8 | 9.6 | 19.5 | 3.9 | 0.8 | 0.7 | 42.5 |
+| `macos-15` (3 vCPU, 7 GB), run 1 | 0.1 | 7.2 (1.2) | 4.3 (0.8) | 11.7 (0.8) | 9.5 (2.7) | 0.5 | 0.5 (1.0) | 35.2 |
+
+Whole jobs in runs 2 and 3: Ubuntu 21.8 and 26.0 min, macOS 31.4 and 36.6, Windows 20.3 (AMD) and 40.6 (Intel).
+Each run took 32-43 min end to end. Run 1 downloaded the raw files (0.92 GB per OS in `actions/cache`); later runs
+restore them, and the corpus download and build drops to 2-4 min. Disk was never short: after cleanup, 117 GB free
+on Ubuntu, 69 GB on macOS, 146 GB on Windows `D:`. The cache is 18.1 GB and the corpus 5.1 GB on every OS. macOS
+fits in 7 GB of RAM (train peaks at 2.7 GB).
+
+**Not verified.**
+- **One match.** Labels were compared on one external match. On the real match, a near-tie could flip a label
+  where the TCN's last bits differ. No bundle leaves a runner, so the cross-OS probability differences were not
+  measured. The Nov 8 kernel probe on Windows moved them by at most 5e-7 and changed no label.
+- **Dispatch path.** The runs came from the temporary `push` trigger. The `workflow_dispatch` path (the `os`
+  input) runs only once the file is on main.
+- **Reference timings.** The reference's timings are the Nov 8 entry's (2 workers), not remeasured.
+
 ## 2026-11-08
 
 ### Locked-bench sanity read of F (registered before the read)
