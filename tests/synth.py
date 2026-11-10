@@ -57,3 +57,31 @@ def make_match(seed: int = 0, invert_labels: bool = False) -> Match:
     return Match(P=P, team=team, speed=speed, ball=ball, half_blocks=blocks,
                  attack_dir={1: +1, 2: -1}, y=y_out, pitch=(L, W), fps=25.0,
                  name="synthetic", source="synthetic", meta={"label_source": "synthetic"})
+
+
+def tagging_xml(instances) -> str:
+    """A Smart Tagging file in the documented SportsCode layout (docs/upstream/DATA.md, starter/load_smart_tagging.py).
+
+    ``instances``: ``(start_s, end_s, code, {group: text})``, written in the order given. Seconds are written with
+    ``repr``, so ``round(seconds * 25)`` gives back the frame the caller meant."""
+    out = ['<?xml version="1.0" encoding="utf-8"?>', "<file><ALL_INSTANCES>"]
+    for i, (start, end, code, labels) in enumerate(instances, start=1):
+        body = "".join(f"<label><group>{g}</group><text>{t}</text></label>" for g, t in labels.items())
+        out.append(f"<instance><ID>{i}</ID><start>{float(start)!r}</start><end>{float(end)!r}</end>"
+                   f"<code>{code}</code>{body}</instance>")
+    out.append("</ALL_INSTANCES></file>")
+    return "\n".join(out) + "\n"
+
+
+def write_tagging(root, instances):
+    """Write ``tagging_xml(instances)`` where ``games.asset_paths(data_dir=root)`` looks for the Smart Tagging file."""
+    import sys
+    from pathlib import Path
+    repo = Path(__file__).resolve().parents[1]
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+    import games
+    path = Path(games.asset_paths(data_dir=str(root))["smart_tagging"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(tagging_xml(instances).encode("utf-8"))
+    return path

@@ -12,7 +12,8 @@ Stages, each cached under ``KATENA_WORK`` (``scripts/make_submission.py`` sets i
     worlds   the ``d2j`` worlds' features, their touch columns, and the ``d2j`` pools with touch columns
     train    the LightGBM member, the TCN member and the priors, saved to ``model/`` with sha256 hashes
     predict  the real match from ``data/``: features at 5 Hz from the real ATD, touch columns from the real
-             25 Hz ball, blend, Viterbi, one label per video frame, the submission file, validation
+             25 Hz ball, blend, Viterbi, one label per video frame, the kickoff rule (frames of a graded half
+             before its Smart Tagging ``Kick Off (Start)`` become D), the submission file, validation
 
 Training reads external matches only. ``predict`` is the only stage that opens ``data/`` and it reports
 aggregates only (counts, shares, shapes, hashes, run times), never a frame-level value (CLAUDE.md).
@@ -328,6 +329,83 @@ def label_match(model: Model, m, threads: int | None = None) -> tuple[np.ndarray
     return codes, report
 
 
+# ---------------------------------------------------------------------------------------------
+# kickoff from Smart Tagging (W4a, docs/plan-final-week.md)
+#
+# A graded half can begin before its kickoff, and the frames before the kickoff are dead ball (FAQ.md: the second
+# half is graded from before its kickoff). The kickoff is read from the provided inputs, never from a frame constant:
+# the half's Smart Tagging instance whose Type is "Kick Off (Start)" (Metrica's automatic tagging). Its start time
+# maps to a video frame with round(seconds * 25), as DATA.md documents; frames of the block before it become D.
+
+KICKOFF_TYPE = "kick off (start)"            # compared lower-case and stripped; "Kick Off (After Goal)" never matches
+# How far into a graded half block a tagged kickoff may lie and still be used. A half block can open while the
+# teams line up, so a kickoff a minute or two in is plausible. Much later, a "Kick Off (Start)" tag is more likely a
+# tagging error than a long wait, and acting on it would turn minutes of play into D. Fixed on 2026-11-10 before the
+# rule ever ran on the match, from no frame of it: 3 minutes. Past it, or outside the block, nothing changes.
+KICKOFF_MAX_S = 180.0
+
+
+def tagged_kickoffs(tags) -> dict:
+    """{half: [video frame of the start of each "Kick Off (Start)" instance of that half]}. ``tags`` are
+    ``katena.target.tagging.Tag`` (Type and Half matched case-insensitively there and here)."""
+    out = {}
+    for t in tags:
+        if (t.kind or "").strip().lower() == KICKOFF_TYPE and t.half is not None:
+            out.setdefault(int(t.half), []).append(int(t.start_frame))
+    return out
+
+
+def kickoff_status(frames: list, first: int, last: int, fps: float) -> tuple[str, int | None]:
+    """(status, kickoff frame or None) of one graded half block ``[first, last]`` given its tagged kickoffs.
+    The status is "applied" only when exactly one tag lies in ``[first, min(last, first + KICKOFF_MAX_S)]``."""
+    if not frames:
+        return "no_tag", None
+    if len(frames) > 1:
+        return "several_tags", None
+    k = frames[0]
+    if k < first:
+        return "before_block", None
+    if k > last:
+        return "after_block", None
+    if k > first + int(round(KICKOFF_MAX_S * fps)):
+        return "beyond_bound", None
+    return "applied", k
+
+
+def apply_kickoff_rule(codes: np.ndarray, half_blocks, tags, fps: float,
+                       missing: str = "no_tagging_file") -> tuple[np.ndarray, dict]:
+    """``codes`` with the frames of each graded half before that half's tagged kickoff set to D (code 2), and a
+    report of counts and flags only: per half, whether the rule applied, how many frames it changed, and why not.
+    ``tags`` is the list read from the Smart Tagging file, or None when there is none (``missing`` says why); then
+    nothing changes."""
+    from katena.types import D
+    out = np.array(codes, copy=True)
+    kick = tagged_kickoffs(tags) if tags is not None else {}
+    rep = {"bound_s": KICKOFF_MAX_S}
+    for h, a, b in half_blocks:
+        status, k = (missing, None) if tags is None else kickoff_status(kick.get(int(h), []), a, b, fps)
+        changed = 0
+        if k is not None:
+            changed = int((out[a:k] != D).sum())
+            out[a:k] = D
+        rep[f"half{int(h)}"] = {"applied": k is not None, "frames_changed": changed, "status": status}
+    return out, rep
+
+
+def read_target_tags(data_dir: Path | None = None, fps: float = 25.0):
+    """(tags, None) from the bundle's Smart Tagging file; (None, reason) when it is missing or unreadable. The
+    reason holds an exception's type name only, never its message (messages can quote the file)."""
+    from katena.target.atd import _games
+    from katena.target.tagging import read_tags
+    path = Path(_games().asset_paths(data_dir=str(data_dir) if data_dir else None)["smart_tagging"])
+    if not path.is_file():
+        return None, "no_tagging_file"
+    try:
+        return read_tags(path, fps=fps), None
+    except Exception as e:  # noqa: BLE001  the type alone
+        return None, f"unreadable_{type(e).__name__}"
+
+
 def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
     """Write the file, then run the official checks on the bytes written. Raises if they fail, and then leaves no
     file at ``path`` from this run (the bytes are checked in a temporary file and moved into place only if valid)."""
@@ -351,8 +429,12 @@ def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
 
 
 def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None = None, hold_out=(),
-                  timeline=None) -> dict:
+                  timeline=None, kickoff: bool = True) -> dict:
     """Label the real match and write the submission. Prints aggregates only.
+
+    After decoding, the kickoff rule (``apply_kickoff_rule``) sets each graded half's frames before its tagged
+    ``Kick Off (Start)`` to D; ``kickoff=False`` turns it off. A bundle without a Smart Tagging file (an exported
+    external match) is left unchanged, and the report says so.
 
     ``hold_out`` and ``timeline`` are for the dressed-match check only (an external match exported in the ATD
     format, ``scripts/dressed_check.py``): the held-out model, and the exported match's own frame count, half
@@ -366,6 +448,9 @@ def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None =
     rep = m.meta.get("read_report", {})
     model = load_model(hold_out)
     codes, report = label_match(model, m, threads)
+    if kickoff:
+        tags, why = read_target_tags(data_dir, m.fps)
+        codes, report["kickoff_rule"] = apply_kickoff_rule(codes, m.half_blocks, tags, m.fps, missing=why or "")
     sub = write_submission(codes, out, m.n)
     report["read"] = {k: rep.get(k) for k in ("n_lines", "n_malformed", "n_out_of_range", "n_duplicate",
                                               "n_frames_present", "contiguous_from_one")}

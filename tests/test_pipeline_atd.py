@@ -148,7 +148,48 @@ def test_predict_reads_an_atd_bundle_on_the_competition_timeline(trained):
     assert rep["read"]["contiguous_from_one"] and rep["read"]["n_malformed"] == 0
     assert rep["frames"] == 199319 and rep["frames_in_halves"] == 158857 and rep["features"][1] == 213
     assert rep["submission"]["sha256"] == hashlib.sha256(data).hexdigest()
+    assert {rep["kickoff_rule"][h]["status"] for h in ("half1", "half2")} == {"no_tagging_file"}   # bundle has none
     r = subprocess.run([sys.executable, str(ROOT / "evaluation" / "validate_submission.py"), str(out)],
+                       capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0 and r.stdout.startswith("OK"), r.stdout[-300:]
+
+
+def test_predict_applies_the_kickoff_rule_from_smart_tagging(trained):
+    """W4a end to end: a synthetic ATD bundle plus a synthetic Smart Tagging file whose second-half
+    ``Kick Off (Start)`` lies one minute into the graded block. Frames before it become D, nothing else moves; the
+    first half's kickoff tag starts just before its block, so that half is left alone."""
+    from synth import write_tagging
+
+    from katena import pipeline as PL
+    tmp = trained["tmp"]
+    root = tmp / "bundle_kickoff"
+    dress.write_bundle(synth_target(seed=1), root, fmt=four_decimals)
+    (_, a1, _), (_, a2, b2) = official_timeline().half_blocks
+    k2 = a2 + 60 * 25
+    sp = "SET PIECES"
+    write_tagging(root, [
+        ((a1 - 30) / 25, (a1 + 95) / 25, sp, {"Team": "Barcelona", "Half": "1st Half", "Type": "Kick Off (Start)"}),
+        ((a1 + 4000) / 25, (a1 + 4100) / 25, sp, {"Team": "Atletic Club", "Half": "1st Half",
+                                                  "Type": "Kick Off (After Goal)"}),
+        ((a2 + 200) / 25, (a2 + 300) / 25, "BUILD UP", {"Team": "Barcelona", "Half": "2nd Half"}),
+        (k2 / 25, (k2 + 120) / 25, sp, {"Team": "N/A", "Half": "2nd Half", "Type": "kick off (start)"}),
+        ((b2 - 900) / 25, (b2 - 800) / 25, sp, {"Team": "N/A", "Half": "2nd Half", "Type": "Throw-in"}),
+    ])
+    off = PL.stage_predict(tmp / "kickoff" / "off.csv", root, threads=2, kickoff=False)
+    on = PL.stage_predict(tmp / "kickoff" / "on.csv", root, threads=2)
+
+    def labels(p):
+        return np.array([r.split(",")[1] for r in p.read_bytes().decode("ascii").splitlines()[1:]])
+    lab_off, lab_on = labels(tmp / "kickoff" / "off.csv"), labels(tmp / "kickoff" / "on.csv")
+    assert "kickoff_rule" not in off
+    rule = on["kickoff_rule"]
+    assert rule["half1"] == {"applied": False, "frames_changed": 0, "status": "before_block"}
+    assert rule["half2"]["applied"] and rule["half2"]["status"] == "applied"
+    assert (lab_on[a2:k2] == "D").all()
+    assert np.array_equal(lab_on[:a2], lab_off[:a2]) and np.array_equal(lab_on[k2:], lab_off[k2:])
+    assert rule["half2"]["frames_changed"] == int((lab_off[a2:k2] != "D").sum()) > 0
+    assert on["submission"]["rows"] == 199319
+    r = subprocess.run([sys.executable, str(ROOT / "evaluation" / "validate_submission.py"), str(tmp / "kickoff" / "on.csv")],
                        capture_output=True, text=True, timeout=300)
     assert r.returncode == 0 and r.stdout.startswith("OK"), r.stdout[-300:]
 
