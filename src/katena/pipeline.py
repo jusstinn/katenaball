@@ -272,11 +272,15 @@ def submission_bytes(labels) -> bytes:
     return ("frame,label\n" + "".join(f"{i},{v}\n" for i, v in enumerate(labels))).encode("ascii")
 
 
-def label_match(model: Model, m, threads: int | None = None) -> tuple[np.ndarray, dict]:
+def label_match(model: Model, m, threads: int | None = None, set_pieces=None) -> tuple[np.ndarray, dict]:
     """int8 codes (0 H, 1 A, 2 D, 3 X) for every native frame of ``m``, and an aggregate-only report.
 
     ``m`` is a native-rate Match without labels. It is not corrupted: the real ATD is the noisy input
-    the training worlds stand in for."""
+    the training worlds stand in for.
+
+    ``set_pieces`` (``katena.featurize.tags.SetPiece`` list, from the real Smart Tagging) appends the G2 tag columns
+    to the LightGBM member's input. Off by default: F has no tag columns, so a model must have been trained with them
+    (G2, not adopted or integrated as of 2026-11-10), or the column check below refuses."""
     from katena.decode import hmm
     from katena.eval.score import to_native_codes
     from katena.featurize.build import featurize, infer_dirs
@@ -294,9 +298,14 @@ def label_match(model: Model, m, threads: int | None = None) -> tuple[np.ndarray
     if not np.array_equal(tidx, f0.idx):
         raise RuntimeError("touch rows do not line up with the base features")
     names = list(f0.names) + list(tnames)
+    X0, X1 = np.concatenate([f0.X, A[0]], 1), np.concatenate([f1.X, A[1]], 1)
+    if set_pieces is not None:
+        from katena.featurize import tags as TAGS
+        G, gnames = TAGS.tag_columns(set_pieces, f0.idx, int(m5.meta["step"]), m.fps)
+        names += gnames
+        X0, X1 = np.concatenate([X0, G[0]], 1), np.concatenate([X1, G[1]], 1)
     if names != model.names:
         raise RuntimeError("feature columns differ from the trained model's")
-    X0, X1 = np.concatenate([f0.X, A[0]], 1), np.concatenate([f1.X, A[1]], 1)
     t1 = time.time()
     pa_g, ph_g = model.heads().predict(X0, X1)
     E.set_deterministic(threads)
@@ -429,12 +438,15 @@ def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
 
 
 def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None = None, hold_out=(),
-                  timeline=None, kickoff: bool = True) -> dict:
+                  timeline=None, kickoff: bool = True, tag_columns: bool = False) -> dict:
     """Label the real match and write the submission. Prints aggregates only.
 
     After decoding, the kickoff rule (``apply_kickoff_rule``) sets each graded half's frames before its tagged
     ``Kick Off (Start)`` to D; ``kickoff=False`` turns it off. A bundle without a Smart Tagging file (an exported
     external match) is left unchanged, and the report says so.
+
+    ``tag_columns=True`` reads the bundle's Smart Tagging ``SET PIECES`` intervals and gives them to ``label_match``
+    as G2's tag columns. Off by default, and F refuses it (see ``label_match``).
 
     ``hold_out`` and ``timeline`` are for the dressed-match check only (an external match exported in the ATD
     format, ``scripts/dressed_check.py``): the held-out model, and the exported match's own frame count, half
@@ -447,7 +459,16 @@ def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None =
     m = load_target(data_dir, timeline=timeline)
     rep = m.meta.get("read_report", {})
     model = load_model(hold_out)
-    codes, report = label_match(model, m, threads)
+    set_pieces = None
+    if tag_columns:
+        from katena.featurize import tags as TAGS
+        tags, why = read_target_tags(data_dir, m.fps)
+        if tags is None:
+            raise RuntimeError(f"tag columns need the Smart Tagging file ({why})")
+        set_pieces = TAGS.from_tagging(tags)
+    codes, report = label_match(model, m, threads, set_pieces=set_pieces)
+    if set_pieces is not None:
+        report["tag_columns"] = {"set_pieces_by_type": TAGS.counts(set_pieces)}
     if kickoff:
         tags, why = read_target_tags(data_dir, m.fps)
         codes, report["kickoff_rule"] = apply_kickoff_rule(codes, m.half_blocks, tags, m.fps, missing=why or "")

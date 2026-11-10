@@ -192,6 +192,18 @@ def test_predict_applies_the_kickoff_rule_from_smart_tagging(trained):
     r = subprocess.run([sys.executable, str(ROOT / "evaluation" / "validate_submission.py"), str(tmp / "kickoff" / "on.csv")],
                        capture_output=True, text=True, timeout=300)
     assert r.returncode == 0 and r.stdout.startswith("OK"), r.stdout[-300:]
+    # G2's tag columns (off by default) read the same file, and F, trained without them, refuses them
+    with pytest.raises(RuntimeError, match="feature columns differ"):
+        PL.stage_predict(tmp / "kickoff" / "tags.csv", root, threads=2, tag_columns=True)
+    import games
+    tagging = Path(games.asset_paths(data_dir=str(root))["smart_tagging"])
+    tagging.rename(tagging.with_suffix(".away"))
+    try:
+        with pytest.raises(RuntimeError, match="need the Smart Tagging file"):
+            PL.stage_predict(tmp / "kickoff" / "tags.csv", root, threads=2, tag_columns=True)
+    finally:
+        tagging.with_suffix(".away").rename(tagging)
+    assert not (tmp / "kickoff" / "tags.csv").exists()
 
 
 def test_hold_out_leaves_the_match_out_and_keeps_the_submission_model(trained):
