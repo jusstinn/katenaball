@@ -4,7 +4,8 @@
 # sources (scripts/build_external.py), builds the cache from empty, trains F on all 30 external matches, exports
 # one external match (IDSSE DFL-MAT-J03WMX) in the competition's ATD format, and labels it with that model, exactly
 # as the Windows reference in docs/repro/windows-reference.json was made. Uploads hashes, digests, versions, CPU
-# facts, timings and aggregates only: never a CSV, never a frame-level output. It takes hours: on demand only.
+# facts, timings and aggregates only: never a CSV, never a frame-level output. About 45 min on three runners,
+# so it runs on demand only.
 name: Repro
 
 on:
@@ -15,11 +16,6 @@ on:
         type: choice
         default: all
         options: [all, ubuntu-24.04, windows-2025, macos-15]
-  # TEMPORARY, for developing this file before it is on the default branch (a workflow_dispatch workflow cannot
-  # be dispatched until then). Remove this trigger before merging.
-  push:
-    branches: [ci/repro-workflow]
-    paths: [.github/workflows/repro.yml, scripts/repro_ci.py]
 
 concurrency:
   group: repro-${{ github.ref_name }}

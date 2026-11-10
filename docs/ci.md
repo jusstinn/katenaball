@@ -144,7 +144,8 @@ real match could flip.
 
 `repro.yml` answers J3 on GitHub's runners: does F train and label identically on another OS? It runs only
 when dispatched (Actions, then Repro, then Run workflow, or `gh workflow run repro.yml -f os=all`), never on
-pushes or pull requests, because it takes hours. It never sees the competition match.
+pushes or pull requests: one run keeps three runners busy for 30-45 minutes. It never sees the competition match.
+Results so far: `docs/decision-log.md`, 2026-11-10, "J3: cross-OS reproduction in CI".
 
 Each runner (`ubuntu-24.04`; `windows-2025` and `macos-15` are optional, so their failure does not fail the
 run) frees disk, then: `uv sync --frozen`; restores the raw external downloads from `actions/cache` (keyed on
