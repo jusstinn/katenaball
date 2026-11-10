@@ -144,7 +144,7 @@ def run_captured(cmd: list[str], env: dict) -> tuple[int, list[str], list[str]]:
     return p.returncode, shown, f.raised
 
 
-VERDICT = re.compile(r"^\s*(PASS|FAIL)\b\s*(.*?)\s*$")                  # "PASS  what" (check_target.py)
+VERDICT = re.compile(r"^\s*(PASS|FAIL|WARN)\b\s*(.*?)\s*$")                  # "PASS  what" (check_target.py)
 VERDICT_AFTER = re.compile(r"^\s*(\w[\w .()/-]*?):\s+(PASS|FAIL)\s*$")    # "what: PASS" (check_public_window.py)
 EXCEPTION_LINE = re.compile(r"\braised [A-Za-z_][\w.]*|\b(?:failed|skipped) \([A-Za-z_][\w.]*[;)]")
 TOUCH_SHAPE = re.compile(r"^target \(real 25 Hz ball\)\s+rows\s+(\d+)\s+cols\s+(\d+)\b")

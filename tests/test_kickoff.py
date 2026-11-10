@@ -133,7 +133,7 @@ import check_kickoff_tags as CK  # noqa: E402
 
 
 def _check(root, instances, capsys, write=True):
-    CK.RESULTS.update({"pass": 0, "fail": 0})
+    CK.RESULTS.update({"pass": 0, "warn": 0, "fail": 0})
     if write:
         write_tagging(root, instances)
     code = CK.main(["--data-dir", str(root)])
@@ -153,14 +153,21 @@ def test_check_passes_when_both_tags_sit_on_the_published_kickoffs(tmp_path, cap
     assert code == 0 and len(lines) == 4 and all(x.startswith("PASS") for x in lines), out
 
 
-def test_check_fails_a_late_or_far_or_missing_tag(tmp_path, capsys):
+def test_check_fails_only_a_late_tag(tmp_path, capsys):
+    # early by 3 s: far but safe (fewer frames to D) -> WARN, then PASS; late by 2.5 s -> WARN, then FAIL
     code, out = _check(tmp_path / "a", [published(1, -3.0), published(2, 2.5)], capsys)
     assert code == 1
     first = [x for x in out.splitlines() if "1st half" in x]
     second = [x for x in out.splitlines() if "2nd half" in x]
-    assert first[0].startswith("FAIL") and first[1].startswith("PASS")           # early: far, but not late
-    assert second[0].startswith("FAIL") and second[1].startswith("FAIL")         # late
-    code, out = _check(tmp_path / "b", [published(1), published(1, 1.0)], capsys)
-    assert code == 1 and "several Kick Off (Start) tags" in out and "no Kick Off (Start) tag" in out
-    code, out = _check(tmp_path / "c", [], capsys, write=False)
-    assert code == 1 and "raised OSError" in out
+    assert first[0].startswith("WARN") and first[1].startswith("PASS")
+    assert second[0].startswith("WARN") and second[1].startswith("FAIL")
+
+
+def test_check_only_warns_when_the_rule_is_safe(tmp_path, capsys):
+    code, out = _check(tmp_path / "early", [published(1, -3.0), published(2, -10.0)], capsys)
+    assert code == 0 and "FAIL" not in out and out.count("WARN") == 2
+    code, out = _check(tmp_path / "b", [published(1), published(1, 1.0)], capsys)    # several in half 1, none in 2
+    assert code == 0 and "FAIL" not in out
+    assert "several Kick Off (Start) tags" in out and "no Kick Off (Start) tag" in out
+    code, out = _check(tmp_path / "c", [], capsys, write=False)                       # no tagging file at all
+    assert code == 0 and "WARN" in out and "raised OSError" in out

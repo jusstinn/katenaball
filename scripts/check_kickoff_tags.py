@@ -3,8 +3,8 @@
 
     uv run python scripts/check_kickoff_tags.py [--data-dir <bundle>]
 
-A human runs this on the real match. It prints PASS or FAIL lines only, never a frame, a time or a count, so the
-output is safe to paste. Exceptions print their type only, because some exception messages can quote the file.
+A human runs this on the real match. It prints PASS, WARN or FAIL lines only, never a frame, a time or a count, so
+the output is safe to paste. Exceptions print their type only, because some exception messages can quote the file.
 
 For each graded half it derives the kickoff exactly as ``katena.pipeline.apply_kickoff_rule`` does: the half's one
 Smart Tagging instance whose Type is ``Kick Off (Start)`` (Type and Half matched case-insensitively), its start
@@ -18,11 +18,13 @@ These two numbers are check references only. Nothing in the pipeline reads them.
 
 Per half, two lines:
 
-* within 2 s: the tag-derived kickoff lies within 2 s of the published one;
-* not late: it is not more than 2 s after the published one. When it is earlier, the rule sets fewer frames to D
-  than it could, which is safe. When it is later, the rule would turn frames of play into D.
+* within 2 s: the tag-derived kickoff lies within 2 s of the published one. WARN when it does not, or when the half
+  has no single ``Kick Off (Start)`` tag: the rule then sets fewer frames to D than it could, or none, which is safe.
+* not late: it is not more than 2 s after the published one. FAIL when it is later: the rule would turn frames of
+  play into D. A half without a single tag passes this line, because the rule does not apply there.
 
-Exit code 0 when every line passes, 1 otherwise.
+An unreadable or missing tagging file is a WARN too: the pipeline then leaves every frame unchanged.
+Exit code 1 only on a FAIL line, so ``scripts/real_run.py`` stops only when the rule could do harm.
 """
 
 from __future__ import annotations
@@ -40,12 +42,13 @@ import games  # noqa: E402
 PUBLISHED_KICKOFF = {1: 11185, 2: 113742}      # video frames; DATA.md and FAQ.md (check references only)
 TOLERANCE_S = 2.0
 HALF_NAME = {1: "1st half", 2: "2nd half"}
-RESULTS = {"pass": 0, "fail": 0}
+RESULTS = {"pass": 0, "warn": 0, "fail": 0}
 
 
-def report(name: str, ok: bool, why: str = "") -> None:
-    RESULTS["pass" if ok else "fail"] += 1
-    print(f"{'PASS' if ok else 'FAIL'}  {name}{'  (' + why + ')' if why and not ok else ''}")
+def report(name: str, status: str, why: str = "") -> None:
+    """``status`` is PASS, WARN or FAIL; ``why`` is printed for WARN and FAIL."""
+    RESULTS[status.lower()] += 1
+    print(f"{status}  {name}{'  (' + why + ')' if why and status != 'PASS' else ''}")
 
 
 def check(tags, fps: float) -> None:
@@ -58,12 +61,12 @@ def check(tags, fps: float) -> None:
         late = f"{HALF_NAME[half]}: the tag-derived kickoff is not more than 2 s after the published kickoff"
         if len(frames) != 1:
             why = "no Kick Off (Start) tag for this half" if not frames else "several Kick Off (Start) tags for this half"
-            report(near, False, why)
-            report(late, False, why)
+            report(near, "WARN", why + "; the rule does not apply")
+            report(late, "PASS")
             continue
         delta = frames[0] - PUBLISHED_KICKOFF[half]
-        report(near, abs(delta) <= tol, "more than 2 s away")
-        report(late, delta <= tol, "later: the rule would set frames of play to D")
+        report(near, "PASS" if abs(delta) <= tol else "WARN", "more than 2 s away; the rule sets fewer frames to D")
+        report(late, "PASS" if delta <= tol else "FAIL", "later: the rule would set frames of play to D")
 
 
 def main(argv=None) -> int:
@@ -77,14 +80,14 @@ def main(argv=None) -> int:
         path = games.require(["smart_tagging"], data_dir=str(a.data_dir) if a.data_dir else None)[0]
         tags = read_tags(path, fps=fps)
     except Exception as e:  # noqa: BLE001  the type alone, as messages can quote the file
-        report("reading the Smart Tagging file", False, f"raised {type(e).__name__}")
-        print(f"\n{RESULTS['pass']} passed, {RESULTS['fail']} failed")
-        return 1
+        report("reading the Smart Tagging file", "WARN", f"raised {type(e).__name__}; the rule does not apply")
+        print(f"\n{RESULTS['pass']} passed, {RESULTS['warn']} warned, {RESULTS['fail']} failed")
+        return 0
     try:
         check(tags, fps)
     except Exception as e:  # noqa: BLE001
-        report("checking the tagged kickoffs", False, f"raised {type(e).__name__}")
-    print(f"\n{RESULTS['pass']} passed, {RESULTS['fail']} failed")
+        report("checking the tagged kickoffs", "FAIL", f"raised {type(e).__name__}")
+    print(f"\n{RESULTS['pass']} passed, {RESULTS['warn']} warned, {RESULTS['fail']} failed")
     return 1 if RESULTS["fail"] else 0
 
 

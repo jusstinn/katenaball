@@ -277,6 +277,21 @@ def test_the_touch_check_fails_when_the_real_match_raises(box):
     assert not box.ran("make_submission")
 
 
+def test_a_kickoff_warn_line_is_shown_and_does_not_stop_the_run(box):
+    # check_kickoff_tags.py's own wording: an early tag is safe, so it warns and exits 0
+    box.check("check_kickoff_tags", [
+        "WARN  1st half: the tag-derived kickoff lies within 2 s of the published kickoff  (more than 2 s away; "
+        "the rule sets fewer frames to D)",
+        "PASS  1st half: the tag-derived kickoff is not more than 2 s after the published kickoff",
+        "PASS  2nd half: the tag-derived kickoff lies within 2 s of the published kickoff",
+        "PASS  2nd half: the tag-derived kickoff is not more than 2 s after the published kickoff"])
+    rc, out, rep = box.run()
+    assert rc == 0, out
+    assert "WARN  1st half: the tag-derived kickoff lies within 2 s" in out
+    assert any(w.startswith("check_kickoff_tags.py: 1st half") for w in rep["warnings"])
+    assert box.ran("make_submission")
+
+
 @pytest.mark.parametrize("verdict, rc_expected", [("PASS", 0), ("FAIL", 1)])
 def test_the_kickoff_check_runs_when_this_checkout_has_it(box, verdict, rc_expected):
     box.check("check_kickoff_tags", ["half 1 kickoff within 2 s of FAQ.md: " + verdict,
