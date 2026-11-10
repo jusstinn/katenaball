@@ -4,6 +4,77 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-10
+
+### Gate G1: TCN reads the touch columns (pre-registration)
+
+**Registered before any G1 score was computed.** Workstream W3 of `docs/plan-final-week.md`, which fixes the
+candidate and the gate: commit `ff2e0b1` (2026-11-10 11:50 +0100) on `origin/docs/final-week-plan`, PR #16. Branch
+`david/g1-tcn-touch`, cut from `origin/main` at `28450b4`. External development matches only: no `data/`, no
+`evaluation/gt/`, no public window, no locked bench. Code: `katena.eval.g1` and `scripts/run_g1.py`, written after
+this entry. Cache `D:/katena/work-g1`. Nothing below changes after a result.
+
+**Candidate.** `G1` is F with one change: its TCN member reads M2's 160 columns plus D1's 53 `touch` columns
+(213 in all) instead of 160. Everything else stays as in F ("Final candidate F (pre-registration)", 2026-11-07).
+
+- **TCN member (`G1T`).** `katena.models.tcn` unchanged apart from the input width: the first 1x1 convolution
+  takes 213 channels. Trained through `ensemble.fit_tcn` with seed 0, 1200 steps, 4 threads and the deterministic
+  settings, and `pin_cpu_env` runs before torch loads.
+- **Sequences.** One whole-match sequence per (training match, world) of the match's `d2j` mix, as
+  `final.tcn_seqs`: 15 per IDSSE or Metrica match, 9 per SkillCorner match. The order is the same (development
+  match, severity, world), and the orientation draws are the same, from `default_rng(0)` over all 28 matches. So
+  every sequence has F's orientation. Each row holds that world's 160 base columns, then the same world's 53 touch
+  columns in the same orientation (`X0` with `A0`, `X1` with `A1`), with rows matched on `idx`. The sequences are
+  held in float16 and scaled when a window is drawn, as in F.
+- **Scaler.** `tcn.Scaler` on every 6th `d2j` pool row of the 27 training matches, as in F, but on all 213
+  columns of `FinalPools(dev)`. The touch columns of each pool row come from the same world as the row.
+- **Prediction.** Each evaluation world is predicted from its 213 columns (`touch_gate.features`), averaging both
+  orientations as `tcn.predict` does.
+- **LightGBM member: unchanged.** F's stored out-of-fold probabilities (`work-final/oof/final_gbdt`) are
+  reused. They are provably identical: nothing in that member's training or prediction reads the TCN, and its
+  inputs are the same files.
+- **Decoding.** `ensemble.blend_heads(FG, G1T, w=0.5)`, the 3-state Viterbi at tau 2, priors from
+  `bakeoff.priors_for` without the held-out match, T = 2. Scored with `final.decode_score`.
+
+**Inputs.** These are copied read-only from `D:/katena/work-final` into `D:/katena/work-g1`, development matches
+only: ground truth, the `d2j` pools and their touch pools, the base features and touch columns of every world of
+the 28 matches (308 pairs), F's two out-of-fold probability sets, and `final_results.pkl`. Each copy is checked
+byte-identical to its source by SHA-256. The touch columns carry `touch.py`'s source hash (unchanged since F), and
+`touch_gate.load_tfeat` refuses stale ones. Nothing is rebuilt.
+
+**Check before the gate.** F re-decoded from the copied probabilities with this code must reproduce F's stored
+scores (spellF1, macroF1, spell counts and flags) on every fold and evaluation world. The gate reads F's stored
+scores, as the plan says, and any mismatch is reported beside it.
+
+**Rule** (fixed by the plan; `katena.eval.bootstrap` unchanged). G1 passes if and only if both hold on the 28
+development folds, against F's stored per-fold scores (`work-final/final_results.pkl`, model `F`):
+
+- at `target`, it wins on at least 70% of folds (at least 20 of 28, a win being a strictly higher spellF1), and
+  the paired 95% bootstrap interval of the mean difference (possessions resampled within each match, 2000 draws,
+  seed 0) lies above 0;
+- at `severe`, it is not worse. Worse means a mean difference below 0 with the interval's upper bound also below
+  0.
+
+This entry decides only "G1 passes" or "G1 fails". The adoption order is the plan's: G12 if G1 and G2 both pass
+and G12 passes, otherwise G1 if it passed, otherwise G2 if it passed, otherwise F. Nothing is adopted after
+Nov 14 18:00 CET. Integration is W6, not this workstream.
+
+**Information only, never a reason to change G1.**
+
+- The 8 IDSSE + Metrica folds (`stages.FOLDS8`), at `target` and `severe`.
+- The per-dataset means and wins.
+- The TCN member alone: `G1T` against F's `FT`, on 28 and 8 folds.
+- G1 against F, and `G1T` against `FT`, in every `worlds.EVAL_WORLDS` world that applies to the fold (the coupled
+  worlds on the 8 folds only). These come from the same runs.
+- MacroF1 on the 8 folds; the wall time, CPU time and peak memory of each stage.
+
+**Recorded now.**
+
+- These are the 5th and 6th packages gated on these 28 folds (G1 and G2), as the plan says.
+- The wider input layer changes the TCN's initial weights, because torch draws every parameter in order from the
+  same seed. So `G1T` against `FT` includes a fresh initialization, not only the touch columns. The F2 screen
+  (2026-11-07) found that seed 0 did unusually well for F on the 8 folds. This changes nothing in the rule.
+
 ## 2026-11-08
 
 ### Locked-bench sanity read of F (registered before the read)
