@@ -30,15 +30,16 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
-from cache_digests import STAGES  # noqa: E402  (stdlib only at import time)
+from cache_digests import STAGES, compare_stage  # noqa: E402  (stdlib only at import time)
 
 BLOCK = 1000                      # frames per block hash of the dressed labels
 LABELS = "HADX"
 # Model parts and dressed-match files, in pipeline order after the cache stages.
 HASH_ROWS = (("gbdt", "LightGBM member"), ("part_gbdt_alive", "  alive head"), ("part_gbdt_team", "  team head"),
              ("part_names", "feature names"), ("part_scaler", "TCN scaler"),
-             ("part_priors_viterbi", "Viterbi priors"), ("part_priors_hsmm", "HSMM priors"),
-             ("tcn", "TCN weights"), ("bundle.pkl", "model bundle"),
+             ("part_priors_viterbi", "Viterbi priors"), ("part_priors_hsmm", "HSMM priors (unused by Viterbi)"),
+             ("part_priors_hsmm_logT", "  HSMM logT"), ("part_priors_hsmm_logdur", "  HSMM logdur"),
+             ("part_priors_hsmm_dur_params", "  HSMM dur_params"), ("tcn", "TCN weights"), ("bundle.pkl", "model bundle"),
              ("dressed_raw", "dressed ATD raw"), ("dressed_meta", "dressed ATD metadata"),
              ("dressed_timeline", "dressed timeline"), ("dressed_gt_T2", "dressed match's own labels"),
              ("dressed_csv", "dressed CSV, all-30 model"))
@@ -268,9 +269,8 @@ def cmd_report(a) -> int:
     hashes = dict(man["sha256"]) if man else {}
     if dig:
         hashes.update(dig.get("models", {}).get("model", {}))
-        rep["stages"] = dig["stages"]
-    else:
-        rep["stages"] = {}
+    for k in ("stages", "content", "content_nan", "members"):   # file bytes; arrays exact, NaN-canonical, per member
+        rep[k] = dig.get(k, {}) if dig else {}
     d = Path(a.dressed) if a.dressed else None
     for key, rel in (("dressed_raw", "bundle/tactical/BAR-ATH_tactical_atd.txt"),
                      ("dressed_meta", "bundle/tactical/BAR-ATH_tactical_atd.xml"),
@@ -309,20 +309,14 @@ def cmd_report(a) -> int:
 
 def compare_pair(x: dict, y: dict) -> dict:
     """Stage by stage and part by part: what agrees between two reports, and the earliest item that differs."""
-    stages = {}
-    for st in STAGES:
-        sx, sy = x.get("stages", {}).get(st, {}), y.get("stages", {}).get(st, {})
-        common = sorted(set(sx) & set(sy))
-        bad = [k for k in common if sx[k] != sy[k]]
-        stages[st] = {"common": len(common), "same": len(common) - len(bad), "only_one": len(set(sx) ^ set(sy)),
-                      "first_differing": bad[:3]}
+    stages = {st: compare_stage(x, y, st) for st in STAGES}    # by array content when both have it
     hx, hy = x.get("hashes", {}), y.get("hashes", {})
     parts = {k: ("missing" if k not in hx or k not in hy else "same" if hx[k] == hy[k] else "differs")
              for k, _ in HASH_ROWS}
-    status = {**{st: ("missing" if v["common"] == 0 else "differs" if v["same"] < v["common"] else "same")
-                 for st, v in stages.items()}, **parts}
+    status = {**{st: v["verdict"] for st, v in stages.items()}, **parts}
     earliest = next((k for k in ORDER if status[k] == "differs"), None)
     out = {"stages": stages, "parts": parts, "earliest_difference": earliest,
+           "nan_payload_only": [k for k in ORDER if status[k] == "nan_payload"],
            "not_compared": [k for k in ORDER if status[k] == "missing"]}
     lx, ly = x.get("labels") or {}, y.get("labels") or {}
     if lx and ly:
@@ -374,8 +368,17 @@ def cmd_compare(a) -> int:
         cells = []
         for r in reports:
             s = cmp_ref[r.get("label")]["stages"][st]
-            cells.append(f"{s['same']} of {s['common']} same" + (f", {s['only_one']} in one only" if s["only_one"] else "")
-                         + (f"; first differing {', '.join(s['first_differing'])}" if s["first_differing"] else ""))
+            if s["by"] == "content":
+                cell = (f"**{s['verdict']}**: arrays {s['content_same']} of {s['common']} same"
+                        + (f", {s['nan_same']} up to NaN bits" if s["nan_same"] is not None else "")
+                        + f"; file bytes {s['bytes_same']}")
+            else:
+                cell = f"**{s['verdict']}** (file bytes only): {s['bytes_same']} of {s['common']} same"
+            cell += f", {s['only_one']} in one only" if s["only_one"] else ""
+            if s["verdict"] in ("differs", "nan_payload"):
+                cell += f"; first {', '.join(s['first_differing'][:1])}"
+                cell += f" ({', '.join(s['members_differing'])})" if s["members_differing"] else ""
+            cells.append(cell)
         md.append(f"| {st} | " + " | ".join(cells) + " |")
     md.append("")
     for i, x in enumerate(reports):
@@ -393,6 +396,8 @@ def cmd_compare(a) -> int:
                 line += (f"; dressed CSV differs: {lab['blocks_differing']} of {lab['blocks']} blocks of "
                          f"{lab['block_frames']} frames, graded label-count change {lab['count_delta_graded']}, "
                          f"runs {lab['runs_graded']}, score {lab['score']}")
+        if c["nan_payload_only"]:
+            line += f"; NaN bit patterns only: {', '.join(c['nan_payload_only'])}"
         if c["not_compared"]:
             line += f" (not compared: {', '.join(c['not_compared'])})"
         md.append(line)

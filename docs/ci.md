@@ -161,6 +161,12 @@ files agree, and the earliest item that differs. If two dressed CSVs differ, the
 1,000-frame blocks hold the difference. To compare two machines by hand, `cache_digests.py diff` works on the
 uploaded `digests-<os>.json`.
 
+Stages are compared by array content, not file bytes. A `.npz` written on Windows never has the bytes of
+the same arrays written on Linux or macOS: Python's `zipfile` records the writing OS in each entry
+(`create_system`). `cache_digests.py` also hashes the arrays with every NaN made canonical, because a NaN
+computed on x86-64 has its sign bit set and one computed on arm64 does not. A stage whose arrays differ only
+in NaN bits is reported as `nan_payload`, not as a difference.
+
 ## CD
 
 The submission cannot be built in hosted CI. CD here is two things:
