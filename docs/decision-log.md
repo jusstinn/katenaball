@@ -6,6 +6,72 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-10
 
+### J3: fresh-clone rebuild on Windows (W1)
+
+External matches only. Nothing ran on the real match. This is the same PC as the J2/J3 entry of 2026-11-08: Windows
+10, i7-7700, Python 3.11.17, torch 2.15.0+cpu, LightGBM 4.7.0, numpy 2.2.6.
+
+**Setup.**
+- `git clone` into `D:/katena/fresh/repo`, then a checkout of `origin/main` at `28450b4`. The global
+  `core.autocrlf=true` is overridden by `.gitattributes`: every text file is LF in the working tree.
+- The venv: `uv venv --python <uv's 3.11.17>`, then `uv sync --frozen`. The package list matches the main checkout's
+  venv.
+- Then the "Without make" steps of `docs/REPRODUCE.md`, with `KATENA_EXTERNAL` and `KATENA_WORK` pointing at a new
+  empty corpus and an empty cache: `build_external.py` (a fresh download), then `corpus`, `worlds` and `train` with
+  `--workers 2`, then `predict` on the dressed IDSSE bundle `D:/katena/dressed/J03WMX`, exactly like `A_full`.
+
+**Result: identical to `D:/katena/work-submit` at every stage. No stage differs.**
+
+| what | files | fresh clone vs `work-submit` / `D:/katena/external_data` |
+|---|---|---|
+| raw downloads (IDSSE, Metrica, SkillCorner; `.git` excluded) | 21 + 11 + 139 | all identical (SHA-256) |
+| canonical matches (`canonical/*/*.npz`) | 30 | 30 identical |
+| gt, pool | 30, 30 | all identical |
+| feat, touch | 381, 330 | all identical |
+| pool_d2j, touch_pool_d2j | 30, 30 | all identical |
+| gbdt | | `b2146150e006ead3b543f2ee424c84d9a12446ff551dd505f9480eb6a582ec0e`, same |
+| tcn | | `01488c84721327147b3975886e3b758a13f049531146bc54985b88976e8f6eb3`, same |
+| bundle.pkl | | `cb0ea4fc546014665888a69ae86e4ba83f79cf7ff10dacc051f54b00f105a85c`, same |
+| model parts (both LightGBM strings, TCN state, scaler, Viterbi and HSMM priors, names) | 7 | all identical |
+| dressed J03WMX CSV, model trained on all 30 | 1 | `909f4ffa6aac5705d5269af5b7072a424afe6ca81c02e565bf904e1147aeb788`, byte-identical to `A_full.csv` and `B_full.csv` |
+
+- `scripts/cache_digests.py diff` names no differing stage. The fresh dump is
+  `D:/katena/dressed/runs/digests_windows_fresh.json`. `work-submit` also holds the two `model_without_*` check
+  models, which a plain rebuild does not make.
+- **The corpus sidecars** differ from the old corpus only in `code_sha256`, as the J2/J3 entry explains. The fresh
+  ones are reproducible:
+  - A second `build_external.py --skip-download` reports all 30 matches up to date and rebuilds none (1.7 min).
+  - The clone's working tree stays clean, so `scripts/external_manifest.json` is not rewritten.
+- **The dressed bundle re-exported** from the fresh corpus with the fresh code (`dressed_check.py export`) is
+  byte-identical to the one the reference labelled: the raw ATD, the metadata XML, `timeline.json` and `gt_T2.csv`.
+- **`origin/main` moved during the run,** to `c18d76e` (PRs #16-#18).
+  - Since `28450b4`, none of these changed: `uv.lock`, the loader code that `build_external.py` hashes, or the
+    corpus, worlds and train stages.
+  - `predict` gained the kickoff rule.
+  - `train` was re-run at `c18d76e` on the fresh cache: the same three hashes.
+  - `predict` at `c18d76e` writes the same CSV, `909f4ffa...`. Its `kickoff_rule` reports `no_tagging_file` for both
+    halves, so the rule changes nothing on a dressed bundle.
+
+**Timings on this PC.** Each heavy step ran through `heavy.py`, beside the other agents' gate runs.
+
+| step | fresh clone | 2026-11-08 (`work-submit`) |
+|---|---|---|
+| `uv sync --frozen` | 70 s | |
+| `build_external.py` | 13.1 min: download 6.2 (IDSSE 50 s, Metrica 6 s, SkillCorner 316 s), building the 30 matches 4.9, the rest SHA-256 checks | |
+| `corpus --workers 2` | 17.6 min | 18.0 min |
+| `worlds --workers 2` | 38.8 min, after 14.4 min waiting for a slot | 33.7 min |
+| `train` | 4.9 min (LightGBM 29 s, TCN 243 s); 4.4 min at `c18d76e` (31 s, 197 s) | 4.5 min alone (34 s, 222 s) |
+| `predict`, dressed bundle | 57 s | 38 s |
+| `cache_digests.py dump` | 3.1 min | |
+
+From the start of the download to the dressed CSV took 1 h 39 min, including the 14.4 min wait. The disk needed was
+5.1 GB for the corpus, 19 GB for the cache and 0.9 GB for the venv.
+
+**Not covered here.**
+- Other machines. W2 runs CI on GitHub's runners, and Justin's Mac digests are still to come.
+- The real match.
+- `corpus` and `worlds` were not re-run at `c18d76e`. Their code did not change.
+
 ### Gate G2: set-piece tag features (pre-registration)
 
 **Registered before any G2 score was computed.** Candidate G2 is fixed by `docs/plan-final-week.md` (W4b, commit
