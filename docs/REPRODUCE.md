@@ -61,7 +61,10 @@ The copied files are byte-identical to what the corpus step writes, which was ch
 
 ## Without `make` (Windows)
 
-`make` is not on every machine (it is not on the team's Windows PC). The same steps, from the repository root:
+`make` is not on every machine (it is not on the team's Windows PC). For the real run on that PC,
+`python scripts/real_run.py --team <team_name>` runs, in one command, the checks on the provided files, every step
+below except `build_external.py` (it expects a built corpus), the public-window check, and a run report
+(`docs/real-run.md`). The same steps, from the repository root:
 
 ```bash
 python scripts/build_external.py                       # skips matches that are up to date (see below)
