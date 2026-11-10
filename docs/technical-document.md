@@ -214,7 +214,7 @@ tracking (section 7).
 |---|---|---|
 | Tactical ATD | Yes, the only model input | 5 Hz features, plus the native-rate ball for `touch` |
 | Half boundaries (DATA.md, `games.half_video_blocks`) | Yes | Which frames are graded |
-| Smart Tagging | No | Read only by the loader check. A crude bake-off simulation of tag fusion gave at most +0.023 at 90% tag accuracy, at most +0.015 when tag errors fall where ours do, and can be negative at 60-70%. A tag-feature package was planned and has no gate result |
+| Smart Tagging | Kickoff only | The `Kick Off (Start)` tags set the pre-kickoff frames of each half to D (section 6). Set-piece tag features (G2) were gated and not adopted (below) |
 | Homography | No | Only the schema probe reads its header |
 | Tactical video | No | We built no detector |
 | Broadcast video, ATD and homography | No | Only the slot-layout check reads the broadcast ATD metadata. A "cutaways as a dead-ball prior" package was planned and has no gate result |
@@ -232,6 +232,8 @@ tracking (section 7).
 | S2tail: T = 2, also merging touch-then-out flips | +0.0024 [-0.0003, +0.0051], 68% | Narrow miss; an option, not re-run after a later SkillCorner label fix |
 | MR: Metrica stoppages derived back from restarts | +0.0010, 57% | Not adopted |
 | S1: training at T = 1 | +0.0034 [+0.0005, +0.0062], 79% | Passed; not applied (below) |
+| G1: the TCN member also reads the 53 touch columns | +0.0017 [-0.0014, +0.0047], 16/28 against F | Failed; not adopted. The TCN alone gains (+0.0041), but the blend barely moves |
+| G2: set-piece tag features in the LightGBM member, imitation tags from external events | +0.0046 [+0.0014, +0.0079], 16/28 (57%) against F | Failed on wins and not adopted. The 8 tagged IDSSE + Metrica folds all gain (+0.023, 8/8); the 20 SkillCorner folds have no events, so no tags, and lose slightly |
 | Decoder priors from another convention | Under 0.004 | No lever |
 | PathCRF | Not run | Needs 22 identified players; its weights were trained on our IDSSE matches |
 | StatsBomb open data | Not used | Its agreement asks for a name and email and bans redistribution |
@@ -287,9 +289,16 @@ under-segments, with 0.738 predicted possessions per true one at target-like. On
 never writes X on a graded frame.
 
 **Second-half kickoff.** The second half is graded from frame 110,808 but kicks off later (FAQ.md), and
-every frame in between is D. The model must find this from the tracking, with no frame constant, and
-`make_submission.py` adds none. Its report prints, as an aggregate, the share of D over the first 60 and
-120 s of each half, so a human can see whether that span was read as dead ball without seeing any frame.
+every frame in between is D. We take the kickoff from the provided Smart Tagging, Metrica's automatic
+annotation, never from a frame constant. In each graded half, the frames before that half's single
+`Kick Off (Start)` tag are set to D (`katena.pipeline.apply_kickoff_rule`). The tag's start time maps to a
+frame by DATA.md's `round(seconds * 25)`. Nothing changes when there is no such tag, when there are several,
+or when the tag lies outside the half or more than 180 s into it.
+
+`scripts/check_kickoff_tags.py`, run by a human, prints pass, warn or fail only. It fails only when a tag
+lies more than 2 s after the published kickoff, because then the rule would turn play into D. An early tag
+only warns: the rule then sets fewer frames to D, which is safe. `predict`'s report also prints the share of
+D over the first 60 and 120 s of each half, as an aggregate.
 
 ## 7. Limitations
 
@@ -322,15 +331,20 @@ every frame in between is D. The model must find this from the tracking, with no
 - **Assumed identity-switch rates.** No external source measures them.
 - **Short possessions.** At IoU 0.5 and target-like noise, M2 matched 0.167 of true possessions under
   2 s, and M2 with touch features 0.169.
-- **Cross-machine byte identity is not guaranteed.** On one machine, two fresh processes reproduce every
-  model, probability and label byte for byte, and the CSV too. Between Windows x86 (i7-7700) and macOS arm64:
-  - the LightGBM model is byte-identical;
-  - the TCN's weights differ in their last bits, because torch picks different CPU kernels;
-  - F's 8-fold development means agree to the 4 decimals reported.
+- **Model bytes differ across machines; the labels did not.** On the reference machine the rebuild is exact.
+  A fresh clone, with a fresh download of the external corpus and an empty cache, reproduced every stage byte
+  for byte: corpus, features, worlds, pools, both models and a dressed-match CSV (`docs/decision-log.md`, J3 W1).
+  Across machines we trained F 11 times on 7 OS and CPU combinations (`.github/workflows/repro.yml`):
+  - Windows 10 and Windows Server on Intel, Windows on AMD, Ubuntu on AMD and on Intel, macOS on Apple M1.
+  - Every training input is equal in content everywhere. On macOS only NaN sign bits differ, and nothing reads them.
+  - The LightGBM model, the scaler and the decoder priors are identical everywhere.
+  - The TCN's weights differ in their last bits whenever the OS or the CPU vendor differs, because torch picks
+    different kernels. Windows on two other Intel CPUs reproduced the reference machine bit for bit.
+  - The dressed external match (IDSSE `DFL-MAT-J03WMX`, 173,528 frames, in the provided ATD format) got a
+    byte-identical CSV in all 11 trainings.
 
-  Retraining the TCN with other CPU kernels moved probabilities by at most 5e-7 and left a dressed-match CSV
-  byte-identical. Expect the same labels on another machine, though this has not been shown on the provided
-  match itself.
+  So expect the same file on another machine. That has been shown on an external match in the provided format,
+  not on the provided match itself, where a near-tie could still flip a label.
 
 **With more time** we would recalibrate the D2 worlds inside each fold, and make native-ball noise as
 smooth and correlated as real tracking. We would also re-run the `tail` gate after its label fix, add a
@@ -361,6 +375,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 
 - **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (CPU), numpy 2.2.6, pandas 2.3.3, numba
   0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
+- **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and the
+  model byte for byte in 1 h 39 min, including the download.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
   import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
 - **Cost:**
