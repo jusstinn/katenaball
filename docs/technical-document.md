@@ -232,6 +232,7 @@ tracking (section 7).
 | S2tail: T = 2, also merging touch-then-out flips | +0.0024 [-0.0003, +0.0051], 68% | Narrow miss; an option, not re-run after a later SkillCorner label fix |
 | MR: Metrica stoppages derived back from restarts | +0.0010, 57% | Not adopted |
 | S1: training at T = 1 | +0.0034 [+0.0005, +0.0062], 79% | Passed; not applied (below) |
+| G1: the TCN member also reads the 53 touch columns | +0.0017 [-0.0014, +0.0047], 16/28 against F | Failed; not adopted. The TCN alone gains (+0.0041), but the blend barely moves |
 | G2: set-piece tag features in the LightGBM member, imitation tags from external events | +0.0046 [+0.0014, +0.0079], 16/28 (57%) against F | Failed on wins and not adopted. The 8 tagged IDSSE + Metrica folds all gain (+0.023, 8/8); the 20 SkillCorner folds have no events, so no tags, and lose slightly |
 | Decoder priors from another convention | Under 0.004 | No lever |
 | PathCRF | Not run | Needs 22 identified players; its weights were trained on our IDSSE matches |
