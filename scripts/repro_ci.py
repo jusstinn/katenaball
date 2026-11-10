@@ -239,9 +239,18 @@ def label_summary(csv: Path, timeline: dict, gt_csv: Path | None) -> dict:
 
 
 def _tree_gb(root: Path) -> float | None:
+    """Total size of the files under ``root``; entries that cannot be read are skipped (a cache-restored git
+    checkout on Windows can hold one that ``stat`` refuses)."""
     if not root.exists():
         return None
-    return round(sum(p.stat().st_size for p in root.rglob("*") if p.is_file()) / 2 ** 30, 2)
+    total = 0
+    for top, _, names in os.walk(root):            # os.walk skips directories it cannot list
+        for n in names:
+            try:
+                total += os.lstat(os.path.join(top, n)).st_size
+            except OSError:
+                pass
+    return round(total / 2 ** 30, 2)
 
 
 def cmd_report(a) -> int:
