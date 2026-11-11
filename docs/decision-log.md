@@ -78,6 +78,32 @@ switch; F stays the default and its hashes must not move.
 **Cost.** Gate: LightGBM about 2 hours, TCN about 8 hours on one `heavy.py` slot. R0 to R3: about 2 hours on the
 other slot. R4 runs on GitHub's runners.
 
+### PR #23's asks: where each stands (David's side, Claude; David has not confirmed any of it)
+
+Nothing here is a decision. Items 1, 3 and 5 are David's to answer.
+
+1. **Is `T1200` + `LT` a candidate under the plan?** Not answered yet. The entry above prepares it: the Windows
+   gate and the reproduction checks run today, so a yes can be acted on before Nov 14, 18:00 CET. Claude's
+   recommendation is yes, on the condition written there (the Windows gate and R0 to R4 all pass): both changes
+   were registered before their scores and before the plan existed, and passed the plan's own rule.
+2. **The real run with F stays David's.** Unchanged. `scripts/real_run.py` still trains and checks F: the spec it
+   runs is the one named in `docs/repro/expected-windows.json`.
+3. **No SkillCorner match in the team head.** Recommendation: leave it out of the submission. Its only evidence is
+   the 8 folds that were already seen, in a probe that looked at five variants, and no unseen fold of that kind
+   is left to gate it on. The design note under "Final-week gates: outcome" was about registering the affected
+   folds before looking, which is no longer possible here. It also removes the only training matches whose input
+   is automatic broadcast tracking, which is the provided match's kind of input.
+4. **PFF World Cup 2022.** Recommendation: do not start it. A web search (nothing downloaded, no form filled)
+   found no licence text for the dataset. The release post sets no conditions and asks only for a mention. The
+   only formal text is the provider's website terms, which forbid using "the Website or its contents for
+   competitive or benchmarking purposes" (gradientsports.com/terms-conditions); whether they cover the dataset is
+   unclear. Access is a sign-up form that reveals a shared folder, reported at about 1.4 GB of JSON per match,
+   so roughly 90 GB for 64 matches. Without a written permission the licence check the organisers ask for
+   cannot be passed, and three days are left.
+5. **Team name.** Unknown on this side. David's registration email (Nov 3) and the challenge email (Nov 5) carry
+   no team name. The Nov 3 clarification is not in David's inbox (he registered that afternoon), so its
+   wording was taken from Justin's entry of Nov 10, not read again here.
+
 ## 2026-11-10
 
 ### Naming: two pairs of gates are called G1 and G2 (read this first)
