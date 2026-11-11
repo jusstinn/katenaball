@@ -6,6 +6,110 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-11
 
+### F3's R5 on Justin's Mac: the 1,200-tree member's hash agrees with the Windows PC (Claude; Justin asleep)
+
+For the check R5 that `david/f3-assembly` registered (PR #25). `scripts/make_submission.py train --spec F3`,
+run on the Mac (macOS arm64, Apple M5) from an export of that branch at `3863b47`, with this branch's
+locked environment (the lock file is the same on both) and the Mac's own cache of the 30 external matches. No
+score was computed and nothing ran on the provided match. It wrote `work/final/model_F3/`; F's `model/` was not
+touched. Log: `work/final/f3_train_mac.log`.
+
+| | Mac | Windows PC (PR #25) | |
+|---|---|---|---|
+| Pool | 657,133 rows x 213 columns | 657,133 rows x 213 columns | same |
+| gbdt | `056ffa8a41eaf246b741234351e30dcd8e5191446493e24e8c1ea3f2e6a5bc47` | `056ffa8a...6a5bc47` | **same** |
+| tcn | `bf52132cc2d52eb903390598c99dc328aacfbdbea4a9679aa6ce0b6beeb1070b` | `4ec1a79e...` | differs |
+| bundle.pkl | `36cc2eb289495e9b0c3cc07fdef395d70978ba59b5b56db485076a30b077d940` | `0a6359f3...` | differs (it holds the TCN) |
+
+**R5 holds on this Mac.** The TCN's bytes differ, as they do between every pair of machines in PR #25's table;
+they also differ from the `macos-15` runner's (`55cc7100...`), which is an M1. Whether this Mac's TCN gives the
+same labels on the dressed match was not checked here: that is R4's question, and `dressed_check.py` was not
+run. Times on the Mac: LightGBM 32 s, TCN 486 s.
+
+### S1 and S2: result (Justin + Claude)
+
+**Both fail. The unweighted members stay, and `T1200` + `LT` (F3 on `david/f3-assembly`) is unchanged.** One
+unattended run of `scripts/night_s12.sh` on the Mac at HEAD `3f742ca`, the commit that holds the registration
+(2026-11-10, below), from 01:00 to 06:03 PST on Nov 11, on the charger and out of Low Power Mode. External
+development matches only. Nothing in the registration was changed. Tables: `work/final/night_s12.log`; verdicts:
+`s1_gate.json`, `s2_report_8.json`, `s2_report_28.json` beside it, all with `registered_run: true`.
+
+**Checks the run printed.** S1's alive head equals `T1200`'s cached probabilities byte for byte on 28 of 28
+folds. S1's scores on the 8 seen folds equal the probe's on 32 of 32 values.
+
+**S1 gate: weighted LightGBM team head against `T1200`, both blended with `LT`, 28 folds.**
+
+| Comparison | Folds | S1 | `T1200` | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6233 | 0.6180 | +0.0053 | [+0.0004, +0.0101] | 17/28 |
+| `severe`, all (rule: not worse) | 28 | 0.5914 | 0.5840 | +0.0074 | [+0.0027, +0.0120] | 18/28 |
+| `target`, SkillCorner (rule: not worse; unseen) | 20 | 0.6075 | 0.6103 | -0.0028 | [-0.0088, +0.0029] | 9/20 |
+| `severe`, SkillCorner (unseen) | 20 | 0.5826 | 0.5816 | +0.0010 | [-0.0045, +0.0064] | 12/20 |
+| `target`, IDSSE + Metrica (seen in the probe) | 8 | 0.6628 | 0.6374 | +0.0254 | [+0.0162, +0.0353] | 8/8 |
+| `severe`, IDSSE + Metrica (seen in the probe) | 8 | 0.6133 | 0.5900 | +0.0233 | [+0.0146, +0.0323] | 6/8 |
+
+S1 fails on the win count: 17 of 28 at `target`, the rule needs 20. It is not worse at `severe` and not worse on
+SkillCorner by the rule's meaning (the interval reaches 0), so the two guard conditions hold. The 20 unseen folds
+give 9 wins where 12 were needed, and a mean below the incumbent's. The mean gain on 28 folds is the 8 seen
+folds. Information only: the member alone is worse on 28 folds (-0.0116 at `target`, 7/28) and loses every
+SkillCorner fold (-0.0317, 0/20), while it gains +0.0388 on IDSSE + Metrica (7/8).
+
+**S2 screen: weighted team loss in the TCN against `LT`, both blended with `T1200` (S1 did not pass), 8 IDSSE +
+Metrica folds.**
+
+| Cond | S2 | `LT` | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|
+| `target` | 0.6752 | 0.6374 | +0.0378 | [+0.0261, +0.0495] | 8/8 |
+| `severe` | 0.6318 | 0.5900 | +0.0418 | [+0.0308, +0.0532] | 7/8 |
+
+The screen passes, so S2 went to the gate, as registered.
+
+**S2 gate: the same comparison on 28 folds.**
+
+| Comparison | Folds | S2 | `LT` | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6288 | 0.6180 | +0.0108 | [+0.0051, +0.0165] | 17/28 |
+| `severe`, all (rule: not worse) | 28 | 0.5907 | 0.5840 | +0.0067 | [+0.0012, +0.0121] | 11/28 |
+| `target`, SkillCorner (information) | 20 | 0.6102 | 0.6103 | -0.0000 | [-0.0069, +0.0069] | 9/20 |
+| `severe`, SkillCorner (information) | 20 | 0.5742 | 0.5816 | -0.0074 | [-0.0137, -0.0014] | 4/20 |
+
+S2 fails on the win count too: 17 of 28 at `target`. On the SkillCorner folds it does nothing at `target` and is
+worse at `severe` (the interval is below 0, 4 of 20 folds won). Information only: the TCN alone is worse on 28
+folds (-0.0196 at `target`, 8/28). Against F the blend is +0.0269 at `target` (21/28), which is mostly `T1200`
+and `LT`'s own gain and was not a registered comparison.
+
+**The two together are worse than either.** S2 with the weighted LightGBM member against S1 on 28 folds: -0.0140
+at `target` (6/28), -0.0202 at `severe` (7/28). On the 8 IDSSE + Metrica folds the pair is still ahead of S1
+(+0.0199 at `target`, 6/8). The pair was never a candidate once S1 failed; this is the number, for the record.
+
+**Predicted possessions per true one, at `target`.**
+
+| Folds | F | `T1200` + `LT` | S1 + `LT` | `T1200` + S2 |
+|---|---|---|---|---|
+| All 28 | 0.738 | 0.751 | 0.850 | 0.897 |
+| SkillCorner (20) | | 0.760 | 0.869 | |
+| IDSSE + Metrica (8) | 0.685 | 0.729 | 0.807 | 0.872 |
+
+**What this says.** The weight does what it was built to do: the model commits to more short possessions (0.75
+predicted per true one rises to 0.85 and 0.90). On the 8 IDSSE + Metrica folds that pays in both members, at both
+conditions. On the 20 SkillCorner folds it pays nothing at `target` and costs at `severe`. The split is by
+dataset, and it is the same split the probe of Nov 10 showed for SkillCorner's place in the team head.
+
+**What this does not say.** Which kind the provided match is. The two groups differ in two ways at once: the
+labels (IDSSE and Metrica carry a dead label and come from corrected tracking, as the provided match's ground
+truth is described in `docs/upstream/CHALLENGE.md`; SkillCorner has no dead label and its possession comes with
+its automatic tracking) and the input (the provided match's tracking is automatic broadcast tracking, SkillCorner's kind). No
+development match has the first kind of label on the second kind of input, so no fold separates the two
+readings. The public 5 minutes cannot be used to choose between them.
+
+**Closed, as registered.** "If S1 wins on the IDSSE + Metrica folds and fails on 28, that is the result: it is
+not re-gated on 8 folds." The same holds for S2. No other weight form, clip or exponent is tried, and no rule is
+re-read after the fact. Length weighting is not in F3 and is not a candidate. These were the 9th and 10th
+packages gated on the same 28 folds.
+
+**Run times on the Mac.** S1: 31 min for 28 LightGBM folds. S2 screen: 101 min (about 760 s a fold). S2 gate:
+169 min for the 20 remaining folds (about 500 s a fold).
+
 ### F3 on the Windows PC: the reproduction checks (result; the gate is still running)
 
 **R0 to R4 pass.** R5 holds on GitHub's macOS runner and waits for Justin's own hash. External matches only;
