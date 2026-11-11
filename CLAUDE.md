@@ -26,7 +26,12 @@ Claude Code is a hosted LLM. So:
 - **The public 5-minute GT is a pipeline check only.** Do not train on it, tune on it, or choose
   between two versions with it. Model selection comes from leave-one-match-out on external matches.
 - **No hand labels or hand corrections on this match.** No rules or constants tied to specific frames
-  of it. Algorithmic pseudo-labels are allowed if no person decided them.
+  of it.
+- **Train, fit and tune on external data only** (organisers' clarification of 2026-11-03, which overrides the
+  documentation; `docs/decision-log.md`, 2026-11-10). No pseudo-labels on this match, and nothing fitted or
+  calibrated on its tracking, its video or its ground truth. The tracking, the Smart Tagging and the video
+  may be inputs at inference.
+- **Nobody checks our output against the video.** Automatic checks may use only the provided data.
 - **Byte-identical reproduction.** One command must regenerate the exact submission from the data
   bundle plus this repo: pin dependencies, fix seeds, run final inference deterministically, and record
   training data in the technical document.
