@@ -6,6 +6,61 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-11
 
+### F3 on the Windows PC: the reproduction checks (result; the gate is still running)
+
+**R0 to R4 pass.** R5 holds on GitHub's macOS runner and waits for Justin's own hash. External matches only;
+nothing ran on the provided match. Code at `c97d4eb` and later on `david/f3-assembly`; logs in
+`D:/katena/logs/f3`. The 28-fold gate has not finished, so nothing here says whether F3 is put forward.
+
+| # | Check | Result |
+|---|---|---|
+| R0 | F after the code change | Pass. `train` gives gbdt `b2146150...`, tcn `01488c84...`, bundle `cb0ea4fc...`, as logged on Nov 8 |
+| R1 | Same machine, fresh processes | Pass. F3 trained twice on all 30: the same bundle both times, and a byte-identical dressed CSV |
+| R2 | Dressed match, held-out model, both paths | Pass. Features and all six probability arrays bitwise equal, 0 of 29,123 work-grid labels differ, 0 CSV frames differ |
+| R3 | Kernel swap on this PC | Pass. The held-out TCN's hash changes (`fdc7797b...` to `b3185586...`); the dressed CSV is byte-identical (`4db583ae...`), 0 of 145,608 graded frames |
+| R4 | Other machines (`repro.yml`, `spec=F3`, run 43015046674) | Pass on three runners: the dressed CSV equals this PC's on each |
+| R5 | LightGBM across machines | The 1,200-tree member's hash is the same on this PC and all three runners, the arm64 macOS one included. Justin's Mac: not yet reported |
+
+**F3's hashes on this PC** (all 30 matches, 657,133 rows x 213 columns):
+
+| | sha256 |
+|---|---|
+| gbdt | `056ffa8a41eaf246b741234351e30dcd8e5191446493e24e8c1ea3f2e6a5bc47` |
+| tcn | `4ec1a79e8f1303e1fa890879ffa34c983344c57fb3335139e49a35741f719bb3` |
+| bundle.pkl | `0a6359f3411082e32a9b1e97385eb430abc3eaf96198df6306a934b36e982cd9` |
+| dressed CSV (`idsse/DFL-MAT-J03WMX`, all-30 model) | `72d7c3fb09f854bf06872d0996201ca338b247d27335a1829363379bd2cb9a7f` |
+
+**R4 by runner.** As with F, the TCN's bytes follow the OS and the CPU, and no label does.
+
+| Machine | CPU | gbdt | tcn | Dressed CSV | `train` |
+|---|---|---|---|---|---|
+| This PC, Windows 10 | Intel i7-7700 | reference | reference | reference | 23 min beside another job |
+| `windows-2025` | Intel Xeon Platinum 8573C | same | same | same | 12.9 min |
+| `ubuntu-24.04` | AMD EPYC 9V74 | same | differs | same | 8.4 min, 5.7 GB peak |
+| `macos-15` | Apple M1 | same | differs | same | 36.5 min |
+
+A second pass on the runners is queued for more CPU types. `docs/repro/windows-reference-F3.json` is this PC's
+reference for `repro.yml`.
+
+**Also checked.**
+
+- The pipeline's TCN code (`katena.eval.g1` at 4,800 steps) against `run_g12.py`'s `LT` code, before any score:
+  on 5 matches at 20 steps the sequences, the scaler, the trained weights and the probabilities are identical.
+  `tests/test_pipeline.py` repeats this on the synthetic corpus.
+- The gate's LightGBM stage is done: on all 28 folds the 1,200-tree member's first 150 trees give F's cached
+  member byte for byte.
+
+**One fold score was seen in R2.** `dressed_check.py compare` prints the held-out match's score at clean input:
+F3 0.7221 on both paths (F: 0.6506 on Nov 8). It is one fold at a condition the gate does not use, it was part
+of the registered check, and it decides nothing.
+
+**Cost.** `train` for F3 on this PC: LightGBM 2.6 to 2.8 min, TCN 20 to 21 min with a second heavy job running
+(F: 0.6 and 3.7 min alone). The organisers' one command grows by about that much.
+
+**Scheduling.** From 14:27 a second process shares the gate's TCN stage (`run_f3.py tcn --reverse`): each
+process claims a fold before training it. A fold's result does not depend on which process trains it; a test
+checks that against `g1.stage_tcn`.
+
 ### F3 on the Windows PC (pre-registration): the second-machine gate and the reproduction checks
 
 **Registered before any Windows score of `T1200`, `LT` or F3, and before F3's final model is trained.** David +
