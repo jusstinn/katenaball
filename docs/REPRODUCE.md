@@ -29,9 +29,9 @@ shapes, hashes, run times).
 - [uv](https://docs.astral.sh/uv/). `uv.lock` pins every dependency, and `.python-version` pins Python 3.11.
 - About 25 GB of free disk: 5 GB of external data and an 18 GB cache.
 - 16 GB of RAM is enough.
-- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model took 18 minutes:
-  corpus 4.5, worlds 9.5, LightGBM 0.25, TCN 3.5. Labelling the match takes well under a minute. The
-  external download is extra.
+- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model takes about 23 minutes:
+  corpus 4.5, worlds 9.5, LightGBM 0.5, TCN 8. On the team's Windows PC (4 cores) training alone takes about
+  20 minutes. Labelling the match takes well under a minute. The external download is extra.
 - On macOS without Homebrew's libomp, the scripts load LightGBM through scikit-learn's bundled copy and
   re-execute themselves once (`gbdt.ensure_openmp`).
 
