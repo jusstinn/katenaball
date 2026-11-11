@@ -6,6 +6,271 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-10
 
+### Naming: two pairs of gates are called G1 and G2 (read this first)
+
+Two branches named candidates independently. In the entries headed **"Justin's branch"** below, `G1` is a
+1,200-tree LightGBM member and `G2` a 4,800-step TCN: registered on Nov 9 (commit `11c11fa`), run in the night
+of Nov 9 to 10, both passed. In the final-week plan and the entries headed **"Gate G1"** and **"Gate G2"**, written
+on Nov 10 without sight of that branch, `G1` is the TCN reading the touch columns at 1,200 steps and `G2` is
+set-piece tag features: both failed. Neither side had seen the other's work: this branch was not pushed until the
+evening of Nov 10. From here on Justin's two are called **`T1200`** (the trees) and **`LT`** (the TCN: 4,800
+steps, touch columns). File and cache names (`run_g12.py`, `g1_gbdt1200`, `g2_tcn4800t`) keep the old letters.
+
+### S1 and S2 (pre-registration): possession-length weights in both members
+
+**Registered before any SkillCorner fold of either candidate and before any fold of S2.** Justin + Claude, branch
+`claude/git-pull-analyze-strategy-e4504e`, the Mac (macOS arm64). External development matches only: no `data/`,
+no `evaluation/gt/`, no public window, no locked bench. Code: `scripts/run_s12.py`, run unattended by
+`scripts/night_s12.sh`, which refuses to start unless this entry and the code are committed. Nothing below
+changes after a result.
+
+**Standing.** This is outside the final-week plan, which fixed its own two candidates and adopts nothing after
+Nov 14, 18:00 CET. David has not seen or agreed to it. A pass here makes a candidate for the team to decide on;
+it adopts nothing. These are the 9th and 10th packages gated on the same 28 folds (the plan's two were the 5th
+and 6th, `T1200` and `LT` the 7th and 8th).
+
+**Why.** The diagnosis below: on the IDSSE + Metrica folds possessions under 4 s are 36% of the true ones and
+65% of the misses, and no training weight depends on possession length, while spellF1 counts every possession
+once.
+
+**What was seen before this entry.** The exploratory probe below: `inv` in the LightGBM member on the 8 IDSSE +
+Metrica folds (blended +0.0254 at `target`, 8/8; +0.0233 at `severe`, 6/8), and `sqrt`, which was smaller and is
+dropped. One smoke fold of S1 (`idsse/DFL-MAT-J03WMX`, one of those 8; it reproduced the probe's scores). One
+smoke of S2's code on that fold at 20 steps instead of 4,800, which is not the candidate. No SkillCorner fold of
+a weighted model, and no fold of S2.
+
+**Incumbent.** The model that passed the night run of Nov 9: the 1,200-tree LightGBM member (`T1200`) blended at
+w = 0.5 with the 4,800-step TCN that reads the touch columns (`LT`). Read from that run's cache, not refitted.
+
+**The weight** (`katena.models.lenweight`, fixed before the probe ran). A training frame weighs 1 / L, L the
+length in seconds of the constant-label run it sits in, in the T = 2 training labels, clipped to [1, 30]. No
+other form, clip, exponent or label convention is tried.
+
+| | Changes | Everything else |
+|---|---|---|
+| **S1** | The LightGBM team head's rows carry the weight, scaled to mean 1 (`gbdt.fit_heads(team_weight=...)`). | As `T1200`: pool, 213 columns, parameters, 1,200 trees. The alive head is unweighted. |
+| **S2** | The TCN's team loss carries the weight per frame (`tcn.train` reads `w`; the loss already divides by the weight sum). | As `LT`: 4,800 steps, 213 columns, seed 0, 4 threads, the `d2j` sequences, the scaler. The alive loss is unweighted. |
+
+Decoder (Viterbi, tau 2), priors, blend weight 0.5 and T = 2 are F's and unchanged.
+
+**S1, gate.** All 28 folds, S1 blended with `LT` against `T1200` blended with `LT`. F's rule: at `target` at
+least 70% of folds won and the paired 95% bootstrap interval above 0; not worse at `severe`. And, as for `T1200`:
+not worse at `target` on the 20 SkillCorner folds alone. Eight of the 28 folds were seen (8/8 at `target`), so
+the rule needs 12 of the 20 unseen SkillCorner folds. The SkillCorner rows of the table are the only unseen
+evidence and are reported as such.
+
+**S2, screen.** The 8 IDSSE + Metrica folds, S2 against `LT`, both blended with the LightGBM member that stands
+after S1's gate (weighted if S1 passed, `T1200` if not). Passes if at `target` it wins at least 6 of 8 folds with
+the interval above 0, and it is not worse at `severe`. **S2, gate:** only if the screen passes, the same
+comparison on all 28 folds under F's rule.
+
+**Fixed in advance.** Each of S1 and S2 that passes its gate is a candidate for adoption, S1 + S2 together if
+both pass (S2's gate is then already the test of the pair). If S1 wins on the IDSSE + Metrica folds and fails on
+28, that is the result: it is not re-gated on 8 folds. The design note under "Final-week gates: outcome" is about
+changes that cannot reach SkillCorner folds; this one can.
+
+**Checks the run prints.** S1's alive head equals `T1200`'s cached probabilities byte for byte on every fold
+(same pool, columns, parameters and features). S1's scores on the 8 seen folds equal the probe's.
+
+**Cost.** S1 about 40 minutes, S2's screen about 65, S2's gate about 155.
+
+### Justin's branch: G1 and G2: result (Justin + Claude)
+
+**G1 passes. G2's screen passes for both variants, `LT` goes to the gate and passes it.** One unattended run of
+`scripts/night_g12.sh` on the Mac at HEAD `11c11fa`, the commit that holds the registration below, from 01:30 to
+07:54 on Nov 10, on the charger and out of Low Power Mode. External development matches only. Nothing in the
+registration was changed. Tables: `work/final/night_g12.log`; verdicts: `g1_gate.json`, `g2_report_8.json`,
+`g2_report_28.json` beside it, all with `registered_run: true`.
+
+**The incumbent is F.** The 150-tree read and the TCN trained here are byte-identical to the F2 screen's cache on
+all 8 folds that cache holds. F at `target` on 28 folds: 0.6019 here, 0.6019 on the Windows PC.
+
+**G1 gate: F with 1,200 trees against F, 28 folds.**
+
+| Comparison | Folds | G1 | F | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6060 | 0.6019 | +0.0041 | [+0.0015, +0.0070] | 21/28 |
+| `severe`, all (rule: not worse) | 28 | 0.5738 | 0.5696 | +0.0042 | [+0.0010, +0.0074] | 17/28 |
+| `target`, SkillCorner (rule: not worse) | 20 | 0.6046 | 0.6030 | +0.0016 | [-0.0018, +0.0050] | 14/20 |
+| `severe`, SkillCorner | 20 | 0.5789 | 0.5804 | -0.0014 | [-0.0054, +0.0024] | 9/20 |
+| `target`, IDSSE + Metrica | 8 | 0.6095 | 0.5991 | +0.0104 | [+0.0049, +0.0159] | 7/8 |
+| `severe`, IDSSE + Metrica | 8 | 0.5610 | 0.5426 | +0.0185 | [+0.0126, +0.0247] | 8/8 |
+
+All three registered conditions hold, so G1 passes. Read it with care: the gain sits in the 8 folds that chose
+the size. On the 20 SkillCorner folds, the only unseen ones, the difference at `target` is +0.0016 with an interval
+through 0, and at `severe` the mean is slightly below F's. G1 is not shown to help there; it is shown not to hurt.
+The member alone (information): +0.0067 at `target` on 28 folds, 17/28 wins, which is not an adoption by itself.
+
+**G2 screen: TCN at 4,800 steps against F's TCN, both blended with the 1,200-tree member, 8 IDSSE + Metrica folds.**
+
+| Variant | Cond | Candidate | Incumbent | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `L` | `target` | 0.6297 | 0.6095 | +0.0202 | [+0.0129, +0.0272] | 8/8 |
+| `L` | `severe` | 0.5895 | 0.5610 | +0.0285 | [+0.0212, +0.0363] | 8/8 |
+| `LT` | `target` | 0.6374 | 0.6095 | +0.0280 | [+0.0194, +0.0360] | 8/8 |
+| `LT` | `severe` | 0.5900 | 0.5610 | +0.0289 | [+0.0204, +0.0380] | 8/8 |
+
+Both pass. `LT` has the higher mean at `target`, so only `LT` went to the gate, as registered. `L` has no
+SkillCorner fold and no 28-fold score.
+
+**G2 gate: `LT` against F's TCN, both blended with the 1,200-tree member, 28 folds.**
+
+| Cond | Folds | `LT` + 1,200 | F's TCN + 1,200 | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target` (rule) | 28 | 0.6180 | 0.6060 | +0.0120 | [+0.0082, +0.0160] | 21/28 |
+| `severe` (rule: not worse) | 28 | 0.5840 | 0.5738 | +0.0102 | [+0.0061, +0.0142] | 20/28 |
+
+`LT` passes the gate. The run did not print the SkillCorner folds separately for G2; from the two tables, the mean
+difference at `target` on the 20 SkillCorner folds is about +0.0056 (no interval computed), a fifth of the 8-fold
+one. Information only: with the 150-tree member `LT` is +0.0114 at `target` (21/28); the TCN alone is +0.0244
+(24/28); at `target_ids` the blend is +0.0090 with 15/28 wins; `mild`, `target_smooth` and both coupled worlds are
+above 0 with at least 75% of folds. Predicted possessions per true one at `target`: 0.749 to 0.751, so the gain is
+not from cutting more spells.
+
+**Both together, means only (no paired interval was registered for this pair).** F to `LT` + 1,200 trees on the
+28 folds: 0.6019 to 0.6180 at `target`, 0.5696 to 0.5840 at `severe`. By group at `target`: 0.5991 to 0.6374 on
+IDSSE + Metrica, 0.6030 to about 0.6102 on SkillCorner.
+
+**Run times on the Mac.** G1: 91 min (LightGBM 21, TCN 71). G2 screen: 136 min. G2 gate: 155 min. An `LT` fold
+is about 465 s, so the final model's TCN costs about four times F's.
+
+**What this changes.** No submission and no final model yet. Still open before either result is adopted, all from
+the registration: `LT` repeats D3's kernel-swap check on the dressed match; F3's assembly gets its own registration
+before the final model is trained; the final model's LightGBM hash must agree between the Mac and the Windows PC.
+No other tree count, step count or input set is tried.
+
+### Where the gated model loses: `scripts/inspect_fold.py` (description only, selects nothing)
+
+Run after the gate, on the cached out-of-fold probabilities of the 28 external folds, decoded as the gate decodes
+them. Its per-group spellF1 equals the gate's (0.6374 and 0.6103 for `LT` + 1,200 trees at `target`).
+
+| `LT` + 1,200 trees, `target` | IDSSE + Metrica (8) | SkillCorner (20) |
+|---|---|---|
+| True possessions found at IoU 0.5 | 55% | 55% |
+| Found, by true length: under 2 s / 2-4 s / 4-8 s / 8-16 s / over 16 s | 7% / 30% / 58% / 79% / 91% | 24% / 27% / 51% / 68% / 85% |
+| Share of the misses that are under 4 s | 65% | 52% |
+| Misses given to the other team / right team but too long / called dead | 47% / 41% / 10% | 61% / 33% / 4% |
+| Predicted possessions per true one | 0.73 | 0.76 |
+| F1 at IoU 0.3 / 0.5 / 0.7 | 0.749 / 0.645 / 0.506 | 0.714 / 0.622 / 0.484 |
+| spellF1 with the true team on the frames predicted alive | 0.905 | 0.990 (no dead-ball label, so trivial) |
+| spellF1 with the true alive/dead pattern | 0.661 | 0.610 |
+
+The same picture as F in the strategy review: short hand-overs are missed, the neighbouring possession then runs
+too long, and dead ball is not where the points are. No training weight depends on possession length anywhere in
+`gbdt.py` or `tcn.py`, so a possession of 2 s weighs a thirtieth of one of 60 s in training and the same in the
+metric. That is a candidate for a registered screen, not a result.
+
+`inspect_fold.py fold <match>` writes a timeline page for one held-out external match under `runs/`.
+`inspect_fold.py public <submission>` writes the same page for the public window under `artifacts/`, for a person
+only, and prints no score. **Public window:** that mode was tested once, on a synthetic submission built from the
+public labels themselves (shifted, two invented errors). No prediction of ours was compared with the window.
+
+### The organisers' rule clarification of Nov 3, read on Nov 10 (Justin + Claude)
+
+The email "Clarification of the rules for the Initial Challenge" (hackathon.talentarena@mobileworldcapital.com,
+2026-11-03, sent to all participants) was in Justin's inbox, unread. It says its rules take precedence over the
+documentation, earlier emails and individual answers. In our words:
+
+- **Not allowed:** checking your output against the video; hand labels or any manually created data on the
+  provided game; uploading the provided data to AI services; training, fitting or calibrating on the ground-truth
+  possession data or on the provided video.
+- **Allowed:** automatic checks that use only the provided data; inspecting the provided data and the video to
+  understand what counts as possession; using the video, the tracking, the Smart Tagging or other generated data
+  as input, as long as the algorithm was not trained on the ground truth or the provided video; files of
+  intermediate steps; any dataset we have the rights to use, licence checked.
+- **Training and tuning:** training must use only external data, and parameters must be tuned on external data,
+  never on the ground truth or the provided video.
+
+What it changes here:
+
+- **Nobody watches the video beside our predictions.** `inspect_fold.py public` stays a check against the public
+  labels only, and its page now says so.
+- **Pseudo-labels on the provided match are out.** `CLAUDE.md` still says algorithmic pseudo-labels are allowed;
+  "training must use only external data" overrides that. We had none planned.
+- **G3 cannot be a person reading a statistic of the match and picking a training mix.** That is tuning on
+  provided data. A rule inside the algorithm is different: both models trained on external data, a ball-jitter
+  statistic of the input computed by the code, and a threshold fixed on external worlds. The tracking is an
+  allowed input. This reading is ours and has not been put to the organisers.
+- **Smart Tagging is an allowed input** (P5, the second-half kick-off, uses one tag).
+- **External data is explicitly welcome**, licence permitting.
+
+Also from the organisers' emails: every member must have registered under the same team name before Nov 10, and
+the landing page showed "registration closed" when opened on Nov 10 at about 20:30 CET. Submission instructions
+arrive by Nov 14; the deadline is Nov 17, 23:59 CET.
+
+### Two exploratory probes of the LightGBM member: `scripts/probe_levers.py` (written before the run)
+
+Exploratory, like the tree screen of Nov 9: not registered, 8 IDSSE + Metrica folds only, nothing adopted from
+it. The 20 SkillCorner folds are not scored, so they stay unseen for a registered gate. The unchanged model is
+read from the gate's cache. Fixed before the first run:
+
+- **`curve`: would more training matches help?** The member refitted with every second SkillCorner match dropped
+  (7 + 10), with none (7 + 0), and with every second match of the held-out match's own kind dropped (4 + 20).
+  Read at 150 and at 1,200 trees. The bake-off's "four more matches are worth 0.003" was measured with a
+  150-tree member, which G1 showed was too small to use what it had.
+- **`weights`: possession-length weights on the team head.** Each training row weighs 1 / L (`inv`) or
+  1 / sqrt(L) (`sqrt`), L the length in seconds of its possession in the T = 2 labels, clipped to [1, 30],
+  scaled to mean 1. The alive head, the pool, the decoder and the priors are unchanged. No third form is tried.
+
+**Result** (run once, 40 fits, 42 minutes; pool rows agree with the native labels on 1.0000 of rows). Variant
+minus the unchanged model at 1,200 trees, spellF1, 8 folds, 95% paired CI, folds won. "Blended" is with the
+4,800-step touch TCN at w = 0.5, and that TCN is unchanged: it still trains on all 27 matches, unweighted.
+
+| Variant | Member alone, `target` | Blended, `target` | Blended, `severe` | Predicted per true, blended `target` |
+|---|---|---|---|---|
+| unchanged | 0.6042 | 0.6374 | 0.5900 | 0.729 |
+| `7 + 10` | +0.0220 [+0.0134, +0.0303], 8/8 | +0.0128 [+0.0064, +0.0193], 8/8 | +0.0066 [-0.0004, +0.0137], 5/8 | 0.750 |
+| `7 + 0` | +0.0553 [+0.0422, +0.0685], 8/8 | +0.0346 [+0.0238, +0.0459], 8/8 | +0.0316 [+0.0222, +0.0415], 8/8 | 0.824 |
+| `4 + 20` | -0.0167 [-0.0250, -0.0083], 0/8 | -0.0082 [-0.0138, -0.0023], 1/8 | -0.0103 [-0.0159, -0.0051], 0/8 | 0.725 |
+| `inv` | +0.0388 [+0.0259, +0.0519], 7/8 | +0.0254 [+0.0162, +0.0353], 8/8 | +0.0233 [+0.0146, +0.0323], 6/8 | 0.807 |
+| `sqrt` | +0.0253 [+0.0161, +0.0344], 7/8 | +0.0145 [+0.0077, +0.0218], 8/8 | +0.0128 [+0.0059, +0.0198], 6/8 | 0.764 |
+
+At 150 trees every sign is the same and the sizes are close (`7 + 0` blended +0.0337, `inv` blended +0.0293).
+
+What it says, on these 8 folds only:
+
+- **The SkillCorner matches cost the IDSSE and Metrica folds.** Fewer of them is better and none is best:
+  0.6374 to 0.6721 blended with only the LightGBM member changed. SkillCorner has no dead-ball label, so in this
+  member it reaches only the team head, where it is 20 of 27 matches. Its possession field comes from automatic
+  broadcast tracking, the other eight from corrected tracking or events.
+- **Matches of the held-out match's own kind are worth a lot.** Dropping 3 or 4 of the 7 costs 0.017 alone and
+  0.008 blended, losing on every fold alone. This is the opposite of the bake-off's "four more matches are worth
+  0.003", which mixed both kinds and used a 150-tree member.
+- **Length weights help, and the full form more than the half form.** `inv` is +0.025 blended at both severities.
+- **All three gains come with more predicted possessions**, 0.73 per true one rising to 0.75-0.82. They attack
+  the same fault (short hand-overs merged away), so they will not add up. No combination was run.
+
+What it does not say:
+
+- Nothing about the 20 SkillCorner folds, which were not scored. Training without SkillCorner will presumably
+  cost them, and they are 20 of the 28 folds in F's adoption rule.
+- Nothing about the provided match. Which kind it resembles cannot be read from the public window. The public
+  argument is `docs/upstream/CHALLENGE.md`: the ground truth "is derived from corrected tracking data" and has a
+  dead-ball label, which is the IDSSE and Metrica kind of label; its input tracking is automatic, which is the
+  SkillCorner kind of input.
+- Five variants were looked at on eight folds, unregistered. Nothing is adopted from this entry.
+
+Open, for Justin and David:
+
+1. A registered 28-fold gate of `inv` on the LightGBM team head under F's rule. Cost: about 30 minutes of fits.
+2. Whether a gate may judge "no SkillCorner in the team head" on the 8 dead-label folds as primary. Under the
+   28-fold rule it cannot be judged fairly. This changes the protocol, so it needs both names and a registration
+   written before any SkillCorner fold of it is scored.
+3. Whether more matches of the corrected-tracking kind can be had in time (see the dataset search below).
+
+### Dataset search, Nov 10 (web only, nothing downloaded)
+
+- **PFF FC (Gradient Sports) World Cup 2022:** 64 matches, broadcast tracking with the ball, possession and
+  ball-out carried as events embedded in the frames (kloppy has a loader; fouls and offside are not marked dead
+  by it). Access through a form. No licence text found, so competition use is unverified: a person must read the
+  terms before anything is downloaded.
+- **SkillCorner's nine 2019/20 matches** (in the history of `SkillCorner/opendata`): same kind as the 20 we have,
+  licence of that old release unclear. After the result above, not wanted.
+- **Simulators** (Google Research Football, RoboCup 2D): exact labels, unrealistic motion. Not pursued.
+- Checked and unusable: event-only releases (StatsBomb, Wyscout, Impect), clip datasets (SoccerNet-GAR),
+  SoccerTrack v2 (events only, gated), Hudl's broadcast tracking (proposal-gated, closed), GPS sets without a
+  ball. No Sportec release beyond the seven matches we have.
+
 ### J3: fresh-clone rebuild on Windows (W1)
 
 External matches only. Nothing ran on the real match. This is the same PC as the J2/J3 entry of 2026-11-08: Windows
@@ -531,6 +796,118 @@ fits in 7 GB of RAM (train peaks at 2.7 GB).
 - **Dispatch path.** The runs came from the temporary `push` trigger. The `workflow_dispatch` path (the `os`
   input) runs only once the file is on main.
 - **Reference timings.** The reference's timings are the Nov 8 entry's (2 workers), not remeasured.
+
+## 2026-11-09
+
+### Justin's branch: G1 and G2 (pre-registration)
+
+**Registered before any SkillCorner fold and any 28-fold score of either candidate.** Justin + Claude, branch
+`claude/git-pull-analyze-strategy-e4504e`, the Mac (macOS arm64). External development matches only: no `data/`, no
+`evaluation/gt/`, no public window, no locked bench. Code: `scripts/run_g12.py`, run unattended by
+`scripts/night_g12.sh`, which refuses to start unless this entry and the code are committed. Cache: the Mac's
+`work/final`, as `make model` built it. Nothing below changes after a result.
+
+**What had been seen when this was written.** The strategy review below: the 8 IDSSE + Metrica folds with the
+LightGBM member at 150, 300, 600 and 1,200 trees. The size 1,200 comes from there. It is the largest size that
+finished; one fold of a 3,000-tree run was seen and is not used. No SkillCorner fold of a larger LightGBM member, and
+no score of any TCN other than F's two seeds. The code was smoke-tested on two folds (one IDSSE, one SkillCorner)
+with a 200-tree member and 30-step TCNs, under the tag `smoke`. Those numbers decide nothing and are not reported.
+
+**G1, candidate.** F with 1,200 trees in the LightGBM member: `gbdt.fit_heads(..., n_trees=1200)`. Unchanged:
+`gbdt.PARAMS` (learning rate 0.1, 31 leaves, bagging, seed 0), the `d2j` pool, the 213 columns, the TCN member
+(seed 0, 1,200 steps, 160 columns), w = 0.5, Viterbi at tau 2, the priors, T = 2.
+
+**G1, incumbent.** F, recomputed in the same run on the same machine. Its LightGBM member is the same 1,200-tree
+model read at its first 150 trees. LightGBM's rounds are sequential, so that is F's member, and the run checks it
+byte for byte against the F2 screen's cached member on the 8 folds that cache holds. F's TCN is trained here for
+all 28 folds as `final.stage_tcn` trains it, checked the same way against the F2 screen's cache. Both sides of every
+comparison share those TCN probabilities. Side check: F's 28-fold mean at `target` here against 0.6019 on the
+Windows PC.
+
+**G1, rule.** G1 passes if and only if all three hold on the 28 development folds:
+
+- at `target`, it wins at least 20 of 28 folds and the paired 95% bootstrap interval lies above 0
+  (`bootstrap.adopted`, F's rule);
+- at `severe`, it is not worse (mean difference below 0 with the interval's upper bound below 0);
+- at `target` on the 20 SkillCorner folds alone, it is not worse. This is added because the other 8 folds chose
+  the size, so the SkillCorner folds are the only unseen ones.
+
+Reported beside it and deciding nothing: the SkillCorner and the IDSSE + Metrica folds separately, the member alone,
+every `worlds.EVAL_WORLDS` world this cache holds, macroF1, predicted possessions per true one. `make model` builds
+the training worlds only, so the Mac's cache has no `target_cpl100_ids`, the one evaluation world outside the
+training mix. It is not built for this run. If G1 fails, F keeps 150 trees and no other size is tried.
+
+**G1, if it passes.** It becomes the incumbent side of G2 and goes into F3's assembly, which gets its own
+registration before the final model is trained. It changes no submission by itself. The final model's LightGBM
+hash must again agree between the Mac and the Windows PC.
+
+**G2, candidates.** Two, fixed now. Both replace F's TCN member and change nothing else.
+
+| Variant | Steps | Input columns | Everything else |
+|---|---|---|---|
+| `L` | 4,800 (`ensemble.fit_tcn(steps=4800)`; the one-cycle schedule spans them) | M2's 160, as F | As F: peak learning rate, batch 32, window 256, seed 0, 4 threads, the `d2j` sequences, the scaler |
+| `LT` | 4,800 | The 160 plus D1's 53 `touch` (213) | As `L`. Each sequence's touch columns come from the same world and orientation as its base columns, from the files F's LightGBM pool was built from, held in float16 like the rest. The scaler is fit on all 213 columns of the same pool rows |
+
+**G2, screen.** The 8 IDSSE + Metrica folds. Each variant is blended at w = 0.5 with the LightGBM member that
+stands after G1's gate (1,200 trees if G1 passed, 150 if not) and compared with F's TCN blended with that same
+member. A variant passes the screen if at `target` it wins at least 6 of 8 folds with the paired 95% interval
+above 0, and it is not worse at `severe`. This is the F2 screen's rule.
+
+**G2, gate.** A variant that passes the screen goes to the 28 folds under F's rule (at least 20 of 28 and the
+interval above 0 at `target`, not worse at `severe`), against the same incumbent, in the same run if the night
+allows. If both pass the screen, only the one with the higher 8-fold mean at `target` goes, and a tie goes to
+`L`. If neither passes, G2 is dropped and no other step count or input set is tried. A variant that passes the
+gate repeats D3's kernel-swap check on the dressed match before it is adopted, because a longer run can amplify
+last-bit differences between CPUs.
+
+**Information only.** The same comparisons with the other LightGBM size, each TCN alone, every evaluation world,
+macroF1, predicted possessions per true one, and run times.
+
+### Strategy review: one look at the public labels, two exploratory screens (Justin + Claude)
+
+Branch `claude/git-pull-analyze-strategy-e4504e`, `main` at `28450b4`, the Mac. External matches and the public
+label file only: no `data/`, nothing on the provided match, no locked bench. Nothing below was registered before it
+ran, so nothing below decides anything. Detail, tables and the plan: [improvement-plan.md](improvement-plan.md).
+
+**Checks.** `uv run pytest -q`: 225 passed, 14 skipped. F re-decoded from the cached probabilities of
+`screen_tcn_seeds.py` gives 0.5991 at `target` and 0.5426 at `severe` on the 8 IDSSE + Metrica folds, and the
+LightGBM member refitted from the pool gives 0.5839 and 0.5221. All four equal the logged values.
+
+**A look at the public window, labels only** (`scripts/probe_label_structure.py`). No prediction and no score was
+involved, and no file of ours was compared with it. The window's 17 possessions (12% under 2 s, 35% under 4 s,
+median 7.6 s, 71% direct hand-overs) fall in the middle of what 5-minute windows of IDSSE labels at T = 2 give:
+52% of those windows have 17 possessions or fewer, 48% have as few under 4 s. Mean length leans towards T = 3 to
+5 (16% of T = 2 windows reach 14.2 s), and only T = 0 looks unlikely. Seventeen possessions cannot separate T = 2
+from T = 3. **`T_MAIN` stays 2.** No model, constant or rule was changed because of this look.
+
+**Screen 1: the LightGBM member's size** (`scripts/screen_gbdt_trees.py`, 8 folds, tau 2). One 1,200-tree model
+per fold, read at 150, 300, 600 and 1,200 trees, everything else as F.
+
+| | target | severe | target_smooth | target_cpl100 |
+|---|---|---|---|---|
+| Member alone, 150 trees (F's) | 0.5839 | 0.5221 | 0.6011 | 0.6281 |
+| Member alone, 1,200 trees | 0.6042 | 0.5511 | 0.6289 | 0.6545 |
+| Difference [95% paired CI], wins | +0.0203 [+0.0114, +0.0287], 8/8 | +0.0290 [+0.0196, +0.0377], 8/8 | +0.0278 [+0.0185, +0.0366], 8/8 | +0.0264 [+0.0178, +0.0357], 8/8 |
+| F-style blend, 150 trees (F) | 0.5991 | 0.5426 | | |
+| F-style blend, 1,200 trees | 0.6095 | 0.5610 | | |
+| Difference [95% paired CI], wins | +0.0104 [+0.0049, +0.0159], 7/8 | +0.0185 [+0.0126, +0.0247], 8/8 | | |
+
+The member is under-sized. Four sizes were looked at on 8 folds with no SkillCorner fold, so this is a reason to
+gate, not a result.
+
+**Screen 2: a smooth-only training mix** (same script). Every severity's rows from its `_smooth` world. Against
+`d2j` at 600 trees: +0.0215 [+0.0132, +0.0299] in `target_smooth` (7/8), +0.0140 in `mild_smooth`, +0.0030 in
+`severe_smooth`; -0.0852 in `target`, -0.1339 in `severe`, -0.0740 in `target_cpl100` (0/8 each). The `d2j`
+hedge costs about 0.02 if the real tracking is smooth, and dropping it costs about 0.1 if it is rough. `d2j`
+stays unless the team decides that the jitter statistic of `check_touch_target.py` may choose a mix.
+
+**Decoder, information only.** On F's cached probabilities no change gains more than 0.002: tau 1.5 to 6, a bonus
+on team or alive/dead switches, the blend weight.
+
+**Proposed, not yet registered** (owners and rules in the plan): G1, F with a 1,200-tree LightGBM member, on the
+28 folds under F's rule; G2, a 4,800-step TCN, screened on 8 folds first; G3, a smooth-major mix, conditional on
+the organisers' wording.
+
 
 ## 2026-11-08
 
