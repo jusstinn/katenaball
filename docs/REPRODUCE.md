@@ -61,7 +61,10 @@ The copied files are byte-identical to what the corpus step writes, which was ch
 
 ## Without `make` (Windows)
 
-`make` is not on every machine (it is not on the team's Windows PC). The same steps, from the repository root:
+`make` is not on every machine (it is not on the team's Windows PC). For the real run on that PC,
+`python scripts/real_run.py --team <team_name>` runs, in one command, the checks on the provided files, every step
+below except `build_external.py` (it expects a built corpus), the public-window check, and a run report
+(`docs/real-run.md`). The same steps, from the repository root:
 
 ```bash
 python scripts/build_external.py                       # skips matches that are up to date (see below)
@@ -88,4 +91,7 @@ files come out byte-identical to the existing ones, so the training data does no
   `predict --hold-out <key> --data-dir <bundle> --timeline <timeline.json>`, and compares the official score of
   that CSV with the evaluation path's score for the same model. Both options refuse the competition data.
 - `scripts/cache_digests.py dump` hashes every training input and the model stage by stage; `diff` on two
-  machines' dumps names the first stage where they part (J3).
+  machines' dumps names the first stage where they part (J3). It compares array content, because the `.npz`
+  bytes always differ between Windows and Unix (the zip entries record the OS). `.github/workflows/repro.yml`
+  runs the whole chain on GitHub's Linux, Windows and macOS runners and compares them with this PC
+  (`docs/ci.md`).

@@ -148,9 +148,62 @@ def test_predict_reads_an_atd_bundle_on_the_competition_timeline(trained):
     assert rep["read"]["contiguous_from_one"] and rep["read"]["n_malformed"] == 0
     assert rep["frames"] == 199319 and rep["frames_in_halves"] == 158857 and rep["features"][1] == 213
     assert rep["submission"]["sha256"] == hashlib.sha256(data).hexdigest()
+    assert {rep["kickoff_rule"][h]["status"] for h in ("half1", "half2")} == {"no_tagging_file"}   # bundle has none
     r = subprocess.run([sys.executable, str(ROOT / "evaluation" / "validate_submission.py"), str(out)],
                        capture_output=True, text=True, timeout=300)
     assert r.returncode == 0 and r.stdout.startswith("OK"), r.stdout[-300:]
+
+
+def test_predict_applies_the_kickoff_rule_from_smart_tagging(trained):
+    """W4a end to end: a synthetic ATD bundle plus a synthetic Smart Tagging file whose second-half
+    ``Kick Off (Start)`` lies one minute into the graded block. Frames before it become D, nothing else moves; the
+    first half's kickoff tag starts just before its block, so that half is left alone."""
+    from synth import write_tagging
+
+    from katena import pipeline as PL
+    tmp = trained["tmp"]
+    root = tmp / "bundle_kickoff"
+    dress.write_bundle(synth_target(seed=1), root, fmt=four_decimals)
+    (_, a1, _), (_, a2, b2) = official_timeline().half_blocks
+    k2 = a2 + 60 * 25
+    sp = "SET PIECES"
+    write_tagging(root, [
+        ((a1 - 30) / 25, (a1 + 95) / 25, sp, {"Team": "Barcelona", "Half": "1st Half", "Type": "Kick Off (Start)"}),
+        ((a1 + 4000) / 25, (a1 + 4100) / 25, sp, {"Team": "Atletic Club", "Half": "1st Half",
+                                                  "Type": "Kick Off (After Goal)"}),
+        ((a2 + 200) / 25, (a2 + 300) / 25, "BUILD UP", {"Team": "Barcelona", "Half": "2nd Half"}),
+        (k2 / 25, (k2 + 120) / 25, sp, {"Team": "N/A", "Half": "2nd Half", "Type": "kick off (start)"}),
+        ((b2 - 900) / 25, (b2 - 800) / 25, sp, {"Team": "N/A", "Half": "2nd Half", "Type": "Throw-in"}),
+    ])
+    off = PL.stage_predict(tmp / "kickoff" / "off.csv", root, threads=2, kickoff=False)
+    on = PL.stage_predict(tmp / "kickoff" / "on.csv", root, threads=2)
+
+    def labels(p):
+        return np.array([r.split(",")[1] for r in p.read_bytes().decode("ascii").splitlines()[1:]])
+    lab_off, lab_on = labels(tmp / "kickoff" / "off.csv"), labels(tmp / "kickoff" / "on.csv")
+    assert "kickoff_rule" not in off
+    rule = on["kickoff_rule"]
+    assert rule["half1"] == {"applied": False, "frames_changed": 0, "status": "before_block"}
+    assert rule["half2"]["applied"] and rule["half2"]["status"] == "applied"
+    assert (lab_on[a2:k2] == "D").all()
+    assert np.array_equal(lab_on[:a2], lab_off[:a2]) and np.array_equal(lab_on[k2:], lab_off[k2:])
+    assert rule["half2"]["frames_changed"] == int((lab_off[a2:k2] != "D").sum()) > 0
+    assert on["submission"]["rows"] == 199319
+    r = subprocess.run([sys.executable, str(ROOT / "evaluation" / "validate_submission.py"), str(tmp / "kickoff" / "on.csv")],
+                       capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0 and r.stdout.startswith("OK"), r.stdout[-300:]
+    # G2's tag columns (off by default) read the same file, and F, trained without them, refuses them
+    with pytest.raises(RuntimeError, match="feature columns differ"):
+        PL.stage_predict(tmp / "kickoff" / "tags.csv", root, threads=2, tag_columns=True)
+    import games
+    tagging = Path(games.asset_paths(data_dir=str(root))["smart_tagging"])
+    tagging.rename(tagging.with_suffix(".away"))
+    try:
+        with pytest.raises(RuntimeError, match="need the Smart Tagging file"):
+            PL.stage_predict(tmp / "kickoff" / "tags.csv", root, threads=2, tag_columns=True)
+    finally:
+        tagging.with_suffix(".away").rename(tagging)
+    assert not (tmp / "kickoff" / "tags.csv").exists()
 
 
 def test_hold_out_leaves_the_match_out_and_keeps_the_submission_model(trained):
@@ -234,8 +287,48 @@ def test_cache_digests_name_the_first_stage_that_differs(trained, tmp_path, monk
     assert len(d["stages"]["canonical"]) == 4 and len(d["stages"]["touch"]) == 15 + 15 + 15 + 9
     assert {"gbdt", "tcn", "bundle.pkl", "part_tcn_state", "part_priors_viterbi"} <= set(d["models"]["model"])
     assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 0
-    d["stages"]["pool_d2j"][sorted(d["stages"]["pool_d2j"])[0]] = "0" * 64
+    k = sorted(d["stages"]["pool_d2j"])[0]
+    # Only the file bytes differ (as between Windows and Unix, whose zip headers differ): the arrays agree.
+    d["stages"]["pool_d2j"][k] = "0" * 64
+    b.write_text(json.dumps(d), encoding="utf-8")
+    assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 0
+    # The arrays differ only in NaN bit patterns: reported, not a difference.
+    d["content"]["pool_d2j"][k] = "1" * 64
     b.write_text(json.dumps(d), encoding="utf-8")
     capsys.readouterr()
+    assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 0
+    assert "nan_payload" in capsys.readouterr().out
+    d["content_nan"]["pool_d2j"][k] = "2" * 64
+    b.write_text(json.dumps(d), encoding="utf-8")
     assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 1
     assert "earliest stage that differs: pool_d2j" in capsys.readouterr().out
+    # A dump without content digests (written before they existed) is judged by file bytes.
+    for key in ("content", "content_nan", "members"):
+        d.pop(key)
+    b.write_text(json.dumps(d), encoding="utf-8")
+    assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 1
+    assert "earliest stage that differs: pool_d2j" in capsys.readouterr().out
+
+
+def test_content_digest_ignores_the_zip_container_and_nan_bits(tmp_path):
+    """The zip entries record the writing OS (``create_system``), so equal arrays give different files on Windows
+    and Unix; and a computed NaN has its sign bit set on x86-64 and clear on arm64."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import cache_digests as CD
+    x = np.array([1.0, np.nan, 3.0], dtype=np.float32)
+    np.savez(tmp_path / "a.npz", X=x, idx=np.arange(3))
+    raw = bytearray((tmp_path / "a.npz").read_bytes())
+    for i in range(len(raw) - 4):                        # every central-directory entry: "version made by" OS byte
+        if raw[i:i + 4] == b"PK\x01\x02":
+            raw[i + 5] = 3 if raw[i + 5] == 0 else 0
+    (tmp_path / "b.npz").write_bytes(bytes(raw))
+    y = x.copy()
+    y.view(np.uint32)[1] |= np.uint32(0x80000000)         # the same NaN with the sign bit flipped
+    np.savez(tmp_path / "c.npz", X=y, idx=np.arange(3))
+    np.savez(tmp_path / "d.npz", X=x + np.float32(1), idx=np.arange(3))
+    a, b, c, d = (CD.content_digest(tmp_path / f"{n}.npz") for n in "abcd")
+    assert CD.sha256_file(tmp_path / "a.npz") != CD.sha256_file(tmp_path / "b.npz")
+    assert a == b                                        # same arrays, other container
+    assert c[0] != a[0] and c[1] == a[1]                 # NaN bits differ: exact digest moves, canonical does not
+    assert c[2]["X"] != a[2]["X"] and c[2]["idx"] == a[2]["idx"]
+    assert d[0] != a[0] and d[1] != a[1]                 # a value differs
