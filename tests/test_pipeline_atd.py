@@ -276,6 +276,8 @@ def test_cache_digests_name_the_first_stage_that_differs(trained, tmp_path, monk
     import shutil
 
     import cache_digests as CD
+
+    from katena import pipeline as PL
     shutil.copytree(P.CANON, tmp_path / "ext" / "canonical")          # the corpus layout: <root>/canonical/<ds>
     monkeypatch.setenv("KATENA_EXTERNAL", str(tmp_path / "ext"))
     monkeypatch.setenv("KATENA_WORK", str(P.WORK))
@@ -285,7 +287,7 @@ def test_cache_digests_name_the_first_stage_that_differs(trained, tmp_path, monk
     assert a.read_bytes() == b.read_bytes()
     d = json.loads(a.read_text(encoding="utf-8"))
     assert len(d["stages"]["canonical"]) == 4 and len(d["stages"]["touch"]) == 15 + 15 + 15 + 9
-    assert {"gbdt", "tcn", "bundle.pkl", "part_tcn_state", "part_priors_viterbi"} <= set(d["models"]["model"])
+    assert {"gbdt", "tcn", "bundle.pkl", "part_tcn_state", "part_priors_viterbi"} <= set(d["models"][PL.model_dir().name])
     assert CD.diff(argparse.Namespace(a=str(a), b=str(b))) == 0
     k = sorted(d["stages"]["pool_d2j"])[0]
     # Only the file bytes differ (as between Windows and Unix, whose zip headers differ): the arrays agree.
