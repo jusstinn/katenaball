@@ -443,6 +443,10 @@ def test_the_traceback_filter_keeps_only_the_type():
 def test_constants_and_the_train_line_agree_with_the_pipeline(capsys):
     from katena import pipeline as PL
     assert (RR.MODEL_DIR, RR.MANIFEST, RR.BUNDLE) == (PL.MODEL_DIR, PL.MANIFEST, PL.BUNDLE)
+    # the expected hashes are the submission model's, and real_run.py looks for it where the pipeline writes it
+    assert RR.expected_spec() == PL.SUBMISSION_SPEC
+    for spec in PL.SPECS:
+        assert RR.model_folder(spec) == PL.model_dir((), spec).name
     PL.log("train " + json.dumps({"seconds": {"gbdt": 1.0}, "sha256": {"gbdt": "ab", "tcn": "cd"}}, sort_keys=True))
     line = capsys.readouterr().out.rstrip("\n")
     w = RR.MakeWatch(expected_gbdt="ab")

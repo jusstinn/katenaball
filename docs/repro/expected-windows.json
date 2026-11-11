@@ -1,5 +1,6 @@
 {
- "about": "Model hashes of candidate F as scripts/make_submission.py trains it on the team's Windows PC. scripts/real_run.py compares the trained model's manifest.json with these: a different gbdt hash stops the run (the training data changed); a different tcn or bundle.pkl hash alone is a warning (torch's CPU kernels changed). Update these only together with a change to the model (W6), never to make a run pass.",
+ "about": "Model hashes of the submission model (spec F) as scripts/make_submission.py trains it on the team's Windows PC. scripts/real_run.py compares the trained model's manifest.json with these: a different gbdt hash stops the run (the training data changed); a different tcn or bundle.pkl hash alone is a warning (torch's CPU kernels changed). Update these only together with a change to the model (W6), never to make a run pass.",
+ "spec": "F",
  "machine": "the team's Windows PC (x86-64), with the locked environment of uv.lock",
  "recorded": "2026-11-08",
  "source": "docs/decision-log.md (J3 on Windows); docs/real-run.md, step 2",
