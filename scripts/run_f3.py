@@ -11,6 +11,7 @@ The F cache is read only; everything is written under KATENA_WORK. Fits go throu
     $PY scripts/run_f3.py seed                  # copy F's inputs, probabilities and scores, SHA-256 checked
     $PY scripts/run_f3.py equiv                 # the TCN code here equals run_g12.py's LT code (20 steps, no score)
     $H $PY scripts/run_f3.py gbdt tcn score gate
+    $H $PY scripts/run_f3.py tcn --reverse      # optional: a second process takes folds from the other end
     $PY scripts/run_f3.py cost
 """
 
@@ -185,6 +186,8 @@ def main() -> None:
     ap.add_argument("stages", nargs="+", help=", ".join(STAGES) + " (run in order)")
     ap.add_argument("--folds", default="all", help="all (28), 8 (IDSSE + Metrica), or match keys")
     ap.add_argument("--final-cache", dest="final_cache", default="")
+    ap.add_argument("--reverse", action="store_true",
+                    help="tcn: walk the folds from the other end (a second process sharing the stage)")
     ap.add_argument("--equiv-fold", default=F.DET_FOLD)
     ap.add_argument("--equiv-steps", type=int, default=20)
     a = ap.parse_args()
@@ -203,7 +206,7 @@ def main() -> None:
         elif stage == "gbdt":
             info = F3.stage_gbdt(F.FinalPools(dev), folds)
         elif stage == "tcn":
-            info = F3.stage_tcn(dev, folds)
+            info = F3.stage_tcn(dev, folds, reverse=a.reverse)
         elif stage == "score":
             info = F3.stage_score(F3.results(), dev, folds, F3.f_store())
             print(f"F re-decoded against F's stored scores: {info}", flush=True)

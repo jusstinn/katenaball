@@ -19,6 +19,7 @@ builds or scores a locked bench.
 
 from __future__ import annotations
 
+import os
 import time
 
 import numpy as np
@@ -84,9 +85,55 @@ def stage_gbdt(pools: F.FinalPools, folds: list) -> dict:
     return {"folds": done, "first150_is_F": int(sum(flags)), "of": len(flags)}
 
 
-def stage_tcn(dev: list, folds: list, steps: int = STEPS) -> dict:
-    """The 4,800-step TCN on 213 columns for every fold: ``g1.stage_tcn`` with more steps."""
-    return G1.stage_tcn(dev, folds, steps=steps, variant=VAR_T)
+def stage_tcn(dev: list, folds: list, steps: int = STEPS, reverse: bool = False, wait_s: float = 30.0) -> dict:
+    """The 4,800-step TCN on 213 columns for every fold: ``g1.stage_tcn``'s loop (the same scaler, sequences, fit,
+    predict and saved arrays) with more steps.
+
+    Two processes may share the folds: each claims a fold with a ``.claim`` file before training it and skips a fold
+    that is done or claimed, and ``reverse`` walks the folds from the other end. A fold's result does not depend on
+    which process trained it (seed, sequences and thread count are the same). The stage returns once no claim is
+    left, so the scoring that follows sees every fold."""
+    order = list(reversed(folds)) if reverse else list(folds)
+    out_of = lambda r: Lm.oof_path(VAR_T, T, r)                      # noqa: E731
+    claim_of = lambda r: out_of(r).with_suffix(".claim")              # noqa: E731
+    if all(out_of(r).exists() for r in order):
+        return {"folds": 0}
+    t0 = time.time()
+    pools = F.FinalPools(dev)                                        # 160 base + 53 touch columns, d2j rows
+    n_cols = pools.X.shape[1]
+    scs = {r.key: G1.scaler(pools, {r.key}) for r in order if not out_of(r).exists()}
+    del pools
+    seqs = G1.tcn_seqs(dev, T, 0)
+    if {s["X"].shape[1] for s in seqs.values()} != {n_cols}:
+        raise RuntimeError(f"sequence widths differ from the pool's {n_cols} columns")
+    Lm.timed(f"{len(scs)} scalers and {len(seqs)} TCN sequences "
+             f"({sum(s['X'].nbytes for s in seqs.values()) / 2 ** 30:.2f} GB)", t0)
+    done = 0
+    for r in order:
+        out, claim = out_of(r), claim_of(r)
+        if out.exists():
+            continue
+        out.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.close(os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        except FileExistsError:
+            continue                                                 # another process is training this fold
+        try:
+            t1 = time.time()
+            model, sc = G1.fit_tcn(scs[r.key], seqs, {r.key}, 0, E.TCN_THREADS, steps)
+            t2 = time.time()
+            arrays = G1.predict_tcn(model, sc, r, F.eval_worlds(r), E.TCN_THREADS)
+            arrays["model_sha"] = np.array(E.model_hash(model))
+            arrays["n_in"] = np.array(model.inp.in_channels)
+            d3._save(out, arrays)
+            done += 1
+            print(f"[{time.strftime('%H:%M:%S')}] F3 TCN fold {r.key}: train {t2 - t1:.0f}s, "
+                  f"predict {time.time() - t2:.0f}s", flush=True)
+        finally:
+            claim.unlink(missing_ok=True)
+    while any(claim_of(r).exists() for r in order):                  # the other process is finishing its last fold
+        time.sleep(wait_s)
+    return {"folds": done, "columns": n_cols, "sequences": len(seqs), "steps": steps}
 
 
 def results(name: str = RES_NAME) -> Lm.Results:
