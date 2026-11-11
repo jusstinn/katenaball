@@ -104,6 +104,7 @@ def test_spec_f3_trains_beside_f_with_the_gate_code(synth_corpus, monkeypatch):
     """F3 (more trees, a longer TCN that also reads the touch columns) trains into its own folder, leaves F's model
     untouched, and its held-out TCN equals what the gate's own code (scripts/run_g12.py, ``LT``) trains."""
     import importlib.util
+    import os
 
     from katena import pipeline as PL
     from katena.eval import final as F
@@ -122,6 +123,9 @@ def test_spec_f3_trains_beside_f_with_the_gate_code(synth_corpus, monkeypatch):
     model = PL.load_model([key], "F3")
     assert model.tcn_n_in == len(model.names) == man["columns"] and PL.load_model().tcn_n_in == model.n_base
     # the gate's code for the same fold: same weights, same scaler
+    # run_g12.py sets environment defaults when imported; keep them out of the tests that follow
+    for k, v in {**E.CPU_ENV, "KATENA_WORK": str(synth_corpus / "a")}.items():
+        monkeypatch.setenv(k, os.environ.get(k, v))
     spec = importlib.util.spec_from_file_location("run_g12", P.REPO / "scripts" / "run_g12.py")
     G12 = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(G12)
