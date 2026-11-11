@@ -459,13 +459,27 @@ def read_expected() -> dict:
         return json.load(fh)["sha256"]
 
 
+def expected_spec() -> str:
+    """The model spec the expected hashes belong to (``katena.pipeline.SUBMISSION_SPEC``; a test checks they agree)."""
+    with open(EXPECTED, encoding="utf-8") as fh:
+        return json.load(fh).get("spec", "F")
+
+
+def model_folder(spec: str) -> str:
+    """``katena.pipeline.model_dir``'s folder name for a spec: ``model`` for F, ``model_<spec>`` otherwise."""
+    return MODEL_DIR if spec == "F" else f"{MODEL_DIR}_{spec}"
+
+
 def submission(run: Run) -> None:
     """Step 3: train and label, then the model hashes."""
     expected = read_expected()
+    spec = expected_spec()
     run.report["expected_sha256"] = expected
+    run.report["model_spec"] = spec
     run.csv.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, str(TOOLS["make_submission"]), "all", "--workers", str(WORKERS), "--out", str(run.csv)]
-    say(f"{TOOLS['make_submission'].name} all --workers {WORKERS} --out {run.csv}  (streamed)")
+    cmd = [sys.executable, str(TOOLS["make_submission"]), "all", "--workers", str(WORKERS), "--out", str(run.csv),
+           "--spec", spec]
+    say(f"{TOOLS['make_submission'].name} all --workers {WORKERS} --out {run.csv} --spec {spec}  (streamed)")
     t = time.time()
     watch = MakeWatch(expected.get("gbdt"))
     rc, stopped = stream(cmd, run.env, watch)
@@ -480,9 +494,9 @@ def submission(run: Run) -> None:
     if rc != 0:
         raise Stop(f"make_submission.py exited with status {rc}")
 
-    manifest = run.work / MODEL_DIR / MANIFEST
+    manifest = run.work / model_folder(spec) / MANIFEST
     if not manifest.is_file() or manifest.stat().st_mtime < t - 2:
-        raise Stop(f"{MODEL_DIR}/{MANIFEST} was not written by this run")
+        raise Stop(f"{model_folder(spec)}/{MANIFEST} was not written by this run")
     with open(manifest, encoding="utf-8") as fh:
         got = json.load(fh).get("sha256", {})
     run.report["model_sha256"] = {k: got.get(k) for k in HASH_KEYS}

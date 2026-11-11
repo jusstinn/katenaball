@@ -1,7 +1,7 @@
 # <team_name>: technical document
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Draft of 2026-11-08,
-against `main` at `d2ce418`. Every number comes from `docs/decision-log.md` and the evidence pages it
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Draft of 2026-11-11.
+Every number comes from `docs/decision-log.md` and the evidence pages it
 links. `TODO(after the real run)` marks what only the final run on the provided match can fill in.
 
 ## 1. Summary
@@ -131,9 +131,10 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   reproduces the bake-off's recorded bench scores to the 3 decimals printed. The final model also trains
   on these two matches, so this read is of the 28-match model, not the submitted one.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
-  on it. We used only DATA.md's published aggregates (46 slots, 20.5 tracked objects, 41% ball missing)
-  and the published half boundaries. Human-run checks on the real file (loader, slot layout, domain-gap
-  alarms) print aggregates only and never choose between versions.
+  on it, which is also what the organisers' clarification of 2026-11-03 requires. We used only DATA.md's
+  published aggregates (46 slots, 20.5 tracked objects, 41% ball missing) and the published half
+  boundaries. Human-run checks on the real file (loader, slot layout, domain-gap alarms) print aggregates
+  only and never choose between versions. Nobody compared our output with the video.
 - **The public 5 minutes are a pipeline check only.** CI reads them only to check that the official scorer
   still reproduces the published scores of the published baseline files. The final file is checked on the
   window by `scripts/check_public_window.py`, which prints pass or fail only, never a score. It checks four
@@ -141,6 +142,11 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   way round); shifting the labels by 5 or 10 s lowers spellF1 (the frames line up); and the file beats the
   published smooth50 baseline. A fail means a bug to find, not something to tune, and every run is logged.
   `TODO(after the real run)`: the result of that run.
+- **One look at the public labels' structure, with no prediction and no score.** On Nov 9
+  `scripts/probe_label_structure.py` counted the window's possessions and their lengths (17 possessions,
+  median 7.6 s) and placed them among 5-minute windows of IDSSE labels under each label convention. The
+  question was whether T = 2 looks implausible. It does not: the counts sit in the middle of the T = 2
+  windows, and 17 possessions cannot separate T = 2 from T = 3. Nothing was changed because of this look.
 - **The submission path equals the evaluation path.** We exported an external development match
   (IDSSE `DFL-MAT-J03WMX`) in the provided ATD file format and read it back bit-identical through the real
   loader (`katena.target.atd.load_target`). We trained F without it and labelled it with
@@ -208,6 +214,47 @@ These are means over external matches under simulated noise, not a forecast of t
 label convention alone moves the level by about 0.15 (section 6), and the simulated noise is not the real
 tracking (section 7).
 
+### 3.4 After F: a larger tree model and a longer-trained TCN (F3, 2026-11-09 to 11)
+
+After F, six more packages were gated on the same 28 folds, each against the model before it and each
+registered before its score. Four failed (section 4). Two passed:
+
+| Package | Change, everything else as F | Against | Difference [95% CI] | Wins |
+|---|---|---|---|---|
+| `T1200` | The LightGBM member has 1,200 trees instead of 150 | F | +0.0041 [+0.0015, +0.0070] | 21/28 |
+| `LT` | The TCN trains 4,800 steps instead of 1,200 and also reads the 53 touch columns | F with `T1200` | +0.0120 [+0.0082, +0.0160] | 21/28 |
+
+- **Where the sizes came from.** An unregistered screen on the 8 IDSSE and Metrica folds read one LightGBM
+  model at 150, 300, 600 and 1,200 trees, and the score was still rising at 1,200. Because those 8 folds chose
+  the size, `T1200`'s rule added a condition: not worse on the 20 SkillCorner folds alone. The TCN's 4,800
+  steps were fixed without a screen of step counts. Two variants were screened on the 8 folds, with and without
+  the touch columns, and the better one went to the 28.
+- **F3 is F with both changes.** One teammate's laptop (Apple silicon) ran the two gates. The pair was then
+  run again on the other teammate's PC (Windows, Intel), under a registration written before any score on
+  that machine:
+
+| Folds | Noise | F3 | F | Difference [95% CI] | Wins |
+|---|---|---|---|---|---|
+| 28 | target-like | 0.6180 | 0.6019 | +0.0161 [+0.0118, +0.0207] | 21/28 |
+| 28 | severe | 0.5840 | 0.5696 | +0.0144 [+0.0095, +0.0191] | 19/28 |
+| 20 SkillCorner | target-like | 0.6103 | 0.6030 | +0.0073 [+0.0021, +0.0122] | 13/20 |
+| 20 SkillCorner | severe | 0.5816 | 0.5804 | +0.0012 [-0.0044, +0.0064] | 11/20 |
+| 8 IDSSE + Metrica | target-like | 0.6374 | 0.5991 | +0.0383 [+0.0288, +0.0469] | 8/8 |
+| 8 IDSSE + Metrica | severe | 0.5900 | 0.5426 | +0.0474 [+0.0373, +0.0573] | 8/8 |
+
+- **The two machines agree.** Both give 0.6180 and 0.5840 on the 28 folds, although their TCN weights differ
+  in the last bits. The second run is a replication, not new evidence: the folds are the same.
+- **Where the gain is.** Mostly on the 8 folds with a dead-ball label, where every fold gains. On SkillCorner
+  F3 gains 0.007 at target-like noise and nothing at severe.
+- **Every evaluation world gains.** F3 meets the adoption rule in the mild, target-like, smooth and coupled
+  worlds. With identity switches (`target_ids`) it gains +0.0127 on 18 of 28 folds.
+- **The TCN alone now scores above the blend** (0.6205 against 0.6180). We kept the blend at w = 0.5, fixed
+  before any result, and tried no other weight.
+- **Reproduction.** F3 trained twice on the PC gives the same model file. A dressed external match gets a
+  byte-identical CSV on six OS and CPU combinations and with other torch kernels (section 7).
+- **Status.** F3 has passed its gates and its reproduction checks. The submitted model is the one named in
+  section 1.
+
 ## 4. Assets, and what we tried and dropped
 
 | Provided asset | Used? | How |
@@ -234,6 +281,10 @@ tracking (section 7).
 | S1: training at T = 1 | +0.0034 [+0.0005, +0.0062], 79% | Passed; not applied (below) |
 | G1: the TCN member also reads the 53 touch columns | +0.0017 [-0.0014, +0.0047], 16/28 against F | Failed; not adopted. The TCN alone gains (+0.0041), but the blend barely moves |
 | G2: set-piece tag features in the LightGBM member, imitation tags from external events | +0.0046 [+0.0014, +0.0079], 16/28 (57%) against F | Failed on wins and not adopted. The 8 tagged IDSSE + Metrica folds all gain (+0.023, 8/8); the 20 SkillCorner folds have no events, so no tags, and lose slightly |
+| Possession-length weights (1 / length) in the LightGBM team head | +0.0053 [+0.0004, +0.0101], 17/28 against F3 | Failed on wins. All of the gain is on the 8 IDSSE + Metrica folds, which had been seen; the 20 SkillCorner folds lose slightly |
+| The same weights in the TCN's team loss | +0.0108 [+0.0051, +0.0165], 17/28 against F3 | Failed on wins, and worse at severe on SkillCorner |
+| No SkillCorner match in the LightGBM team head | 8 folds, not registered: +0.035, 8/8 | Not gated and not used. Its only folds had been seen, and it would drop the only training matches whose input is automatic broadcast tracking |
+| A smooth-only training mix | 8 folds, not registered: +0.02 in the smooth worlds, -0.09 to -0.13 in the rough ones | Not used. Choosing it would need a statistic of the provided match |
 | Decoder priors from another convention | Under 0.004 | No lever |
 | PathCRF | Not run | Needs 22 identified players; its weights were trained on our IDSSE matches |
 | StatsBomb open data | Not used | Its agreement asks for a name and email and bans redistribution |
@@ -319,9 +370,11 @@ D over the first 60 and 120 s of each half, as an aggregate.
   `Sample_Game_2` included. The effect is probably small but unmeasured.
 - **The development estimate is optimistic.** D1, D2 and D3 were gated on the same 28 folds before F
   combined them. F was registered before its own score, but its parts were chosen knowing their results.
-  Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. The two locked benches are
-  the only matches no choice was made on. F's one read there gains about as much as on the development
-  folds (section 3.1). With two matches, that read is a sanity check, not a second estimate.
+  Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, six more packages
+  were gated on the same folds (sections 3.4 and 4), each registered before its score: ten in all. The two
+  locked benches are the only matches no choice was made on. F's one read there gains about as much as on
+  the development folds (section 3.1). With two matches, that read is a sanity check, not a second
+  estimate, and nothing after F was read on them.
 - **The TCN seed matters.** F's TCN uses seed 0, fixed in advance. Averaging in a second seed lowered the
   8-fold score by 0.005 (1 of 8 folds won), so seed 0 does unusually well on those folds. With seed 1, F is
   still about +0.02 above M2 there, so roughly a quarter of the 8-fold gain depends on the seed. The 28-fold
@@ -342,6 +395,10 @@ D over the first 60 and 120 s of each half, as an aggregate.
     different kernels. Windows on two other Intel CPUs reproduced the reference machine bit for bit.
   - The dressed external match (IDSSE `DFL-MAT-J03WMX`, 173,528 frames, in the provided ATD format) got a
     byte-identical CSV in all 11 trainings.
+
+  F3 (section 3.4) was checked the same way: six combinations (Windows 10 and Windows Server on Intel,
+  Windows and Ubuntu on AMD, macOS on Apple M1), four different sets of TCN weights, one CSV; and the same
+  LightGBM model on a seventh machine. Ubuntu on Intel was not drawn for F3.
 
   So expect the same file on another machine. That has been shown on an external match in the provided format,
   not on the provided match itself, where a near-tie could still flip a label.

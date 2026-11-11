@@ -66,3 +66,19 @@ Every workstream works on its own branch and opens a PR. The coordinator verifie
 **Left for the humans:** the team name (registration closes today), then the real run on David's PC with
 `.venv\Scripts\python.exe scripts\real_run.py --team <team_name>`, the three disclosure choices in the technical
 document, the `submission-v1` tag, and the form.
+
+## Status, 2026-11-11: a candidate from outside this plan
+
+Justin's branch was pushed on the evening of Nov 10 (PR #23). It held two changes registered on Nov 9, before
+this plan was written, and both had passed F's rule on his Mac: a 1,200-tree LightGBM member (`T1200`) and a
+4,800-step TCN that also reads the touch columns (`LT`). F with both is called F3.
+
+| What | Result | Where |
+|---|---|---|
+| F3 against F on the Windows PC, registered before any score there | Passes: +0.0161 [+0.0118, +0.0207], 21/28; not worse at `severe` or on SkillCorner | PR #25 |
+| F3's reproduction checks (same machine twice, both paths, kernel swap, six OS and CPU combinations, LightGBM hash on three machines) | All pass | PR #25 |
+| Possession-length weights in either member (Justin's S1 and S2) | Both fail, 17/28 | Decision log, 2026-11-11 |
+
+**This plan fixed its own two candidates, so F3 is not adopted by it.** Whether F3 replaces F is David's and
+Justin's decision. The cut-off above still holds: nothing is adopted after Nov 14, 18:00 CET. The change is
+prepared on `david/f3-adopt`. Until it is merged, F is the submission model and `scripts/real_run.py` trains F.

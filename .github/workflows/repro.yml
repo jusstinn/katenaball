@@ -1,7 +1,8 @@
 # Cross-OS reproduction of the submission model (J3). What it runs and how to read it: docs/ci.md.
 #
 # It never sees the competition match. Each runner builds the public external corpus from its SHA-256-pinned
-# sources (scripts/build_external.py), builds the cache from empty, trains F on all 30 external matches, exports
+# sources (scripts/build_external.py), builds the cache from empty, trains the chosen model spec (F, the submission
+# model, by default; F3 is the candidate of 2026-11-11) on all 30 external matches, exports
 # one external match (IDSSE DFL-MAT-J03WMX) in the competition's ATD format, and labels it with that model, exactly
 # as the Windows reference in docs/repro/windows-reference.json was made. Uploads hashes, digests, versions, CPU
 # facts, timings and aggregates only: never a CSV, never a frame-level output. About 45 min on three runners,
@@ -16,9 +17,14 @@ on:
         type: choice
         default: all
         options: [all, ubuntu-24.04, windows-2025, macos-15]
+      spec:
+        description: Model spec to train (katena.pipeline.SPECS)
+        type: choice
+        default: F
+        options: [F, F3]
 
 concurrency:
-  group: repro-${{ github.ref_name }}
+  group: repro-${{ github.ref_name }}-${{ inputs.spec || 'F' }}
   cancel-in-progress: false
 
 permissions:
@@ -32,6 +38,7 @@ env:
   UV_VERSION: "0.13.1"
   UV_PYTHON: "3.11.17"
   MATCH: idsse/DFL-MAT-J03WMX     # the dressed external match of the Windows reference
+  SPEC: ${{ inputs.spec || 'F' }}
   PYTHONUNBUFFERED: "1"
 
 jobs:
@@ -169,9 +176,12 @@ jobs:
           "$PY" scripts/repro_ci.py time --out "$T" --name worlds -- \
             "$PY" scripts/make_submission.py worlds --workers "$WORKERS"
 
-      - name: train (F on all 30)
+      - name: train (the spec's model on all 30)
         run: |
-          "$PY" scripts/repro_ci.py time --out "$T" --name train -- "$PY" scripts/make_submission.py train
+          md=model; [ "$SPEC" = F ] || md="model_$SPEC"      # katena.pipeline.model_dir
+          echo "MODEL_DIR=$md" >> "$GITHUB_ENV"
+          "$PY" scripts/repro_ci.py time --out "$T" --name train -- \
+            "$PY" scripts/make_submission.py train --spec "$SPEC"
 
       - name: Stage digests
         run: |
@@ -187,7 +197,7 @@ jobs:
         run: |
           set -o pipefail
           "$PY" scripts/repro_ci.py time --out "$T" --name predict -- \
-            "$PY" scripts/make_submission.py predict --data-dir "$DRESSED/bundle" \
+            "$PY" scripts/make_submission.py predict --spec "$SPEC" --data-dir "$DRESSED/bundle" \
               --timeline "$DRESSED/timeline.json" --out "$DRESSED/run/dressed.csv" | tee "$OUT/predict.log"
 
       - name: Report (hashes and aggregates only)
@@ -195,7 +205,8 @@ jobs:
         run: |
           "$PY" scripts/repro_ci.py report --label "${{ matrix.os }}" --out "$OUT/repro-${{ matrix.os }}.json" \
             --dressed "$DRESSED" --csv "$DRESSED/run/dressed.csv" --digests "$OUT/digests-${{ matrix.os }}.json" \
-            --manifest "$KATENA_WORK/model/manifest.json" --predict-log "$OUT/predict.log" --timings "$T" \
+            --manifest "$KATENA_WORK/$MODEL_DIR/manifest.json" --model-dir "$MODEL_DIR" \
+            --predict-log "$OUT/predict.log" --timings "$T" \
             --env "$OUT/env.json" --work "$KATENA_WORK" --external "$KATENA_EXTERNAL"
           df -h
 
@@ -229,7 +240,15 @@ jobs:
       - name: Compare (warns, never fails)
         run: |
           shopt -s nullglob
-          python3 scripts/repro_ci.py compare --reference docs/repro/windows-reference.json \
+          ref=docs/repro/windows-reference.json
+          if [ "$SPEC" != F ]; then
+            if [ -f "docs/repro/windows-reference-$SPEC.json" ]; then
+              ref="docs/repro/windows-reference-$SPEC.json"
+            else
+              echo "::warning::no Windows reference for spec $SPEC yet: compared with F's (model and CSV rows differ by design)"
+            fi
+          fi
+          python3 scripts/repro_ci.py compare --reference "$ref" \
             --summary "$GITHUB_STEP_SUMMARY" --out "$RUNNER_TEMP/comparison.json" "$RUNNER_TEMP"/reports/repro-*.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

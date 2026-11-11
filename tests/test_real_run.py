@@ -48,7 +48,8 @@ MAKE = """
     args = sys.argv[1:]
     assert args[:3] == ["all", "--workers", "2"], args
     out = pathlib.Path(args[args.index("--out") + 1])
-    model = pathlib.Path(os.environ["KATENA_WORK"]) / "model"
+    spec = args[args.index("--spec") + 1]
+    model = pathlib.Path(os.environ["KATENA_WORK"]) / ("model" if spec == "F" else "model_" + spec)
     model.mkdir(parents=True, exist_ok=True)
     manifest = {"matches": ["m%d" % i for i in range(30)], "rows": 657133, "sha256": P["sha"]}
     (model / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=True), encoding="utf-8")
@@ -384,7 +385,7 @@ def test_skip_checks_and_the_work_and_external_flags(box, monkeypatch):
     assert rep["skip_checks"] is True and rep["checks"] == [] and not box.ran("check_target")
     assert rep["environment"]["KATENA_WORK"] == str(box.work.resolve())
     assert "skipped (`--skip-checks`)" in snippet_of(out)
-    assert (box.work / "model" / "manifest.json").exists()    # the child got --work as KATENA_WORK
+    assert (box.work / RR.model_folder(RR.expected_spec()) / "manifest.json").exists()   # the child got --work
 
 
 def test_the_real_validator_and_public_window_check_on_a_published_file(box):
@@ -443,6 +444,10 @@ def test_the_traceback_filter_keeps_only_the_type():
 def test_constants_and_the_train_line_agree_with_the_pipeline(capsys):
     from katena import pipeline as PL
     assert (RR.MODEL_DIR, RR.MANIFEST, RR.BUNDLE) == (PL.MODEL_DIR, PL.MANIFEST, PL.BUNDLE)
+    # the expected hashes are the submission model's, and real_run.py looks for it where the pipeline writes it
+    assert RR.expected_spec() == PL.SUBMISSION_SPEC
+    for spec in PL.SPECS:
+        assert RR.model_folder(spec) == PL.model_dir((), spec).name
     PL.log("train " + json.dumps({"seconds": {"gbdt": 1.0}, "sha256": {"gbdt": "ab", "tcn": "cd"}}, sort_keys=True))
     line = capsys.readouterr().out.rstrip("\n")
     w = RR.MakeWatch(expected_gbdt="ab")

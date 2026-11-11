@@ -5,6 +5,10 @@ F is defined in ``katena.eval.final`` (docs/decision-log.md, "Final candidate F"
 mix; the two blended at w = 0.5 in logit space; Viterbi at tau = 2 with priors from the external labels.
 Nothing here is chosen on the real match: every constant comes from ``katena.eval.final`` and its imports.
 
+``SPECS`` names the models ``train`` can fit. ``F`` is the submission model. ``F3`` is the candidate of 2026-11-11
+(docs/decision-log.md): F with a 1,200-tree LightGBM member and a 4,800-step TCN that also reads the touch columns
+(``katena.eval.f3``). A spec other than F lives in its own ``model_<spec>/``, so it can never be taken for F.
+
 Stages, each cached under ``KATENA_WORK`` (``scripts/make_submission.py`` sets it to ``work/final``):
 
     corpus   ground truth, base features and pools of every external match: copied from a finished
@@ -36,7 +40,9 @@ import numpy as np
 from katena.eval import corpus as C
 from katena.eval import d2
 from katena.eval import d3
+from katena.eval import f3 as F3
 from katena.eval import final as F
+from katena.eval import g1 as G1
 from katena.eval import protocol as P
 from katena.eval import touch_gate as TG
 from katena.featurize import touch as TF
@@ -50,12 +56,36 @@ BUNDLE = "bundle.pkl"
 MANIFEST = "manifest.json"
 
 
-def model_dir(hold_out=()) -> Path:
-    """``model/`` for the submission model. A model with matches held out (a check, never the submission) lives
-    in its own ``model_without_<keys>/``, so it can never be mistaken for the submission model."""
+@dataclass(frozen=True)
+class Spec:
+    """What ``train`` fits. Everything not listed here (pool, mix, parameters, seed, blend, decoder) is F's."""
+    name: str
+    gbdt_trees: int        # LightGBM rounds of both heads
+    tcn_steps: int         # TCN training steps (the one-cycle schedule spans them)
+    tcn_touch: bool        # the TCN also reads the touch columns (213 columns instead of 160)
+
+
+SPECS = {"F": Spec("F", 150, 1200, False),
+         "F3": Spec("F3", F3.N_TREES, F3.STEPS, True)}
+SUBMISSION_SPEC = "F"       # the model `make submit` trains and predicts with; changed only by an adoption
+
+
+def spec_of(name: str | None = None) -> Spec:
+    name = name or SUBMISSION_SPEC
+    if name not in SPECS:
+        raise ValueError(f"unknown model spec {name!r}; known: {sorted(SPECS)}")
+    return SPECS[name]
+
+
+def model_dir(hold_out=(), spec: str | None = None) -> Path:
+    """``model/`` for F and ``model_<spec>/`` for any other spec, whichever is the submission model, so a cache that
+    holds F's ``model/`` can never serve it as another model. A model with matches held out (a check, never the
+    submission) lives in its own ``..._without_<keys>/``."""
+    sp = spec_of(spec)
+    base = MODEL_DIR if sp.name == "F" else f"{MODEL_DIR}_{sp.name}"
     if not hold_out:
-        return P.WORK / MODEL_DIR
-    return P.WORK / (MODEL_DIR + "_without_" + "+".join(sorted(k.replace("/", "_") for k in hold_out)))
+        return P.WORK / base
+    return P.WORK / (base + "_without_" + "+".join(sorted(k.replace("/", "_") for k in hold_out)))
 
 
 def training_refs() -> list:
@@ -175,9 +205,9 @@ class Model:
     gbdt_team: str
     gbdt_cols: np.ndarray
     names: list            # M2 columns, then touch columns (LightGBM member)
-    n_base: int            # the TCN reads the first n_base columns
+    n_base: int            # the M2 columns come first
     tcn_state: dict
-    tcn_n_in: int
+    tcn_n_in: int          # the TCN reads the first tcn_n_in columns: n_base (F) or all of them (F3)
     scaler_mu: np.ndarray
     scaler_sd: np.ndarray
     priors: object
@@ -210,13 +240,18 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def stage_train(refs: list, threads: int | None = None, steps: int | None = None, hold_out=()) -> dict:
-    """Fit both members on every row of every match (nothing held out) and save ``model/bundle.pkl``.
+def stage_train(refs: list, threads: int | None = None, steps: int | None = None, hold_out=(),
+                spec: str | None = None) -> dict:
+    """Fit both members on every row of every match (nothing held out) and save ``bundle.pkl`` in
+    ``model_dir(hold_out, spec)``. ``spec`` names the model (``SPECS``; default the submission model).
 
     ``hold_out`` (match keys, for the dressed-match check only) leaves those matches out of the LightGBM rows,
-    the TCN sequences and scaler, and the priors, exactly as a gate fold does, and saves to ``model_dir(hold_out)``."""
+    the TCN sequences and scaler, and the priors, exactly as a gate fold does. ``steps`` overrides the spec's
+    TCN steps (tests only)."""
     from katena.eval import bakeoff as B
     from katena.models import ensemble as E
+    from katena.models import gbdt
+    sp = spec_of(spec)
     exclude = set(hold_out)
     if not exclude <= {r.key for r in refs}:
         raise ValueError(f"cannot hold out {sorted(exclude - {r.key for r in refs})}: not an external match")
@@ -224,44 +259,67 @@ def stage_train(refs: list, threads: int | None = None, steps: int | None = None
     E.set_deterministic(threads)
     t0 = time.time()
     pools = F.FinalPools(refs)
-    log(f"pool: {pools.X.shape[0]} rows x {pools.X.shape[1]} columns ({pools.n_base} base)")
-    heads = pools.fit(exclude, T, pools.cols())
+    n_rows, n_cols = pools.X.shape
+    log(f"spec {sp.name}; pool: {n_rows} rows x {n_cols} columns ({pools.n_base} base)")
+    used = ~np.isin(pools.keys, list(exclude))
+    heads = gbdt.fit_heads(pools.X[used], pools.o[used], pools.y[T][used], pools.dead_ok[used], pools.cols(),
+                           n_trees=sp.gbdt_trees)
     t1 = time.time()
-    log(f"LightGBM member: {t1 - t0:.0f}s")
-    seqs = F.tcn_seqs(refs, T, SEED)
-    net, sc = F.fit_tcn(pools, seqs, exclude, SEED, threads, steps)
+    log(f"LightGBM member ({sp.gbdt_trees} trees): {t1 - t0:.0f}s")
+    tcn_steps = steps or sp.tcn_steps
+    if sp.tcn_touch:                  # as the gate's folds: katena.eval.g1 at the spec's steps (katena.eval.f3)
+        sc = G1.scaler(pools, exclude)
+        seqs = G1.tcn_seqs(refs, T, SEED)
+        net, sc = G1.fit_tcn(sc, seqs, exclude, SEED, threads, tcn_steps)
+        tcn_n_in = n_cols
+    else:
+        seqs = F.tcn_seqs(refs, T, SEED)
+        net, sc = F.fit_tcn(pools, seqs, exclude, SEED, threads, tcn_steps)
+        tcn_n_in = int(pools.n_base)
     del seqs
     t2 = time.time()
-    log(f"TCN member: {t2 - t1:.0f}s")
+    log(f"TCN member ({tcn_steps} steps, {tcn_n_in} columns): {t2 - t1:.0f}s")
     pri = B.priors_for(F.PriorSource(refs), exclude, T)
     model = Model(gbdt_alive=heads.alive.model_to_string(), gbdt_team=heads.team.model_to_string(),
                   gbdt_cols=np.asarray(heads.cols), names=list(pools.names), n_base=int(pools.n_base),
                   tcn_state={k: v.detach().cpu().numpy().copy() for k, v in net.state_dict().items()},
-                  tcn_n_in=int(pools.n_base), scaler_mu=np.asarray(sc.mu), scaler_sd=np.asarray(sc.sd),
+                  tcn_n_in=int(tcn_n_in), scaler_mu=np.asarray(sc.mu), scaler_sd=np.asarray(sc.sd),
                   priors=pri, touch_src=TG.SRC)
-    out = model_dir(hold_out)
+    out = model_dir(hold_out, sp.name)
     out.mkdir(parents=True, exist_ok=True)
     tmp = out / (BUNDLE + ".tmp")
     with open(tmp, "wb") as fh:
         pickle.dump(model, fh, protocol=4)
     tmp.replace(out / BUNDLE)
     manifest = {
-        "matches": [r.key for r in refs if r.key not in exclude], "rows": int(pools.X.shape[0]),
-        "columns": int(pools.X.shape[1]),
+        "matches": [r.key for r in refs if r.key not in exclude], "rows": int(n_rows),
+        "columns": int(n_cols),
+        "spec": {"name": sp.name, "gbdt_trees": sp.gbdt_trees, "tcn_steps": tcn_steps, "tcn_columns": int(tcn_n_in)},
         "mix": F.MIX, "T": T, "tau": TAU, "w_tcn": W_TCN, "seed": SEED, "tcn_threads": threads,
         "sha256": {"gbdt": F.gbdt_hash(heads), "tcn": E.model_hash(net), BUNDLE: sha256_file(out / BUNDLE)},
         "seconds": {"gbdt": round(t1 - t0, 1), "tcn": round(t2 - t1, 1)},
     }
     if exclude:
         manifest["held_out"] = sorted(exclude)
-        manifest["rows_used"] = int((~np.isin(pools.keys, list(exclude))).sum())
+        manifest["rows_used"] = int(used.sum())
     (out / MANIFEST).write_bytes((json.dumps(manifest, indent=1, sort_keys=True) + "\n").encode("ascii"))
     return manifest
 
 
-def load_model(hold_out=()) -> Model:
-    with open(model_dir(hold_out) / BUNDLE, "rb") as fh:
+def load_model(hold_out=(), spec: str | None = None) -> Model:
+    with open(model_dir(hold_out, spec) / BUNDLE, "rb") as fh:
         return pickle.load(fh)
+
+
+def tcn_columns(model: Model, base: np.ndarray, full: np.ndarray) -> np.ndarray:
+    """The matrix the TCN member reads: the base columns (F) or the base and touch columns (F3). ``base`` and
+    ``full`` are one orientation's M2 columns and the same with the touch columns appended."""
+    if model.tcn_n_in == base.shape[1]:
+        return base
+    if model.tcn_n_in == full.shape[1]:
+        return full
+    raise RuntimeError(f"the TCN member reads {model.tcn_n_in} columns; the features have {base.shape[1]} "
+                       f"base and {full.shape[1]} with the touch columns")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -299,6 +357,7 @@ def label_match(model: Model, m, threads: int | None = None, set_pieces=None) ->
         raise RuntimeError("touch rows do not line up with the base features")
     names = list(f0.names) + list(tnames)
     X0, X1 = np.concatenate([f0.X, A[0]], 1), np.concatenate([f1.X, A[1]], 1)
+    T0, T1 = tcn_columns(model, f0.X, X0), tcn_columns(model, f1.X, X1)
     if set_pieces is not None:
         from katena.featurize import tags as TAGS
         G, gnames = TAGS.tag_columns(set_pieces, f0.idx, int(m5.meta["step"]), m.fps)
@@ -312,7 +371,7 @@ def label_match(model: Model, m, threads: int | None = None, set_pieces=None) ->
     net, sc = model.tcn()
     import torch
     with torch.no_grad():
-        pa_t, ph_t = tcn.predict(net, sc(f0.X), sc(f1.X), f0.half)
+        pa_t, ph_t = tcn.predict(net, sc(T0), sc(T1), f0.half)
     pa, ph = E.blend_heads((pa_g, ph_g), (pa_t, ph_t), W_TCN)
     rows = hmm.decode(pa, ph, f0.half, model.priors, TAU, "viterbi")
     step = int(m5.meta["step"])
@@ -438,8 +497,9 @@ def write_submission(codes: np.ndarray, path: Path, n_expected: int) -> dict:
 
 
 def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None = None, hold_out=(),
-                  timeline=None, kickoff: bool = True, tag_columns: bool = False) -> dict:
-    """Label the real match and write the submission. Prints aggregates only.
+                  timeline=None, kickoff: bool = True, tag_columns: bool = False, spec: str | None = None) -> dict:
+    """Label the real match with the model of ``spec`` (default the submission model) and write the submission.
+    Prints aggregates only.
 
     After decoding, the kickoff rule (``apply_kickoff_rule``) sets each graded half's frames before its tagged
     ``Kick Off (Start)`` to D; ``kickoff=False`` turns it off. A bundle without a Smart Tagging file (an exported
@@ -458,7 +518,8 @@ def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None =
             raise ValueError("hold_out and timeline are for an exported external match, never the competition data")
     m = load_target(data_dir, timeline=timeline)
     rep = m.meta.get("read_report", {})
-    model = load_model(hold_out)
+    sp = spec_of(spec)
+    model = load_model(hold_out, sp.name)
     set_pieces = None
     if tag_columns:
         from katena.featurize import tags as TAGS
@@ -476,7 +537,8 @@ def stage_predict(out: Path, data_dir: Path | None = None, threads: int | None =
     report["read"] = {k: rep.get(k) for k in ("n_lines", "n_malformed", "n_out_of_range", "n_duplicate",
                                               "n_frames_present", "contiguous_from_one")}
     report["submission"] = sub
-    report["model_sha256"] = sha256_file(model_dir(hold_out) / BUNDLE)
+    report["model_spec"] = sp.name
+    report["model_sha256"] = sha256_file(model_dir(hold_out, sp.name) / BUNDLE)
     return report
 
 
