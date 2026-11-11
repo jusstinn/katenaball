@@ -4,7 +4,8 @@ scores for the same model at the clean condition (``native``).
 
 Evaluation path, as the gate scores a fold (``katena.eval.final``): the cache's ``native`` base features
 (``corpus.build_one``) and the ``native`` touch columns as ``touch_gate`` computes them (5 Hz players, the native
-ball), the LightGBM member on both, the TCN member on the base columns through its scaler, ``ensemble.blend_heads``
+ball), the LightGBM member on both, the TCN member through its scaler on the columns it was trained on (the base
+columns for F, base and touch for F3), ``ensemble.blend_heads``
 at w = 0.5, the Viterbi decode at tau = 2 with the model's priors, and ``lomo.score_rows`` (``to_native_codes`` with
 the half blocks, then the official ``possession_metrics``).
 
@@ -62,11 +63,14 @@ def predict(model, f: dict, threads: int | None = None) -> dict:
     threads = threads or E.TCN_THREADS
     if f["names"] != model.names:
         raise RuntimeError("feature columns differ from the model's")
-    pa_g, ph_g = model.heads().predict(np.concatenate([f["X0"], f["A0"]], 1), np.concatenate([f["X1"], f["A1"]], 1))
+    from katena.pipeline import tcn_columns
+    X0, X1 = np.concatenate([f["X0"], f["A0"]], 1), np.concatenate([f["X1"], f["A1"]], 1)
+    pa_g, ph_g = model.heads().predict(X0, X1)
     E.set_deterministic(threads)
     net, sc = model.tcn()
     with torch.no_grad():
-        pa_t, ph_t = tcn.predict(net, sc(f["X0"]), sc(f["X1"]), f["half"])
+        pa_t, ph_t = tcn.predict(net, sc(tcn_columns(model, f["X0"], X0)), sc(tcn_columns(model, f["X1"], X1)),
+                                 f["half"])
     pa, ph = E.blend_heads((pa_g, ph_g), (pa_t, ph_t), F.W_F)
     rows = hmm.decode(pa, ph, f["half"], model.priors, F.TAU, "viterbi")
     return {"pa_g": pa_g, "ph_g": ph_g, "pa_t": pa_t, "ph_t": ph_t, "pa": pa, "ph": ph, "rows": rows}

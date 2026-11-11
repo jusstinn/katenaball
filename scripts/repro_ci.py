@@ -277,7 +277,7 @@ def cmd_report(a) -> int:
                                              for k, v in man.items() if k != "sha256"}
     hashes = dict(man["sha256"]) if man else {}
     if dig:
-        hashes.update(dig.get("models", {}).get("model", {}))
+        hashes.update(dig.get("models", {}).get(a.model_dir, {}))
     for k in ("stages", "content", "content_nan", "members"):   # file bytes; arrays exact, NaN-canonical, per member
         rep[k] = dig.get(k, {}) if dig else {}
     d = Path(a.dressed) if a.dressed else None
@@ -446,6 +446,8 @@ def main() -> int:
     r.add_argument("--note", default="")
     r.add_argument("--commit", default="", help="override the commit recorded in the env facts")
     r.add_argument("--out", required=True)
+    r.add_argument("--model-dir", default="model",
+                   help="the model folder under the cache whose parts go into the report (model_F3 for spec F3)")
     for k in ("dressed", "csv", "digests", "manifest", "predict-log", "timings", "env", "work", "external"):
         r.add_argument(f"--{k}", default=None)
     c = sub.add_parser("compare", help="compare reports with each other and with the reference")

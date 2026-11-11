@@ -103,9 +103,9 @@ def compare(a) -> None:
     from katena.types import D, X, load_match
     ref = _ref(a.match)
     d = Path(a.dir)
-    man = json.loads((PL.model_dir([a.match]) / PL.MANIFEST).read_text(encoding="utf-8"))
-    model = PL.load_model([a.match])
-    print(f"model {PL.model_dir([a.match]).name}: {len(man['matches'])} training matches, held out {man['held_out']}; "
+    man = json.loads((PL.model_dir([a.match], a.spec) / PL.MANIFEST).read_text(encoding="utf-8"))
+    model = PL.load_model([a.match], a.spec)
+    print(f"model {PL.model_dir([a.match], a.spec).name}: {len(man['matches'])} training matches, held out {man['held_out']}; "
           f"gbdt {man['sha256']['gbdt'][:16]}, tcn {man['sha256']['tcn'][:16]}")
     ev = Dr.eval_path(model, ref)
     tl = Timeline.from_json(json.loads((d / "timeline.json").read_text(encoding="utf-8")))
@@ -198,6 +198,7 @@ def main() -> None:
     c.add_argument("--dir", required=True)
     c.add_argument("--csv", required=True)
     c.add_argument("--out", default="")
+    c.add_argument("--spec", default=None, help="the model spec of the held-out model (default: the submission model)")
     f = sub.add_parser("diff")
     f.add_argument("--gt", required=True)
     f.add_argument("csvs", nargs="+")
