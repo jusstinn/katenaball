@@ -6,6 +6,112 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-11
 
+### K1, K and B1 (pre-registration): a label-kind column, and a boundary head for the decoder
+
+**Registered before any score of any of the three.** Claude, at Justin's request ("implement possible
+improvements"), branch `claude/status-check-7809aa`, the Mac (macOS arm64). External development matches only: no
+`data/`, no `evaluation/gt/`, no public window, no locked bench. Code: `scripts/run_k.py`, `scripts/run_b.py`,
+`katena.decode.tv`, `katena.models.boundary`. Nothing below changes after a result.
+
+**Standing.** Outside the final-week plan, which adopts nothing after Nov 14, 18:00 CET. David has not seen or
+agreed to it. A pass here makes a candidate for the team to decide on; it adopts nothing and changes no file of
+the pipeline. These are the 11th, 12th and 13th packages gated on the same 28 folds.
+
+**Why.** Two results below. (1) The probe of Nov 10: dropping the SkillCorner matches from the LightGBM team
+head gained +0.035 blended on the 8 IDSSE + Metrica folds (8/8), and S1 and S2 then split the same way: gains on
+IDSSE + Metrica, nothing or a loss on SkillCorner. The two groups are labelled by different processes
+(`label-convention.md`, section 2): SkillCorner's owner comes with automatic tracking, is unknown on 46% of
+in-play frames and has no dead ball; IDSSE's and Metrica's come from corrected tracking or events, keep the last
+team on a loose ball and have dead ball. One team head is fitted to both without being told which is which. K
+tells it. (2) The model predicts 0.75 possessions per true one, and no constant change of the decoder gains more
+than 0.002. B1 lets the switch cost vary in time instead.
+
+**What was seen before this entry.** Everything in this log up to here, including the probe, S1 and S2 on all 28
+folds, and Justin's look at the public labels beside the video (the entry below; no prediction or score). Of the
+new code: `run_k.py k1-check` and `run_b.py b-check` on `idsse/DFL-MAT-J03WMX` (both print one boolean: the code
+path reproduces the incumbent's cache; no score). A smoke of K2's code at 20 steps on two folds and of the
+boundary head at 20 trees on one fold, under the tag `smoke`: neither is the candidate, no spellF1 was computed,
+and the head's smoke printed one held-out average precision (0.297). No fold of K1, K or B1.
+
+**Incumbent.** F3 as it passed on both machines: the 1,200-tree LightGBM member (`T1200`) blended at w = 0.5 with
+the 4,800-step touch TCN (`LT`), Viterbi at tau 2. Read from the Mac's cache of Nov 9, not refitted.
+
+**The column** (`label_kind`). 1 on every row of a SkillCorner match, 0 on every row of an IDSSE or Metrica
+match. It is a property of the dataset's labelling process, known without reading a label. A held-out match is
+predicted with its own dataset's value. **For the provided match the value would be 0**, fixed here from
+`docs/upstream/CHALLENGE.md` alone: its ground truth is made mechanically from corrected tracking, keeps the last
+team on a loose ball, and has dead ball. The public window did not choose it and will not be used to check it.
+
+| | Changes | Everything else |
+|---|---|---|
+| **K1** | The LightGBM team head reads the column (214 columns). | As `T1200`: pool, parameters, 1,200 trees. The alive head has only kind-0 rows, so it is not refitted: `T1200`'s cached alive probabilities are used. |
+| **K** | K1, and the TCN reads the column as a 214th input channel. Its alive output is always read with the column at 0 (no kind-1 row has an alive target), its team output with the match's own value. | As `LT`: 4,800 steps, seed 0, 4 threads, the `d2j` sequences, the scaler (now over 214 columns). |
+| **B1** | Decoder only, on F3's probabilities. A boundary head (LightGBM, F's parameters, 1,200 trees, 213 columns, all 27 training matches) is trained on "the owner changes within 0.4 s of this sample" in the T = 2 labels, unknown samples filled with the last owner. In the Viterbi, the odds of a switch into a sample are multiplied by the head's odds there over its training base rate (`katena.decode.tv`, lam = 1). | Emissions, priors, tau 2, blend weight, both members. |
+
+The tolerance (0.4 s), lam (1) and the head's size (1,200) are fixed here and not tuned. lam = 0.5 and 2 are
+printed as information and are not candidates.
+
+**Gates.** Each on all 28 folds against F3, under the rule F3 itself passed: at `target` at least 70% of folds
+won and the paired 95% bootstrap interval above 0; not worse at `severe`; not worse at `target` on the 20
+SkillCorner folds alone.
+
+- **K1** against F3 (K1's LightGBM member blended with `LT`).
+- **K** against F3. The TCN is trained unless K1 is worse than F3 at `target` on 28 folds (mean below 0 and the
+  interval below 0); in that case K is dropped unrun.
+- **B1** against F3.
+
+**What stands, fixed in advance.** K if it passes; otherwise K1 if it passes; otherwise F3. K and K1 are two
+tests of one idea on the same folds, and are reported as such. If B1 passes and a K passes, the pair is not
+assumed: B1's decoder on that K's probabilities is gated against that K under the same rule
+(`run_b.py b-gate --on k`). A candidate that wins on the 8 IDSSE + Metrica folds and fails on 28 has failed: it is
+not re-gated on 8.
+
+**Information the run prints, and how it is read.** For K1 and K, the same model read with the *other* value of
+the column (`K1x`, `Kx`), against F3 and against itself. This is what the candidate would score if the value
+chosen for a match were wrong. It decides nothing here; it is the number the team needs to weigh the 0 above.
+Also: the members alone, the SkillCorner and IDSSE + Metrica folds apart, the other evaluation worlds, predicted
+possessions per true one, the column's share of the team head's split gain, the boundary head's held-out average
+precision.
+
+**Checks the run prints.** K1's team-head code on 213 columns gives `T1200`'s cached probabilities byte for byte
+(done: true). B1's decoder at lam = 0 gives the incumbent's decoded rows on every fold. F3 re-decoded here equals
+the stored scores.
+
+**Cost.** K1 about 20 minutes, B1 about 20, K's TCN about 4 hours (it needs the charger and Low Power Mode off).
+
+### A look at the public window beside the tactical video, labels only (Justin; written up by Claude)
+
+**Nothing was changed because of this look.** Justin watched the public 5 minutes of the tactical video next to
+the public label file, to understand what counts as possession (allowed by the Nov 3 clarification: "inspecting
+the provided data and the video to better understand what counts as possession"). No prediction of ours was
+involved and no score was computed. Claude saw the public label file and Justin's description in words, not the
+video or any provided file. The times Justin gave are estimates and the reading is one person's.
+
+What he reported, as general statements:
+
+- A loose ball, and a ball in the air, stay with the last team. The label changes at the other team's first
+  deliberate touch, not when the first team loses the ball.
+- A pass that strikes an opponent, and a tackle that knocks the ball loose, did not change the label until a
+  player controlled the ball.
+- Both possessions under 2 s in the window (0.8 s and 1.3 s) followed a deliberate play by the team: a regain with
+  a pass, and an intercepting header. Each was lost again at once. The second sits on the edge of the written
+  rule ("an aerial duel won without subsequent control" is not a change).
+- The one short possession that ran into dead ball (3.5 s) was an interception whose first touch was a pass that
+  rolled out of play. It is labelled as a possession of the intercepting team.
+- Dead ball starts at the whistle (after an offside, play stays live until it) and ends when the restart is
+  played. No stoppage was seen without a dead-ball label.
+
+How this sits against `docs/label-convention.md`:
+
+- The sandwich at T = 2 would erase both possessions under 2 s. This is three cases in 17 possessions, and a
+  person describing play describes actions, so it does not show that the rule is action-based.
+- The touch-then-out case agrees with the default `tail=False`. One case.
+- The dead-ball mechanics agree with IDSSE's `BallStatus`.
+
+**No decision.** `T_MAIN` stays 2 and `tail` stays off. The window may not choose between versions, and none was
+chosen. The question for the organisers (label-convention.md, section 7) is still the way to settle T; as far as
+this log shows it has not been sent.
+
 ### F3 on the Windows PC: the gate (result)
 
 **F3 passes the registered rule on the second machine. With R0 to R5 passed (below), F3 is put forward for
