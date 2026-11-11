@@ -6,6 +6,26 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-11
 
+### F3's R5 on Justin's Mac: the 1,200-tree member's hash agrees with the Windows PC (Claude; Justin asleep)
+
+For the check R5 that `david/f3-assembly` registered (PR #25). `scripts/make_submission.py train --spec F3`,
+run on the Mac (macOS arm64, Apple silicon) from an export of that branch at `3863b47`, with this branch's
+locked environment (the lock file is the same on both) and the Mac's own cache of the 30 external matches. No
+score was computed and nothing ran on the provided match. It wrote `work/final/model_F3/`; F's `model/` was not
+touched. Log: `work/final/f3_train_mac.log`.
+
+| | Mac | Windows PC (PR #25) | |
+|---|---|---|---|
+| Pool | 657,133 rows x 213 columns | 657,133 rows x 213 columns | same |
+| gbdt | `056ffa8a41eaf246b741234351e30dcd8e5191446493e24e8c1ea3f2e6a5bc47` | `056ffa8a...6a5bc47` | **same** |
+| tcn | `bf52132cc2d52eb903390598c99dc328aacfbdbea4a9679aa6ce0b6beeb1070b` | `4ec1a79e...` | differs |
+| bundle.pkl | `36cc2eb289495e9b0c3cc07fdef395d70978ba59b5b56db485076a30b077d940` | `0a6359f3...` | differs (it holds the TCN) |
+
+**R5 holds on this Mac.** The TCN's bytes differ, as they do between every pair of machines in PR #25's table;
+they also differ from the `macos-15` runner's (`55cc7100...`), which is an M1. Whether this Mac's TCN gives the
+same labels on the dressed match was not checked here: that is R4's question, and `dressed_check.py` was not
+run. Times on the Mac: LightGBM 32 s, TCN 486 s.
+
 ### S1 and S2: result (Justin + Claude)
 
 **Both fail. The unweighted members stay, and `T1200` + `LT` (F3 on `david/f3-assembly`) is unchanged.** One
