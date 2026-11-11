@@ -9,7 +9,7 @@ Every model, feature, or data decision: what changed, the external score, keep o
 ### F3's R5 on Justin's Mac: the 1,200-tree member's hash agrees with the Windows PC (Claude; Justin asleep)
 
 For the check R5 that `david/f3-assembly` registered (PR #25). `scripts/make_submission.py train --spec F3`,
-run on the Mac (macOS arm64, Apple silicon) from an export of that branch at `3863b47`, with this branch's
+run on the Mac (macOS arm64, Apple M5) from an export of that branch at `3863b47`, with this branch's
 locked environment (the lock file is the same on both) and the Mac's own cache of the 30 external matches. No
 score was computed and nothing ran on the provided match. It wrote `work/final/model_F3/`; F's `model/` was not
 touched. Log: `work/final/f3_train_mac.log`.
