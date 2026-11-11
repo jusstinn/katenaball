@@ -54,9 +54,9 @@ Other rules that shape the work:
 - The public 5 minutes are a pipeline check only. No training, tuning, or choosing between versions.
 - No hand labels or hand corrections on this match, and no constants tied to its frames.
 - Watching the video to understand it is allowed. Turning what you saw into labels or rules is not.
-- **The target is inference-only for now.** A second-hand report says a Nov 3 organiser email requires training and tuning on external
-  data, while the public rules allow algorithmic pseudo-labels. Until we read the wording, we do no self-training and do not fit
-  the degrader to the target.
+- **The target is inference-only.** The organisers' clarification of Nov 3 (read on Nov 10, `decision-log.md`) requires training
+  and tuning on external data only and overrides the public rules, which allowed algorithmic pseudo-labels. We do no
+  self-training and do not fit the degrader to the target.
 - Metrica gets a perpetual, irrevocable commercial licence to submitted ideas and methods (T&Cs section 16). Everyone should be
   comfortable with that.
 - On leaving the competition, delete all data, including weights or embeddings that could reconstruct it.
