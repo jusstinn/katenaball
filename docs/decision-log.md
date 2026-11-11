@@ -4,6 +4,80 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-11
+
+### F3 on the Windows PC (pre-registration): the second-machine gate and the reproduction checks
+
+**Registered before any Windows score of `T1200`, `LT` or F3, and before F3's final model is trained.** David +
+Claude, branch `david/f3-assembly`, the Windows PC (i7-7700, the machine that holds the provided match). External
+matches only: no `data/`, no `evaluation/gt/`, no public window, no locked bench. Nothing below changes after a
+result.
+
+**What F3 is.** F with the two changes that passed on Justin's branch (entries of 2026-11-09 and 2026-11-10,
+PR #23), and nothing else:
+
+| Member | F | F3 |
+|---|---|---|
+| LightGBM | 150 trees | 1,200 trees (`T1200`) |
+| TCN | 1,200 steps, M2's 160 columns | 4,800 steps, the 160 plus D1's 53 touch columns (`LT`) |
+
+Unchanged: `gbdt.PARAMS`, the `d2j` pool and sequences, seed 0, 4 torch threads, the blend at w = 0.5, Viterbi at
+tau 2, the priors, T = 2. S1 and S2 are not part of F3. If either passes on the Mac it gets its own entry.
+
+**Standing.** The final-week plan fixed its own two candidates, and both failed. `T1200` and `LT` were registered
+on Nov 9, before the plan was written, and passed F's rule on the Mac. Whether they count under the plan is
+David's and Justin's decision and is not made here. This entry adopts nothing. It fixes what the Windows PC runs
+and how each outcome is read, so that the decision can be acted on before the plan's cut-off (Nov 14, 18:00 CET).
+
+**What was seen before this entry.** Everything in PR #23: the Mac's gates (`T1200` +0.0041, `LT` +0.0120, F3's
+means 0.6180 against 0.6019 at `target`), the probes, the failure diagnosis. On Windows: F's gate, and the plan's
+G1 (the touch columns in a 1,200-step TCN, +0.0017, failed). No Windows fold of a 1,200-tree member or of a
+4,800-step TCN.
+
+**1. The second-machine gate** (`scripts/run_f3.py`, cache `D:/katena/work-f3`, F's inputs copied from
+`work-final` with SHA-256 checks). The 28 development folds, leave one match out, F3 against F.
+
+- F3's LightGBM member: `gbdt.fit_heads(..., n_trees=1200)` on F's pool and 213 columns. Check printed: its first
+  150 trees give F's cached member byte for byte on every fold.
+- F3's TCN member: `katena.eval.g1`'s sequences, scaler and predict (the plan's G1 code) at 4,800 steps. Check
+  run first, with no score: on one fold at 20 steps it gives the same model hash as `run_g12.py`'s `LT` code.
+- F is not refitted: its stored Windows scores are the incumbent, re-decoded from the copied probabilities and
+  compared with the store.
+- **Rule** (F's, plus the condition Justin registered for `T1200`): at `target` at least 20 of 28 folds won and
+  the paired 95% bootstrap interval above 0; not worse at `severe`; not worse at `target` on the 20 SkillCorner
+  folds alone.
+- These folds are not unseen. The Mac scored the same models on them, up to the TCN's last bits. This is a
+  replication on a second machine, not a new package and not new evidence of the same weight as an unseen fold.
+- Reported beside it, deciding nothing: each change alone (`T1200` with F's TCN, `LT` with F's trees), each
+  member alone, per dataset, every evaluation world, macroF1, predicted possessions per true one, and the
+  difference between the Windows and the Mac means.
+
+**2. The reproduction checks** (pass or fail, they choose nothing). F3 in `katena.pipeline` behind a `--spec F3`
+switch; F stays the default and its hashes must not move.
+
+| # | Check | Passes when |
+|---|---|---|
+| R0 | F after the code change | `train` gives F's logged hashes (gbdt `b2146150...`, tcn `01488c84...`, bundle `cb0ea4fc...`) |
+| R1 | Same machine, fresh processes | F3 trained twice on all 30 matches gives the same `bundle.pkl`; the dressed CSV is byte-identical |
+| R2 | Dressed match (`idsse/DFL-MAT-J03WMX`, held out) | The submission path equals the evaluation path: features and probabilities bitwise, labels equal |
+| R3 | Kernel swap on Windows | The held-out TCN retrained with `ATEN_CPU_CAPABILITY=default`, `ONEDNN_MAX_CPU_ISA=SSE41`, `MKL_CBWR=COMPATIBLE` gives a byte-identical dressed CSV |
+| R4 | Other machines (`repro.yml`, dispatched with the F3 spec) | The dressed CSV on every runner equals the Windows one |
+| R5 | LightGBM across machines | The 1,200-tree member's hash on Windows equals the Mac's (needs Justin's hash) |
+
+**How the outcomes are read, fixed now.**
+
+- F3 is put forward for adoption only if the Windows gate passes its rule **and** R0 to R4 pass. The model that
+  is submitted is trained on this PC, so a pass on the Mac alone is not enough.
+- If the gate passes and R3 or R4 shows a label that differs between machines, F3 is not put forward as it
+  stands. F labelled the dressed match identically on 7 OS/CPU combinations, and byte-identical regeneration is a
+  competition rule. That result is reported, and F stays unless the team finds a fix that needs no new score.
+- If the gate fails on Windows, that is the result. F stays, and nothing is re-run to change it.
+- R5 failing does not block by itself (the CSV is what must agree), but it is reported and looked into.
+- No other tree count, step count, input set, blend weight or decoder setting is tried here.
+
+**Cost.** Gate: LightGBM about 2 hours, TCN about 8 hours on one `heavy.py` slot. R0 to R3: about 2 hours on the
+other slot. R4 runs on GitHub's runners.
+
 ## 2026-11-10
 
 ### Naming: two pairs of gates are called G1 and G2 (read this first)
