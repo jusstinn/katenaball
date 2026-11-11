@@ -146,7 +146,7 @@ sets of TCN weights on six OS and CPU combinations, one CSV.
 | `ubuntu-24.04`, pass 2 | AMD EPYC 7763 | same | as pass 1 | same | 9.8 min |
 | `macos-15`, both passes | Apple M1 | same | differs (`55cc7100...`) | same | 36.5 and 37.8 min |
 
-Not covered: Linux on an Intel CPU, which F's check did cover (a third Ubuntu pass drew an AMD EPYC 7763 again; a fourth is running), and
+Not covered: Linux on an Intel CPU, which F's check did cover (two more Ubuntu passes both drew an AMD EPYC 7763 and gave the same CSV), and
 the dressed match labelled with the Mac's own TCN, a fifth set of weights
 (`dressed_check.py label --bundle <the Mac's model_F3/bundle.pkl>`; the CSV should hash to `72d7c3fb...`). `docs/repro/windows-reference-F3.json` is this
 PC's reference for `repro.yml`. Pass 2 ran before that file was committed, so its own summary compares with F's
