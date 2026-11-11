@@ -6,6 +6,68 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-11
 
+### F3 on the Windows PC: the gate (result)
+
+**F3 passes the registered rule on the second machine. With R0 to R5 passed (below), F3 is put forward for
+adoption, as the registration reads this outcome. It is not adopted here:** that is David's and Justin's
+decision, and the plan's cut-off is Nov 14, 18:00 CET. One run of `scripts/run_f3.py gbdt tcn score gate` at
+`e9f8f95`, cache `D:/katena/work-f3`, external development matches only. Nothing in the registration was
+changed. The process was restarted once, at 12:58, so that two processes could share the TCN stage; the four
+LightGBM folds already cached were kept. `f3_gate.json` has `registered_run: true`.
+
+**The gate: F3 against F (F's stored Windows scores), 28 folds.**
+
+| Comparison | Folds | F3 | F | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6180 | 0.6019 | +0.0161 | [+0.0118, +0.0207] | 21/28 |
+| `severe`, all (rule: not worse) | 28 | 0.5840 | 0.5696 | +0.0144 | [+0.0095, +0.0191] | 19/28 |
+| `target`, SkillCorner (rule: not worse) | 20 | 0.6103 | 0.6030 | +0.0073 | [+0.0021, +0.0122] | 13/20 |
+| `severe`, SkillCorner | 20 | 0.5816 | 0.5804 | +0.0012 | [-0.0044, +0.0064] | 11/20 |
+| `target`, IDSSE + Metrica | 8 | 0.6374 | 0.5991 | +0.0383 | [+0.0288, +0.0469] | 8/8 |
+| `severe`, IDSSE + Metrica | 8 | 0.5900 | 0.5426 | +0.0474 | [+0.0373, +0.0573] | 8/8 |
+
+All three registered conditions hold: 21 of 28 folds won with the interval above 0 at `target`, not worse at
+`severe`, not worse at `target` on the SkillCorner folds alone.
+
+**Checks the run printed.** The 1,200-tree member's first 150 trees give F's cached member byte for byte on 28
+of 28 folds. F, its LightGBM member and its TCN member, re-decoded from the copied probabilities, equal F's
+stored scores on 164 of 164 fold and world pairs.
+
+**The two machines agree to the printed digits.** The Mac's means were 0.6180 at `target` and 0.5840 at
+`severe`; so are these. Each change alone also reproduces the Mac's table: `T1200` against F +0.0041
+[+0.0015, +0.0070], 21/28, and F3 against `T1200` +0.0120 [+0.0082, +0.0160], 21/28. The TCN's weights differ
+between the machines, and that moved no score at four decimals.
+
+**Information only.**
+
+| Comparison at `target`, 28 folds | Diff | 95% paired CI | Wins |
+|---|---|---|---|
+| `LT` with F's 150 trees, against F | +0.0114 | [+0.0074, +0.0154] | 21/28 |
+| LightGBM member alone, 1,200 trees against 150 | +0.0067 | [+0.0024, +0.0111] | 17/28 |
+| TCN member alone, `LT` against F's TCN | +0.0244 | [+0.0186, +0.0302] | 24/28 |
+
+- **Every evaluation world.** F3 meets the adoption rule in `mild`, `target`, `target_smooth` and the three
+  coupled worlds (8/8 each, +0.043 to +0.055). In `target_ids` it gains +0.0127 [+0.0079, +0.0177] with 18 of 28
+  folds, and at `severe` 19 of 28: above 0, under the 70% bar that only `target` has to clear.
+- **Where the gain is.** IDSSE + Metrica: +0.038 at `target`, 8/8. SkillCorner: +0.007 at `target`, and
+  nothing at `severe` (+0.0012, interval through 0).
+- **The TCN member alone is above the blend**: 0.6205 against 0.6180 at `target`, 0.5901 against 0.5840 at
+  `severe`. That was not a registered comparison and has no interval. The blend weight stays 0.5, fixed before
+  any result, and no other weight is tried. With F it was the other way round (TCN alone 0.5961, blend 0.6019).
+- macroF1 on the 8 dead-label folds: 0.8781 to 0.8920 at `target`. Predicted possessions per true one, 28 folds:
+  0.738 to 0.751.
+
+**What this is not.** New evidence of the weight of unseen folds: the Mac had scored the same models on the same
+folds, and 8 of the 28 chose the tree count. `T1200` and `LT` were the 7th and 8th packages gated on these folds.
+The locked benches are spent, so F3 has no bench read.
+
+**Cost.** LightGBM stage: 100 to 150 s a fold. TCN stage: 657 to 984 s a fold (median 747 s) with two heavy
+jobs running; 15 folds in one process and 13 in the other. Start to verdict: 12:44 to 17:22.
+
+**Next, if David and Justin say yes.** Merge the prepared change (`david/f3-adopt`: `SUBMISSION_SPEC`, the
+expected hashes, `docs/real-run.md`, `docs/REPRODUCE.md`). Then David's real run trains and checks F3 with the
+same one command. If the answer is no, or does not come before the cut-off, F stays and nothing else changes.
+
 ### F3's R5 on Justin's Mac: the 1,200-tree member's hash agrees with the Windows PC (Claude; Justin asleep)
 
 For the check R5 that `david/f3-assembly` registered (PR #25). `scripts/make_submission.py train --spec F3`,
@@ -110,11 +172,11 @@ packages gated on the same 28 folds.
 **Run times on the Mac.** S1: 31 min for 28 LightGBM folds. S2 screen: 101 min (about 760 s a fold). S2 gate:
 169 min for the 20 remaining folds (about 500 s a fold).
 
-### F3 on the Windows PC: the reproduction checks (result; the gate is still running)
+### F3 on the Windows PC: the reproduction checks (result)
 
 **R0 to R5 pass.** R5 on Justin's Mac is the entry above. External matches only; nothing ran on the provided
 match. Code at `c97d4eb` and later on `david/f3-assembly`; logs in
-`D:/katena/logs/f3`. The 28-fold gate has not finished, so nothing here says whether F3 is put forward.
+`D:/katena/logs/f3`. Written while the 28-fold gate was still running; its result is the entry above.
 
 | # | Check | Result |
 |---|---|---|
