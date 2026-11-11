@@ -112,8 +112,8 @@ packages gated on the same 28 folds.
 
 ### F3 on the Windows PC: the reproduction checks (result; the gate is still running)
 
-**R0 to R4 pass.** R5 holds on GitHub's macOS runner and waits for Justin's own hash. External matches only;
-nothing ran on the provided match. Code at `c97d4eb` and later on `david/f3-assembly`; logs in
+**R0 to R5 pass.** R5 on Justin's Mac is the entry above. External matches only; nothing ran on the provided
+match. Code at `c97d4eb` and later on `david/f3-assembly`; logs in
 `D:/katena/logs/f3`. The 28-fold gate has not finished, so nothing here says whether F3 is put forward.
 
 | # | Check | Result |
@@ -123,7 +123,7 @@ nothing ran on the provided match. Code at `c97d4eb` and later on `david/f3-asse
 | R2 | Dressed match, held-out model, both paths | Pass. Features and all six probability arrays bitwise equal, 0 of 29,123 work-grid labels differ, 0 CSV frames differ |
 | R3 | Kernel swap on this PC | Pass. The held-out TCN's hash changes (`fdc7797b...` to `b3185586...`); the dressed CSV is byte-identical (`4db583ae...`), 0 of 145,608 graded frames |
 | R4 | Other machines (`repro.yml`, `spec=F3`, runs 43015046674 and 43024430520) | Pass on six runners: the dressed CSV equals this PC's on each |
-| R5 | LightGBM across machines | The 1,200-tree member's hash is the same on this PC and all three runners, the arm64 macOS one included. Justin's Mac: not yet reported |
+| R5 | LightGBM across machines | Pass. The 1,200-tree member's hash is the same on this PC, on every runner and on Justin's Mac (Apple M5, entry above) |
 
 **F3's hashes on this PC** (all 30 matches, 657,133 rows x 213 columns):
 
@@ -146,7 +146,9 @@ sets of TCN weights on six OS and CPU combinations, one CSV.
 | `ubuntu-24.04`, pass 2 | AMD EPYC 7763 | same | as pass 1 | same | 9.8 min |
 | `macos-15`, both passes | Apple M1 | same | differs (`55cc7100...`) | same | 36.5 and 37.8 min |
 
-Not covered: Linux on an Intel CPU, which F's check did cover. `docs/repro/windows-reference-F3.json` is this
+Not covered: Linux on an Intel CPU, which F's check did cover (two more Ubuntu passes drew AMD again), and
+the dressed match labelled with the Mac's own TCN, a fifth set of weights
+(`dressed_check.py label --bundle <the Mac's model_F3/bundle.pkl>`; the CSV should hash to `72d7c3fb...`). `docs/repro/windows-reference-F3.json` is this
 PC's reference for `repro.yml`. Pass 2 ran before that file was committed, so its own summary compares with F's
 reference; the rows above compare its reports with F3's.
 
