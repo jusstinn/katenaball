@@ -52,7 +52,8 @@ class Scaler:
 
 def train(seqs: list, steps: int = STEPS, seed: int = 0, threads: int = 6) -> tuple:
     """``seqs``: list of dicts X float32[T,F] (already scaled), y int8[T], o int8 scalar orientation,
-    dead_ok bool. Returns (model, scaler-free)."""
+    dead_ok bool. Returns (model, scaler-free). A sequence may carry ``w`` float32[T], per-frame weights of
+    the team loss (``katena.models.lenweight``); without it every H or A frame weighs 1, as before."""
     torch.set_num_threads(threads)
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
@@ -77,7 +78,7 @@ def train(seqs: list, steps: int = STEPS, seed: int = 0, threads: int = 6) -> tu
             y = s["y"][sl]
             if s["dead_ok"]:
                 ya[b, :k] = (y != 2); wa[b, :k] = (y < 3)
-            yt[b, :k] = (y == s["o"]); wt[b, :k] = (y < 2)
+            yt[b, :k] = (y == s["o"]); wt[b, :k] = (y < 2) if "w" not in s else (y < 2) * s["w"][sl]
         out = model(torch.from_numpy(xb))
         la = (bce(out[:, 0], torch.from_numpy(ya)) * torch.from_numpy(wa)).sum() / max(wa.sum(), 1)
         lt = (bce(out[:, 1], torch.from_numpy(yt)) * torch.from_numpy(wt)).sum() / max(wt.sum(), 1)

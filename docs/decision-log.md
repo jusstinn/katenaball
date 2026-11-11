@@ -16,6 +16,64 @@ set-piece tag features: both failed. Neither side had seen the other's work: thi
 evening of Nov 10. From here on Justin's two are called **`T1200`** (the trees) and **`LT`** (the TCN: 4,800
 steps, touch columns). File and cache names (`run_g12.py`, `g1_gbdt1200`, `g2_tcn4800t`) keep the old letters.
 
+### S1 and S2 (pre-registration): possession-length weights in both members
+
+**Registered before any SkillCorner fold of either candidate and before any fold of S2.** Justin + Claude, branch
+`claude/git-pull-analyze-strategy-e4504e`, the Mac (macOS arm64). External development matches only: no `data/`,
+no `evaluation/gt/`, no public window, no locked bench. Code: `scripts/run_s12.py`, run unattended by
+`scripts/night_s12.sh`, which refuses to start unless this entry and the code are committed. Nothing below
+changes after a result.
+
+**Standing.** This is outside the final-week plan, which fixed its own two candidates and adopts nothing after
+Nov 14, 18:00 CET. David has not seen or agreed to it. A pass here makes a candidate for the team to decide on;
+it adopts nothing. These are the 9th and 10th packages gated on the same 28 folds (the plan's two were the 5th
+and 6th, `T1200` and `LT` the 7th and 8th).
+
+**Why.** The diagnosis below: on the IDSSE + Metrica folds possessions under 4 s are 36% of the true ones and
+65% of the misses, and no training weight depends on possession length, while spellF1 counts every possession
+once.
+
+**What was seen before this entry.** The exploratory probe below: `inv` in the LightGBM member on the 8 IDSSE +
+Metrica folds (blended +0.0254 at `target`, 8/8; +0.0233 at `severe`, 6/8), and `sqrt`, which was smaller and is
+dropped. One smoke fold of S1 (`idsse/DFL-MAT-J03WMX`, one of those 8; it reproduced the probe's scores). One
+smoke of S2's code on that fold at 20 steps instead of 4,800, which is not the candidate. No SkillCorner fold of
+a weighted model, and no fold of S2.
+
+**Incumbent.** The model that passed the night run of Nov 9: the 1,200-tree LightGBM member (`T1200`) blended at
+w = 0.5 with the 4,800-step TCN that reads the touch columns (`LT`). Read from that run's cache, not refitted.
+
+**The weight** (`katena.models.lenweight`, fixed before the probe ran). A training frame weighs 1 / L, L the
+length in seconds of the constant-label run it sits in, in the T = 2 training labels, clipped to [1, 30]. No
+other form, clip, exponent or label convention is tried.
+
+| | Changes | Everything else |
+|---|---|---|
+| **S1** | The LightGBM team head's rows carry the weight, scaled to mean 1 (`gbdt.fit_heads(team_weight=...)`). | As `T1200`: pool, 213 columns, parameters, 1,200 trees. The alive head is unweighted. |
+| **S2** | The TCN's team loss carries the weight per frame (`tcn.train` reads `w`; the loss already divides by the weight sum). | As `LT`: 4,800 steps, 213 columns, seed 0, 4 threads, the `d2j` sequences, the scaler. The alive loss is unweighted. |
+
+Decoder (Viterbi, tau 2), priors, blend weight 0.5 and T = 2 are F's and unchanged.
+
+**S1, gate.** All 28 folds, S1 blended with `LT` against `T1200` blended with `LT`. F's rule: at `target` at
+least 70% of folds won and the paired 95% bootstrap interval above 0; not worse at `severe`. And, as for `T1200`:
+not worse at `target` on the 20 SkillCorner folds alone. Eight of the 28 folds were seen (8/8 at `target`), so
+the rule needs 12 of the 20 unseen SkillCorner folds. The SkillCorner rows of the table are the only unseen
+evidence and are reported as such.
+
+**S2, screen.** The 8 IDSSE + Metrica folds, S2 against `LT`, both blended with the LightGBM member that stands
+after S1's gate (weighted if S1 passed, `T1200` if not). Passes if at `target` it wins at least 6 of 8 folds with
+the interval above 0, and it is not worse at `severe`. **S2, gate:** only if the screen passes, the same
+comparison on all 28 folds under F's rule.
+
+**Fixed in advance.** Each of S1 and S2 that passes its gate is a candidate for adoption, S1 + S2 together if
+both pass (S2's gate is then already the test of the pair). If S1 wins on the IDSSE + Metrica folds and fails on
+28, that is the result: it is not re-gated on 8 folds. The design note under "Final-week gates: outcome" is about
+changes that cannot reach SkillCorner folds; this one can.
+
+**Checks the run prints.** S1's alive head equals `T1200`'s cached probabilities byte for byte on every fold
+(same pool, columns, parameters and features). S1's scores on the 8 seen folds equal the probe's.
+
+**Cost.** S1 about 40 minutes, S2's screen about 65, S2's gate about 155.
+
 ### Justin's branch: G1 and G2: result (Justin + Claude)
 
 **G1 passes. G2's screen passes for both variants, `LT` goes to the gate and passes it.** One unattended run of

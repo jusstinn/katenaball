@@ -53,13 +53,16 @@ class Heads:
 
 
 def fit_heads(X: np.ndarray, o: np.ndarray, y: np.ndarray, dead_ok: np.ndarray, cols: np.ndarray,
-              n_trees: int = N_TREES) -> Heads:
+              n_trees: int = N_TREES, team_weight: np.ndarray | None = None) -> Heads:
     """X rows already hold the orientation chosen by ``o`` (0 focal=home, 1 focal=away).
-    ``y``: 0 H, 1 A, 2 D, 3 X. ``dead_ok``: rows from sources that carry a dead label."""
+    ``y``: 0 H, 1 A, 2 D, 3 X. ``dead_ok``: rows from sources that carry a dead label.
+    ``team_weight``: one weight per row of ``X`` for the team head (scaled here to mean 1 over its rows);
+    without it the head is unweighted, as before."""
     team_rows = np.flatnonzero((y == 0) | (y == 1))
     alive_rows = np.flatnonzero(dead_ok & (y < 3))
     team_t = (y[team_rows] == o[team_rows]).astype(np.float32)
     alive_t = (y[alive_rows] != 2).astype(np.float32)
-    team = lgb.train(PARAMS, lgb.Dataset(X[team_rows][:, cols], team_t, free_raw_data=True), n_trees)
+    wt = None if team_weight is None else team_weight[team_rows] / team_weight[team_rows].mean()
+    team = lgb.train(PARAMS, lgb.Dataset(X[team_rows][:, cols], team_t, weight=wt, free_raw_data=True), n_trees)
     alive = lgb.train(PARAMS, lgb.Dataset(X[alive_rows][:, cols], alive_t, free_raw_data=True), n_trees)
     return Heads(alive=alive, team=team, cols=cols)
