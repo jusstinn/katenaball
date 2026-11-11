@@ -18,7 +18,7 @@ nothing ran on the provided match. Code at `c97d4eb` and later on `david/f3-asse
 | R1 | Same machine, fresh processes | Pass. F3 trained twice on all 30: the same bundle both times, and a byte-identical dressed CSV |
 | R2 | Dressed match, held-out model, both paths | Pass. Features and all six probability arrays bitwise equal, 0 of 29,123 work-grid labels differ, 0 CSV frames differ |
 | R3 | Kernel swap on this PC | Pass. The held-out TCN's hash changes (`fdc7797b...` to `b3185586...`); the dressed CSV is byte-identical (`4db583ae...`), 0 of 145,608 graded frames |
-| R4 | Other machines (`repro.yml`, `spec=F3`, run 43015046674) | Pass on three runners: the dressed CSV equals this PC's on each |
+| R4 | Other machines (`repro.yml`, `spec=F3`, runs 43015046674 and 43024430520) | Pass on six runners: the dressed CSV equals this PC's on each |
 | R5 | LightGBM across machines | The 1,200-tree member's hash is the same on this PC and all three runners, the arm64 macOS one included. Justin's Mac: not yet reported |
 
 **F3's hashes on this PC** (all 30 matches, 657,133 rows x 213 columns):
@@ -30,17 +30,21 @@ nothing ran on the provided match. Code at `c97d4eb` and later on `david/f3-asse
 | bundle.pkl | `0a6359f3411082e32a9b1e97385eb430abc3eaf96198df6306a934b36e982cd9` |
 | dressed CSV (`idsse/DFL-MAT-J03WMX`, all-30 model) | `72d7c3fb09f854bf06872d0996201ca338b247d27335a1829363379bd2cb9a7f` |
 
-**R4 by runner.** As with F, the TCN's bytes follow the OS and the CPU, and no label does.
+**R4 by runner.** As with F, the TCN's bytes follow the OS and the CPU vendor, and no label does: four different
+sets of TCN weights on six OS and CPU combinations, one CSV.
 
 | Machine | CPU | gbdt | tcn | Dressed CSV | `train` |
 |---|---|---|---|---|---|
-| This PC, Windows 10 | Intel i7-7700 | reference | reference | reference | 23 min beside another job |
-| `windows-2025` | Intel Xeon Platinum 8573C | same | same | same | 12.9 min |
-| `ubuntu-24.04` | AMD EPYC 9V74 | same | differs | same | 8.4 min, 5.7 GB peak |
-| `macos-15` | Apple M1 | same | differs | same | 36.5 min |
+| This PC, Windows 10 | Intel i7-7700 | reference | reference (`4ec1a79e...`) | reference | 23 min beside another job |
+| `windows-2025`, pass 1 | Intel Xeon Platinum 8573C | same | same | same | 12.9 min |
+| `windows-2025`, pass 2 | AMD EPYC 7763 | same | differs (`50b82c14...`) | same | 13.9 min |
+| `ubuntu-24.04`, pass 1 | AMD EPYC 9V74 | same | differs (`12687343...`) | same | 8.4 min, 5.7 GB peak |
+| `ubuntu-24.04`, pass 2 | AMD EPYC 7763 | same | as pass 1 | same | 9.8 min |
+| `macos-15`, both passes | Apple M1 | same | differs (`55cc7100...`) | same | 36.5 and 37.8 min |
 
-A second pass on the runners is queued for more CPU types. `docs/repro/windows-reference-F3.json` is this PC's
-reference for `repro.yml`.
+Not covered: Linux on an Intel CPU, which F's check did cover. `docs/repro/windows-reference-F3.json` is this
+PC's reference for `repro.yml`. Pass 2 ran before that file was committed, so its own summary compares with F's
+reference; the rows above compare its reports with F3's.
 
 **Also checked.**
 
