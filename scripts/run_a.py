@@ -480,7 +480,11 @@ def main() -> int:
     ap.add_argument("--steps", type=int, default=STEPS, help="TCN steps (needs --tag)")
     ap.add_argument("--reverse", action="store_true", help="a-tcn: walk the folds from the other end")
     ap.add_argument("--check-fold", default=F.DET_FOLD)
+    ap.add_argument("--inc", default=f"{INC_G},{INC_T}",
+                    help="F3's cached members as <LightGBM variant>,<TCN variant> under KATENA_WORK/oof: the default is "
+                         "scripts/run_g12.py's names; a cache made by scripts/run_f3.py holds f3_gbdt,f3_tcn")
     a = ap.parse_args()
+    globals()["INC_G"], globals()["INC_T"] = a.inc.split(",")
     if not set(a.stages) <= set(STAGES):
         ap.error(f"unknown stage in {a.stages}")
     if not a.tag and (a.trees != N_TREES or a.steps != STEPS):
