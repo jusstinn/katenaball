@@ -4,6 +4,236 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-12
+
+### Linux on an Intel CPU: both models give this PC's CSV (result)
+
+**F3 and F, trained from an empty cache under Linux on the PC's Intel CPU, each give the Windows reference's CSV
+for the dressed match.** That was the one pair of OS and CPU that F3's cross-machine check had not covered
+(Nov 11, "Not covered"). Claude on David's PC, overnight. External matches only; no fold was scored.
+
+**What ran.** `D:/katena/tools/wsl_repro.sh`: the steps of `repro.yml`, by hand, at `8f3040d` (main before the
+adoption; both specs are named on the command line), in the Ubuntu 24.04 already installed under WSL 1 on the PC
+(Intel i7-7700). It installed uv 0.13.1 and the locked environment (torch 2.15.0+cu132, LightGBM 4.7.0), and
+copied the raw external downloads from the Windows side, as `actions/cache` restores them on a runner. Everything
+else it built from empty: the 30 canonical matches, the cache, both models and the dressed bundle. All of it
+lives in one folder of that distribution, and Ubuntu's `libgomp1` package was unpacked there, not installed.
+
+| | F3 | F |
+|---|---|---|
+| Training inputs: 861 cache files, compared by content | Same as the Windows reference | Same |
+| LightGBM member | `056ffa8a...`, same | `b2146150...`, same |
+| TCN weights | `61bc4699...`, differs | `a7623330...`, differs |
+| Dressed CSV | `72d7c3fb...`, **same** | `909f4ffa...`, **same** |
+
+- **F's TCN is the one GitHub's Ubuntu runner on an Intel Xeon gave on Nov 10** (`a7623330`). So this run
+  behaves as Linux on Intel does elsewhere, although under WSL 1 the kernel is Windows' and only the libraries
+  are Linux's.
+- **F3 now has five sets of TCN weights and one CSV**: the seven OS and CPU combinations of GitHub's runners and
+  this PC (the entry on the adoption, below), and this one.
+- The HSMM duration prior differs by OS, as on Nov 10. Viterbi never reads it.
+- **Which OpenMP runtime LightGBM gets did not matter.** F was trained once more with the `libgomp.so.1` that torch ships in its wheel, in place of Ubuntu's package: the same `bundle.pkl`, byte for byte.
+
+**What this is not.** A second physical machine: the CPU is the reference's own. And a real Linux kernel: numpy
+warns under WSL 1 that `long double` is not the type it expects. Nothing in the pipeline uses that type, and
+every array of every stage equals the reference's.
+
+**Times.** Corpus 23.5 min and worlds 37.2 min with 2 workers. F3's `train` took 85.5 min: 73 for the tree model
+while other heavy jobs shared the PC's four cores (it takes 3 alone on Windows), and 11 for the TCN. F's
+`train` took 4.3 min once the PC was quiet: 29 s for the trees and 2.7 min for the TCN. So the slow tree model
+was the shared machine, not Linux. `predict` took about a minute.
+
+**It also found a missing library.** Its first attempt stopped at once because this Ubuntu has no
+`libgomp.so.1`; that became PR #28 (below). Reports: `D:/katena/logs/wsl`.
+
+### F3 is the submission model (decision)
+
+**F3 replaces F as the submission model, from the merge of PR #26 on 2026-11-12.** That is two days before the
+plan's cut-off (Nov 14, 18:00 CET).
+
+- **Who decided.** David, by handing the decision over. He was asked twice whether to merge PR #26, and on
+  Nov 12 at about 03:17 CET he answered "make the best decisions you see fit". Claude then decided yes.
+- **Why yes.** The registration of Nov 11 said in advance what a pass would mean, and everything in it passed:
+  the gate on both machines (+0.0161 [+0.0118, +0.0207], 21 of 28 folds; not worse at `severe`, not worse on the
+  SkillCorner folds) and the reproduction checks R0 to R5. F3 also gains in the smooth and the coupled worlds, so
+  the gain does not rest on one kind of simulated noise.
+- **What it does not show.** The 28 folds had been seen before, 8 of them chose the tree count, and on the 20
+  SkillCorner folds, the only broadcast tracking we have, the gain is +0.0073. Nothing here says the hidden score
+  rises by 0.016.
+- **Justin has not confirmed the merge itself.** He put F3 forward and ran its first gates (PR #23, ask 1), and
+  PR #26 tells him. If he objects, reverting PR #26's merge commit undoes it: one constant
+  (`katena.pipeline.SUBMISSION_SPEC`), the expected hashes and the documents. F's code path stays (`--spec F`).
+
+**Checked on this branch before the merge.**
+
+| Check | Result |
+|---|---|
+| CI on the pull request | Passes on Ubuntu, Windows and macOS |
+| `repro.yml` with the branch's default spec, run 43132799061 at `d794f13` | F3 trained from an empty cache on three runners (Ubuntu on AMD EPYC 9V45, Windows Server on AMD EPYC 7763, macOS on Apple M1). The dressed CSV is this PC's `72d7c3fb...` on each, and the LightGBM hash is `056ffa8a...` on each. With Nov 11's runs that is seven OS and CPU combinations |
+| The whole test suite on this PC | Passes |
+
+**What changes for the real run.** `scripts/real_run.py --team <team_name>` now trains and checks F3: `train`
+takes about 20 minutes on the PC, and the hashes it expects are gbdt `056ffa8a...`, tcn `4ec1a79e...` and bundle
+`0a6359f3...` (`docs/repro/expected-windows.json`). The command itself is the same.
+
+**Still open, and not Claude's to do:** the team name and the real run, which only David can do.
+
+### The submitted technical document is a short one (decision)
+
+**`docs/technical-document.md` is now 5 pages, and the 9-page text is `docs/technical-document-full.md`.** The
+organisers ask for "a few pages". David handed this decision over with the adoption, and Claude decided to cut.
+
+- **What the short one keeps.** The six things `SUBMISSION.md` asks for: the approach, the assets used and
+  dropped, every labelled dataset with its source and who labelled it, the possession rules, the limitations and
+  the reproduction. One results table takes the model from the starter algorithm to F3. No number is new: each
+  is in the long version or in this log.
+- **What went to the long version only.** The feature-group table, the severity table and the world formulas,
+  the bench table, the per-package tables of F and F3, the per-variant rows of the label conventions, the list of
+  machines, the cost table and the map of the repository.
+- **Where the real run's blanks are.** Only in the short document: its three `TODO(after the real run)` markers
+  (the public-window result, the tagged commit, the file's SHA-256). `scripts/build_document.py` prints the
+  short one and refuses while a marker is left.
+
+**The three disclosure points of the plan are decided: all three are disclosed**, in section 9 of the short
+document and section 10 of the long one.
+
+| Point | What the document says |
+|---|---|
+| A hosted AI assistant | Most of the code and of the document was written with one, under the team's direction. The competition's data was kept away from it: the repository's rules forbid it the data folder, only team members ran anything on the provided match, and those runs print pass or fail and aggregates only |
+| The Zenodo record | An automated agent searching for external datasets opened a public record that held statistics about the provided game. The file was deleted and nothing from it was used |
+| StatsBomb | 35 matches were downloaded to a temporary folder before the agreement was read. They were not used |
+
+**David has to confirm the first row.** It says what was and was not shown to an assistant, and only David and
+Justin know that for their own sessions. If a file, a frame or a per-frame value of the provided match ever
+reached one, the sentence has to change before the document is submitted.
+
+### The night's other work (the four entries below)
+
+Claude on David's PC, overnight; David had read none of it when it was written. None of the four changes a
+model, a feature, a label or a hash. Nothing ran on the provided match and no fold was scored.
+
+### Stress check of the submission path: `scripts/stress_predict.py` (result)
+
+**Every case passes, with F and with F3: 30 of 30 each.** `scripts/stress_predict.py` at `1851600`, on the dressed
+external match (IDSSE `DFL-MAT-J03WMX`, 173,528 frames), with the all-30 models in `D:/katena/work-submit`, which it
+reads and never writes. Claude on David's PC, overnight. External data only. No score was computed and nothing was
+chosen.
+
+**Why.** Until the real run, the provided match has been read by the loader check only. No feature, model or
+decoder code has run on it, and nobody may look at it to debug. The training worlds corrupt external matches at
+5 Hz, in the ways the degrader was built for. This check damages the native-rate match that `predict` reads, in
+ways the degrader does not produce, and asks one thing of each case: does `label_match` finish and write a valid
+file?
+
+**What a pass means.** `label_match` returned. Every frame in the graded halves is H, A or D, and every other
+frame is X. The CSV passed the official checks (`pipeline.write_submission`). A second labelling of the same case
+gave the same labels (`--twice`). It says nothing about accuracy: the labels of a damaged match are not scored.
+
+Every case but the first starts from `target_like`. The last two columns give, for information, the share of
+graded frames whose label differs from that case's.
+
+| Case | What is damaged | F: frames relabelled | F3: frames relabelled |
+|---|---|---|---|
+| `as_exported` | The match as exported: 22 identified players, the provider's ball | 2.5% | 2.8% |
+| `target_like` | 46 anonymous slots, tracks cut into fragments, 41% of the ball missing in bursts (the reference) |  |  |
+| `target_like_through_the_file` | The same, written as an ATD bundle and read back |  |  |
+| `away_team_absent_second_half` | No away slot tracked in the second half | 4.7% | 4.3% |
+| `ball_absent_everywhere` | No ball on any frame | 46.8% | 35.5% |
+| `ball_absent_first_half` | No ball in the first half | 25.3% | 18.4% |
+| `ball_flickers` | The ball missing on a random half of the frames, frame by frame | 1.8% | 1.7% |
+| `ball_frozen_everywhere` | The ball on the centre spot whenever it is seen | 32.9% | 39.8% |
+| `ball_off_pitch` | 2% of ball samples up to 30 m off the pitch, 0.5% up to 10 km away | 1.5% | 2.4% |
+| `ball_one_coordinate` | On a tenth of the frames, only x or only y of the ball | 1.6% | 2.2% |
+| `ball_random_every_frame` | The ball at a random place on every frame | 14.7% | 33.3% |
+| `ball_seen_10_percent` | The ball seen on 10% of frames | 12.2% | 9.4% |
+| `everyone_on_one_spot` | Every player on one point for 5 minutes | 4.2% | 4.1% |
+| `everything_absent_5_minutes` | Nothing tracked for 5 minutes of each half | 7.1% | 7.3% |
+| `ghost_duplicates` | Eight slots repeat another slot for a third of the match | 0.6% | 0.9% |
+| `half_edges_empty` | Nothing tracked in the first and last 2 minutes of each half | 4.0% | 4.3% |
+| `heavy_jitter` | 1 m of noise per frame on every player and the ball | 16.3% | 13.4% |
+| `home_team_absent_everywhere` | No home slot tracked at all | 20.9% | 24.6% |
+| `infinite_values` | 400 ball samples and 0.01% of player samples infinite | 0.0% | 0.1% |
+| `players_absent_5_minutes` | No player tracked for 5 minutes of each half; the ball stays | 2.9% | 3.0% |
+| `players_frozen_10_minutes` | Every player frozen for 10 minutes | 6.5% | 6.2% |
+| `players_off_pitch` | 1% of player samples up to 500 m away | 1.1% | 1.2% |
+| `slots_trade_teams` | 40 stretches of 20 to 120 s in which a home and an away slot swap | 0.4% | 0.5% |
+| `speed_absent` | No speed value | 0.0% | 0.0% |
+| `speed_garbage` | Random speed values | 0.0% | 0.0% |
+| `teams_do_not_change_ends` | The second half mirrored, so the teams keep their ends | 0.0% | 0.0% |
+| `teams_overlap` | Every player within a metre of the halfway line, so no attack direction can be read | 41.0% | 41.8% |
+| `three_slots_per_team` | Three slots per team | 24.1% | 16.6% |
+| `tracked_outside_the_halves` | Tracking present outside the graded halves too | 0.0% | 0.0% |
+| `tracks_flicker` | Every slot seen on a random 30% of frames | 6.3% | 5.4% |
+
+- **Through the file format.** The reference case was also written as an ATD bundle with 46 slots and read back
+  by `load_target`: every field is equal and no label differs.
+- **Four damages change no label** in either model: no speed values, random speed values, teams that keep their
+  ends, and tracking outside the halves. So the features do not read the speed column, and the attack direction
+  comes from the positions alone.
+- **Infinite values behave like missing ones** (0.0% and 0.1% of frames).
+- **The largest effects are the expected ones.** With no ball at all, a third to a half of the graded frames
+  change, most of them to D: its share rises from 0.41 to 0.76 (F3) and 0.88 (F). With no attack direction to
+  read, 41% change.
+- **Cost.** 26 to 75 s a case for the two labellings, about 20 minutes (F) and 29 (F3) for the 30 cases beside
+  another heavy job.
+
+**Not covered.** Damage to the file itself (malformed lines, missing frames, another number of slots): the loader
+check on the real file is the test of that, and it passed 16 of 16 on Nov 7. Several damages at once. Accuracy.
+
+**No failure was found, so no code changed.** Tables: `D:/katena/logs/stress/stress_F.json` and `stress_F3.json`.
+`tests/test_stress_predict.py` checks on a synthetic match that each case does the damage its name says.
+
+### A bare Linux and an outside read of the documents: what would have stopped a reproduction (PR #28)
+
+**Seven problems, all fixed, none of which touches a label.** They came from two places:
+
+- **A Linux that is not a GitHub runner.** The pipeline's first run on Ubuntu 24.04 under WSL on the Windows PC,
+  as installed, with nothing added (the entry on Linux on Intel, above).
+- **An outside read.** A fresh agent got the repository and the organisers' `SUBMISSION.md`, and was asked to
+  regenerate the file as an organiser would and to report what stops or misleads. It read only; it ran nothing
+  but `--help`.
+
+| Problem | Found by | Fix |
+|---|---|---|
+| Without the system's `libgomp.so.1`, every script stopped with "install it (brew install libomp)". LightGBM's Linux wheel takes that library from the system; GitHub's runners have it, a bare WSL distribution and slim container images do not | The WSL run | `gbdt.ensure_openmp` names the platform's package (`apt-get install libgomp1`, `dnf install libgomp`) and quotes the loader's error |
+| A misplaced data bundle was noticed only by `predict`, after the download and the training, with no path in the message | The read | `make_submission.py bundle` checks that the three files `predict` reads exist (names only). `make submit` and `make_submission.py all` run it first |
+| With no Smart Tagging file, `predict` skipped the kickoff rule and went on; only a line of its report said so. The result is a valid CSV with other labels | The read | `predict` on the competition match stops when the file is missing. An exported external match (`--timeline`) is unchanged |
+| `make validate` ended with `shasum -a 256`, which is not on every Linux | The read | Python computes the hash |
+| `$(OUT)` was unquoted, so a team name with a space broke `make submit` | The read | Quoted in every recipe |
+| `REPRODUCE.md` did not say where the bundle goes, and left out git, network access, the uv version, `libgomp1`, and that torch's Linux wheels add about 6 GB | Both | A "Where the data bundle goes" section and a fuller Requirements list |
+| `real-run.md` said `check_kickoff_tags.py` runs "once that script is on main"; the by-hand list and `make check-target` left it out | The read | One list in all three places |
+
+**The Makefile was run with a real GNU make** (4.3, under WSL; `make` is on neither the Windows PC nor in CI's
+steps), on a folder of empty files named like the bundle and on a published baseline file:
+
+- `make -n submit TEAM="My Team"` prints the eight commands with the name quoted.
+- With no bundle, `make submit` stops at its first step, names the three missing paths, and creates no cache
+  and starts no download.
+- `make validate TEAM="My Team"` validates the file and prints the hash `sha256sum` gives.
+- Without `libgomp.so.1`, the first step prints the package to install.
+
+**The read's other findings** are fixed in the technical document's long version: the summary names the one
+Smart Tagging input, the machine lists match the tables of Nov 10 and 11, "ten gated packages" says what it
+leaves out, and section 8 lists six steps. It checked and found right: every command and flag in the
+documents, the library versions against `uv.lock`, F's and F3's sizes against the code, and the hashes in
+`expected-windows.json` and `real-run.md` against this log.
+
+**Its list of cuts** became the short technical document (the entry above).
+
+### The technical document as a PDF (PR #27)
+
+`uv run scripts/build_document.py --team <team_name>` writes `submissions/<team_name>.pdf`, the name the form
+asks for: A4, page numbers, the team name in place of `<team_name>`. It refuses while a `TODO(` marker is left
+(`--draft` builds anyway). Markdown goes to HTML with `markdown-it-py`, which the script declares for itself, so
+`uv.lock` is unchanged; Edge or Chrome prints the page headless. The long document printed to 9 pages; the short
+one (the entry above) prints to 5.
+
+### For the record: F3's dressed-match scores to six decimals
+
+The technical document on `david/f3-adopt` quotes them, and this log had four decimals (R2, Nov 11). From
+`D:/katena/logs/f3/compare_held.log`: spellF1 0.722130 and macroF1 0.941533 on the evaluation path and from the
+official scorer on the CSV, 260 predicted possessions against 341 true. One fold at clean input, as R2 said.
+
 ## 2026-11-11
 
 ### K1 and B1: result (Claude; Justin has not read it yet)

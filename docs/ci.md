@@ -54,7 +54,9 @@ python scripts/synthetic_e2e.py compare /tmp/e2e-1/hashes.json /tmp/e2e-2/hashes
 
 On macOS without Homebrew's libomp, LightGBM tests skip unless you point at the copy scikit-learn
 bundles: `DYLD_FALLBACK_LIBRARY_PATH=.venv/lib/python3.11/site-packages/sklearn/.dylibs uv run pytest -q`
-(scripts do this themselves through `gbdt.ensure_openmp`).
+(scripts do this themselves through `gbdt.ensure_openmp`). On Linux without the system's `libgomp.so.1` (slim
+container images, a bare WSL distribution) the LightGBM tests skip too, and the scripts stop with the package to
+install (`apt-get install libgomp1`).
 
 ### Git hooks
 
@@ -142,7 +144,7 @@ real match could flip.
 
 ## Cross-OS reproduction (repro)
 
-`repro.yml` answers J3 on GitHub's runners: does F train and label identically on another OS? It runs only
+`repro.yml` answers J3 on GitHub's runners: does the model train and label identically on another OS? It runs only
 when dispatched (Actions, then Repro, then Run workflow, or `gh workflow run repro.yml -f os=all`), never on
 pushes or pull requests: one run keeps three runners busy for 30-45 minutes. It never sees the competition match.
 Results so far: `docs/decision-log.md`, 2026-11-10, "J3: cross-OS reproduction in CI".
@@ -152,7 +154,7 @@ run) frees disk, then: `uv sync --frozen`; restores the raw external downloads f
 `scripts/external_manifest.json`); `build_external.py`, which checks every raw file against its pinned SHA-256
 (a new pin fails the step); `make_submission.py corpus`, `worlds` (workers = CPU count) and `train`;
 `cache_digests.py dump`; `dressed_check.py export` of IDSSE `DFL-MAT-J03WMX`; and `predict` of that bundle
-with the all-30 model, as the Windows reference was made. `scripts/repro_ci.py report` then writes one JSON:
+with the all-30 model, as the Windows references were made (`spec` chooses F or F3). `scripts/repro_ci.py report` then writes one JSON:
 model and part hashes, stage digests, the dressed bundle's and CSV's sha256, versions, CPU facts, stage
 timings and label aggregates (counts, one score, one hash per 1,000 frames). The CSV is never uploaded.
 
