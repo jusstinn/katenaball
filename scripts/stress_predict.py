@@ -100,11 +100,15 @@ def bursts(n: int, share: float, mean_len: float, rng) -> np.ndarray:
     return out
 
 
-def span(m: Match, half: int, start_s: float, length_s: float) -> slice:
-    """Frames of ``length_s`` seconds starting ``start_s`` seconds into a half block (clipped to the block)."""
+def span(m: Match, half: int, start: float = 0.0, length_s: float | None = None) -> slice:
+    """Frames of a half block from the fraction ``start`` of its length on: ``length_s`` seconds of them (at most
+    a quarter of the half, so a short test match keeps its shape), or the rest of the half when None."""
     a, b = next((a, b) for h, a, b in m.half_blocks if h == half)
-    s = min(b + 1, a + int(start_s * m.fps))
-    return slice(s, min(b + 1, s + int(length_s * m.fps)))
+    n = b - a + 1
+    s = a + int(start * n)
+    if length_s is None:
+        return slice(s, b + 1)
+    return slice(s, min(b + 1, s + max(1, min(int(length_s * m.fps), n // 4))))
 
 
 def anonymous_slots(m: Match, rng, mean_s: float = 30.0, gap_share: float = 0.3) -> Match:
@@ -156,7 +160,7 @@ def target_like(m: Match, rng) -> Match:
 # the cases: each takes the target-like match (a private copy) and a generator, and returns a Match
 
 def c_ball_absent_first_half(m, rng):
-    m.ball[span(m, 1, 0, 1e9)] = np.nan
+    m.ball[span(m, 1)] = np.nan
     return m
 
 
@@ -177,27 +181,29 @@ def c_ball_flickers(m, rng):
 
 def c_players_absent_5_minutes(m, rng):
     for h, _, _ in m.half_blocks:
-        s = span(m, h, 600, 300)
+        s = span(m, h, 0.2, 300)
         m.P[s], m.speed[s] = np.nan, np.nan
     return m
 
 
 def c_everything_absent_5_minutes(m, rng):
     for h, _, _ in m.half_blocks:
-        s = span(m, h, 600, 300)
+        s = span(m, h, 0.2, 300)
         m.P[s], m.speed[s], m.ball[s] = np.nan, np.nan, np.nan
     return m
 
 
 def c_half_edges_empty(m, rng):
     for h, a, b in m.half_blocks:
-        for s in (span(m, h, 0, 120), slice(max(a, b + 1 - int(120 * m.fps)), b + 1)):
+        first = span(m, h, 0.0, 120)
+        k = first.stop - first.start
+        for s in (first, slice(b + 1 - k, b + 1)):
             m.P[s], m.speed[s], m.ball[s] = np.nan, np.nan, np.nan
     return m
 
 
 def c_away_team_absent_second_half(m, rng):
-    s = span(m, 2, 0, 1e9)
+    s = span(m, 2)
     m.P[s, m.team == 1], m.speed[s, m.team == 1] = np.nan, np.nan
     return m
 
@@ -245,7 +251,7 @@ def c_ghost_duplicates(m, rng):
 
 
 def c_everyone_on_one_spot(m, rng):
-    s = span(m, 1, 900, 300)
+    s = span(m, 1, 0.35, 300)
     m.P[s] = np.where(np.isfinite(m.P[s]), np.float32(40.0), np.nan)
     return m
 
@@ -261,7 +267,7 @@ def c_speed_garbage(m, rng):
 
 
 def c_players_frozen_10_minutes(m, rng):
-    s = span(m, 1, 1200, 600)
+    s = span(m, 1, 0.5, 600)
     m.P[s] = m.P[s.start]
     return m
 
@@ -284,7 +290,7 @@ def c_heavy_jitter(m, rng):
 
 
 def c_teams_do_not_change_ends(m, rng):
-    s = span(m, 2, 0, 1e9)
+    s = span(m, 2)
     m.P[s, :, 0] = m.pitch[0] - m.P[s, :, 0]
     m.ball[s, 0] = m.pitch[0] - m.ball[s, 0]
     return m
