@@ -26,15 +26,15 @@ Replace `<team_name>` with the team name registered on the form (the file must b
 .venv\Scripts\python.exe scripts\real_run.py --team <team_name>
 ```
 
-It does steps 1 to 3 below in order, the same commands with the same checks, and stops at the first failure:
+It runs the six steps listed here, which cover steps 1 to 3 below with the same commands and the same checks,
+and it stops at the first failure:
 
 1. **Environment.** `MTAH_DATA_DIR` is set and the bundle's files exist (it checks existence only, through
    `games.asset_paths`, and opens nothing). `KATENA_WORK` and `KATENA_EXTERNAL` exist, with 30 external
    matches. It prints the git commit, whether the tree is clean, and Python and the library versions against
    `pyproject.toml`.
-2. **The checks on the provided files** (step 1 below), plus `check_kickoff_tags.py` once that script is on
-   `main`. It prints only their PASS/FAIL lines, and for the touch check the feature shape. A FAIL or a
-   `raised <SomeError>` line stops the run.
+2. **The checks on the provided files** (step 1 below). It prints only their PASS/FAIL lines, and for the touch
+   check the feature shape. A FAIL or a `raised <SomeError>` line stops the run.
 3. **`make_submission.py all --workers 2`** (step 2 below), with its output streamed. Then it compares the model
    hashes with [`docs/repro/expected-windows.json`](repro/expected-windows.json). A different gbdt hash stops
    the run, before `predict` when it can. A different tcn or bundle hash alone is printed as a `WARN`.
@@ -68,6 +68,7 @@ fails in a way you need to look at step by step, or to re-run one step.
 .venv\Scripts\python.exe scripts\check_target.py          # 16/16 PASS on 2026-11-07; re-run after any loader change
 .venv\Scripts\python.exe scripts\check_target_layout.py   # never run yet: expect "PASS katena.target.atd reads this layout as intended"
 .venv\Scripts\python.exe scripts\check_touch_target.py    # an alarm only: it must finish and print a feature shape
+.venv\Scripts\python.exe scripts\check_kickoff_tags.py    # PASS or WARN; FAIL means a kickoff tag lies more than 2 s after the published kickoff
 ```
 
 If any of them prints FAIL or `raised <SomeError>`, stop and report the line.
@@ -111,7 +112,15 @@ Get-FileHash -Algorithm SHA256 submissions\<team_name>.csv
 1. Tag the exact commit that produced the file: `git tag submission-v1` then `git push origin submission-v1`.
    The release workflow refuses a tag whose commit is not on `main`.
 2. Fill the hash, tag and public-window result into `docs/technical-document.md` (the `TODO(after the real
-   run)` markers), and export it as `<team_name>.pdf` or keep it as `.md`.
+   run)` markers) and commit it. Then build the PDF the form asks for:
+
+   ```powershell
+   uv run scripts\build_document.py --team <team_name>
+   ```
+
+   It writes `submissions\<team_name>.pdf` (A4, 9 pages on 2026-11-12) with the team name in the title, and
+   prints its page count and SHA-256. It refuses to build while a marker is left; `--draft` builds anyway. It
+   needs Edge or Chrome, which it runs headless, and no network. The form also accepts the `.md`.
 3. Submit through the organisers' Google Form (link by email by 2026-11-14; deadline 2026-11-17 23:59 CET):
    - the team name;
    - `submissions\<team_name>.csv`, after validating that exact file;

@@ -10,26 +10,48 @@ from dataclasses import dataclass
 import numpy as np
 
 
+def openmp_hint(platform: str | None = None) -> str:
+    """What to install when LightGBM cannot load its OpenMP runtime, by platform (default: this one)."""
+    platform = platform or sys.platform
+    if platform == "darwin":
+        return "lightgbm cannot load libomp; install it (brew install libomp)"
+    if platform.startswith("linux"):
+        return ("lightgbm cannot load the OpenMP runtime libgomp.so.1, which its Linux wheel takes from the system. "
+                "Install it and run the same command again: apt-get install libgomp1 (Debian, Ubuntu), "
+                "dnf install libgomp (Fedora, RHEL), apk add libgomp (Alpine). Slim container images and a bare "
+                "WSL distribution do not have it")
+    if platform == "win32":
+        return ("lightgbm cannot load: its Windows wheel needs the Microsoft Visual C++ runtime "
+                "(install the Microsoft Visual C++ Redistributable, x64)")
+    return "lightgbm cannot load its OpenMP runtime"
+
+
 def ensure_openmp() -> None:
-    """Entry-point helper. LightGBM needs libomp. Without Homebrew, the copy bundled in scikit-learn
-    works when ``DYLD_FALLBACK_LIBRARY_PATH`` points at it, and that variable is only read at process
-    start, so re-exec once. Call this first thing in a script (not from library code)."""
+    """Entry-point helper. LightGBM needs an OpenMP runtime. On macOS without Homebrew's libomp, the copy
+    bundled in scikit-learn works when ``DYLD_FALLBACK_LIBRARY_PATH`` points at it, and that variable is only
+    read at process start, so re-exec once. Elsewhere there is nothing to fall back on: say what to install
+    (``openmp_hint``). Call this first thing in a script (not from library code)."""
     if lgb is not None:
         return
     if "pytest" in sys.modules:      # re-exec would replace the test runner; LightGBM tests skip instead
         return
+    why = f" [{_LGB_ERROR}]" if _LGB_ERROR else ""
+    if sys.platform != "darwin":
+        raise RuntimeError(openmp_hint() + why)
     import sklearn
     d = os.path.join(os.path.dirname(sklearn.__file__), ".dylibs")
     if not glob.glob(os.path.join(d, "libomp*")) or os.environ.get("_KATENA_REEXEC"):
-        raise RuntimeError("lightgbm cannot load libomp; install it (brew install libomp)")
+        raise RuntimeError(openmp_hint() + why)
     env = dict(os.environ, DYLD_FALLBACK_LIBRARY_PATH=d, _KATENA_REEXEC="1")
     os.execve(sys.executable, [sys.executable] + sys.orig_argv[1:], env)
 
 
+_LGB_ERROR = ""
 try:
     import lightgbm as lgb
-except OSError:                      # libomp missing: see ensure_openmp
+except OSError as e:                 # the OpenMP runtime is missing: see ensure_openmp
     lgb = None
+    _LGB_ERROR = str(e).splitlines()[0][:200] if str(e) else type(e).__name__
 
 PARAMS = dict(objective="binary", learning_rate=0.1, num_leaves=31, min_data_in_leaf=50,
               feature_fraction=0.5, bagging_fraction=0.5, bagging_freq=1, max_bin=63,

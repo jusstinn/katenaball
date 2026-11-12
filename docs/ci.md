@@ -54,7 +54,9 @@ python scripts/synthetic_e2e.py compare /tmp/e2e-1/hashes.json /tmp/e2e-2/hashes
 
 On macOS without Homebrew's libomp, LightGBM tests skip unless you point at the copy scikit-learn
 bundles: `DYLD_FALLBACK_LIBRARY_PATH=.venv/lib/python3.11/site-packages/sklearn/.dylibs uv run pytest -q`
-(scripts do this themselves through `gbdt.ensure_openmp`).
+(scripts do this themselves through `gbdt.ensure_openmp`). On Linux without the system's `libgomp.so.1` (slim
+container images, a bare WSL distribution) the LightGBM tests skip too, and the scripts stop with the package to
+install (`apt-get install libgomp1`).
 
 ### Git hooks
 
