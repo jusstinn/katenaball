@@ -4,6 +4,40 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-12
+
+### F3 is the submission model (decision)
+
+**F3 replaces F as the submission model, from the merge of PR #26 on 2026-11-12.** That is two days before the
+plan's cut-off (Nov 14, 18:00 CET).
+
+- **Who decided.** David, by handing the decision over. He was asked twice whether to merge PR #26, and on
+  Nov 12 at about 03:17 CET he answered "make the best decisions you see fit". Claude then decided yes.
+- **Why yes.** The registration of Nov 11 said in advance what a pass would mean, and everything in it passed:
+  the gate on both machines (+0.0161 [+0.0118, +0.0207], 21 of 28 folds; not worse at `severe`, not worse on the
+  SkillCorner folds) and the reproduction checks R0 to R5. F3 also gains in the smooth and the coupled worlds, so
+  the gain does not rest on one kind of simulated noise.
+- **What it does not show.** The 28 folds had been seen before, 8 of them chose the tree count, and on the 20
+  SkillCorner folds, the only broadcast tracking we have, the gain is +0.0073. Nothing here says the hidden score
+  rises by 0.016.
+- **Justin has not confirmed the merge itself.** He put F3 forward and ran its first gates (PR #23, ask 1), and
+  PR #26 tells him. If he objects, reverting PR #26's merge commit undoes it: one constant
+  (`katena.pipeline.SUBMISSION_SPEC`), the expected hashes and the documents. F's code path stays (`--spec F`).
+
+**Checked on this branch before the merge.**
+
+| Check | Result |
+|---|---|
+| CI on the pull request | Passes on Ubuntu, Windows and macOS |
+| `repro.yml` with the branch's default spec, run 43132799061 at `d794f13` | F3 trained from an empty cache on three runners (Ubuntu on AMD EPYC 9V45, Windows Server on AMD EPYC 7763, macOS on Apple M1). The dressed CSV is this PC's `72d7c3fb...` on each, and the LightGBM hash is `056ffa8a...` on each. With Nov 11's runs that is seven OS and CPU combinations |
+| The whole test suite on this PC | Passes |
+
+**What changes for the real run.** `scripts/real_run.py --team <team_name>` now trains and checks F3: `train`
+takes about 20 minutes on the PC, and the hashes it expects are gbdt `056ffa8a...`, tcn `4ec1a79e...` and bundle
+`0a6359f3...` (`docs/repro/expected-windows.json`). The command itself is the same.
+
+**Still open, and not Claude's to do:** the team name and the real run, which only David can do.
+
 ## 2026-11-11
 
 ### F3 on the Windows PC: the gate (result)
