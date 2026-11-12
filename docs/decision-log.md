@@ -6,6 +6,68 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-11
 
+### K1 and B1: result (Claude; Justin has not read it yet)
+
+**Both fail the registered rule. F3 is unchanged. K's TCN has not been trained yet.** One run on the Mac at HEAD
+`63e439f`, the commit that holds the registration (below), 13:44 to 14:34 PST on Nov 11, on battery in Low Power
+Mode (a LightGBM fold took its usual time). External development matches only. Nothing in the registration was
+changed. Tables: `work/final/run_kb.log`; verdicts: `k1_gate.json`, `b_gate_f3.json` beside it, both with
+`registered_run: true`.
+
+**Checks the run printed.** F3 re-decoded equals its stored scores on 56 of 56 values, in both scripts. B1's
+decoder at lam = 0 gives the incumbent's decoded rows on 56 of 56. K1's team-head code on 213 columns gave
+`T1200`'s cached probabilities byte for byte (the check before the registration).
+
+**K1 gate: the label-kind column in the LightGBM team head, blended with `LT`, against F3, 28 folds.**
+
+| Comparison | Folds | K1 | F3 | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6225 | 0.6180 | +0.0045 | [+0.0013, +0.0079] | 18/28 |
+| `severe`, all (rule: not worse) | 28 | 0.5885 | 0.5840 | +0.0044 | [+0.0013, +0.0078] | 17/28 |
+| `target`, SkillCorner (rule: not worse) | 20 | 0.6096 | 0.6103 | -0.0007 | [-0.0044, +0.0028] | 10/20 |
+| `severe`, SkillCorner | 20 | 0.5823 | 0.5816 | +0.0007 | [-0.0027, +0.0040] | 11/20 |
+| `target`, IDSSE + Metrica | 8 | 0.6550 | 0.6374 | +0.0175 | [+0.0104, +0.0250] | 8/8 |
+| `severe`, IDSSE + Metrica | 8 | 0.6038 | 0.5900 | +0.0138 | [+0.0075, +0.0207] | 6/8 |
+
+K1 fails on the win count: 18 of 28 at `target`, the rule needs 20. The interval is above 0 and both guards hold.
+The split is the one S1 and S2 showed, with one difference: the SkillCorner folds are not hurt at either
+severity, alone or blended. Information only: the member alone is +0.0090 at `target` on 28 folds (20/28), +0.0312
+on IDSSE + Metrica (8/8) and +0.0001 on SkillCorner (12/20). In the worlds where ball loss is tied to dead ball
+the blend gains +0.026 and +0.024 (8/8 each). The column takes 0.7% to 1.0% of the team head's split gain.
+Predicted possessions per true one: 0.729 to 0.766 on IDSSE + Metrica, 0.760 to 0.747 on SkillCorner.
+
+**K1 read with the other value of the column** (what a wrong value would cost; information, decides nothing).
+
+| Folds, `target` | Wrong value against F3 | Wrong value against K1 |
+|---|---|---|
+| IDSSE + Metrica read as kind 1 (8) | -0.0063 [-0.0121, -0.0000], 3/8 | -0.0238 [-0.0327, -0.0151], 0/8 |
+| SkillCorner read as kind 0 (20) | -0.0089 [-0.0139, -0.0038], 3/20 | -0.0082 [-0.0134, -0.0030], 5/20 |
+
+So the column is used, and it is not free: with the right value K1 gains 0.0175 on the folds labelled as the
+provided match's ground truth is described, and with the wrong value it loses 0.006 to 0.009 against F3.
+
+**B1 gate: the boundary head in the decoder, on F3's probabilities, against F3, 28 folds.**
+
+| Comparison | Folds | B1 | F3 | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6183 | 0.6180 | +0.0003 | [-0.0020, +0.0028] | 13/28 |
+| `severe`, all | 28 | 0.5846 | 0.5840 | +0.0006 | [-0.0015, +0.0030] | 11/28 |
+| `target`, SkillCorner | 20 | 0.6088 | 0.6103 | -0.0015 | [-0.0040, +0.0010] | 7/20 |
+| `target`, IDSSE + Metrica | 8 | 0.6423 | 0.6374 | +0.0049 | [-0.0010, +0.0110] | 6/8 |
+
+B1 fails on every part of the rule: no gain. It predicts more possessions (0.751 to 0.777 per true one) and they
+are not the right ones. The head is weak: held-out average precision 0.107 to 0.515, mean 0.221, on a target whose
+base rate is 0.043. Information only: lam = 0.5 is -0.0005, lam = 2 is -0.0970. **B1 is closed**: no other
+tolerance, lam, size or target is tried, and the pair test with K is void.
+
+**What stands, as registered.** K1 has failed and is not re-gated on 8 folds. K (the column in both members) is
+still to run: its condition was that K1 is not worse than F3 at `target` on 28 folds, and it is not. Its TCN
+needs about 4 hours on the charger with Low Power Mode off, so it waits for Justin. If K fails, F3 stands.
+
+**What this does not say.** Whether the 28-fold rule is the right judge of a change that helps one labelling
+process only. That question was left open on Nov 10 (the probe's point 2) and needs David's and Justin's names;
+this entry does not reopen it and adopts nothing.
+
 ### K1, K and B1 (pre-registration): a label-kind column, and a boundary head for the decoder
 
 **Registered before any score of any of the three.** Claude, at Justin's request ("implement possible
