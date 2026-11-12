@@ -1,13 +1,14 @@
-"""J2: the final pipeline. Train candidate F once on all 30 external matches, then label the real match.
+"""J2: the final pipeline. Train the submission model once on all 30 external matches, then label the real match.
 
 F is defined in ``katena.eval.final`` (docs/decision-log.md, "Final candidate F"): M2's LightGBM heads on M2's
 160 columns plus D1's 53 touch columns, trained on D2's ``d2j`` world mix; the M5 TCN on M2's columns, same
 mix; the two blended at w = 0.5 in logit space; Viterbi at tau = 2 with priors from the external labels.
 Nothing here is chosen on the real match: every constant comes from ``katena.eval.final`` and its imports.
 
-``SPECS`` names the models ``train`` can fit. ``F`` is the submission model. ``F3`` is the candidate of 2026-11-11
-(docs/decision-log.md): F with a 1,200-tree LightGBM member and a 4,800-step TCN that also reads the touch columns
-(``katena.eval.f3``). A spec other than F lives in its own ``model_<spec>/``, so it can never be taken for F.
+``SPECS`` names the models ``train`` can fit. ``F3`` is the submission model (docs/decision-log.md, 2026-11-11):
+F with a 1,200-tree LightGBM member and a 4,800-step TCN that also reads the touch columns (``katena.eval.f3``).
+``F`` is the model it replaced, kept so its checks can be re-run. Each spec has its own folder (``model/`` for F,
+``model_<spec>/`` otherwise), so one can never be taken for the other.
 
 Stages, each cached under ``KATENA_WORK`` (``scripts/make_submission.py`` sets it to ``work/final``):
 
@@ -68,7 +69,7 @@ class Spec:
 
 SPECS = {"F": Spec("F", 150, 1200, False),
          "F3": Spec("F3", F3.N_TREES, F3.STEPS, True)}
-SUBMISSION_SPEC = "F"       # the model `make submit` trains and predicts with; changed only by an adoption
+SUBMISSION_SPEC = "F3"      # the model `make submit` trains and predicts with; changed only by an adoption
 
 
 def spec_of(name: str | None = None) -> Spec:

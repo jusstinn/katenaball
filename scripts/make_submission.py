@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Regenerate the submission: train candidate F on the 30 external matches, then label the real match.
+"""Regenerate the submission: train the submission model (F3) on the 30 external matches, then label the real match.
 
     uv run python scripts/make_submission.py all  --out submissions/<team>.csv   # every stage, in order
     uv run python scripts/make_submission.py bundle                             # are the bundle's files there?
     uv run python scripts/make_submission.py corpus [--seed-from work/bakeoff]  # external corpus features
     uv run python scripts/make_submission.py worlds [--workers N]               # d2j worlds and touch columns
-    uv run python scripts/make_submission.py train                              # model/bundle.pkl + manifest
+    uv run python scripts/make_submission.py train                              # model_F3/bundle.pkl + manifest
     uv run python scripts/make_submission.py predict --out submissions/<team>.csv
 
 Needs the external corpus (``scripts/build_external.py``) and, for ``predict``, the data bundle in ``data/`` or

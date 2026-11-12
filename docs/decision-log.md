@@ -6,13 +6,113 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-12
 
-Claude on David's PC, overnight. David has read none of it. Nothing in this day's entries changes a model, a
-feature, a label or a hash. Nothing ran on the provided match and no fold was scored. F is still the submission
-model; whether F3 replaces it is still David's and Justin's decision (PR #26).
+### F3 is the submission model (decision)
+
+**F3 replaces F as the submission model, from the merge of PR #26 on 2026-11-12.** That is two days before the
+plan's cut-off (Nov 14, 18:00 CET).
+
+- **Who decided.** David, by handing the decision over. He was asked twice whether to merge PR #26, and on
+  Nov 12 at about 03:17 CET he answered "make the best decisions you see fit". Claude then decided yes.
+- **Why yes.** The registration of Nov 11 said in advance what a pass would mean, and everything in it passed:
+  the gate on both machines (+0.0161 [+0.0118, +0.0207], 21 of 28 folds; not worse at `severe`, not worse on the
+  SkillCorner folds) and the reproduction checks R0 to R5. F3 also gains in the smooth and the coupled worlds, so
+  the gain does not rest on one kind of simulated noise.
+- **What it does not show.** The 28 folds had been seen before, 8 of them chose the tree count, and on the 20
+  SkillCorner folds, the only broadcast tracking we have, the gain is +0.0073. Nothing here says the hidden score
+  rises by 0.016.
+- **Justin has not confirmed the merge itself.** He put F3 forward and ran its first gates (PR #23, ask 1), and
+  PR #26 tells him. If he objects, reverting PR #26's merge commit undoes it: one constant
+  (`katena.pipeline.SUBMISSION_SPEC`), the expected hashes and the documents. F's code path stays (`--spec F`).
+
+**Checked on this branch before the merge.**
+
+| Check | Result |
+|---|---|
+| CI on the pull request | Passes on Ubuntu, Windows and macOS |
+| `repro.yml` with the branch's default spec, run 43132799061 at `d794f13` | F3 trained from an empty cache on three runners (Ubuntu on AMD EPYC 9V45, Windows Server on AMD EPYC 7763, macOS on Apple M1). The dressed CSV is this PC's `72d7c3fb...` on each, and the LightGBM hash is `056ffa8a...` on each. With Nov 11's runs that is seven OS and CPU combinations |
+| The whole test suite on this PC | Passes |
+
+**What changes for the real run.** `scripts/real_run.py --team <team_name>` now trains and checks F3: `train`
+takes about 20 minutes on the PC, and the hashes it expects are gbdt `056ffa8a...`, tcn `4ec1a79e...` and bundle
+`0a6359f3...` (`docs/repro/expected-windows.json`). The command itself is the same.
+
+**Still open, and not Claude's to do:** the team name and the real run, which only David can do.
+
+### The night's other work (the four entries below)
+
+Claude on David's PC, overnight; David had read none of it when it was written. None of the four changes a
+model, a feature, a label or a hash. Nothing ran on the provided match and no fold was scored.
 
 ### Stress check of the submission path: `scripts/stress_predict.py` (result)
 
-STRESS_RESULT
+**Every case passes, with F and with F3: 30 of 30 each.** `scripts/stress_predict.py` at `1851600`, on the dressed
+external match (IDSSE `DFL-MAT-J03WMX`, 173,528 frames), with the all-30 models in `D:/katena/work-submit`, which it
+reads and never writes. Claude on David's PC, overnight. External data only. No score was computed and nothing was
+chosen.
+
+**Why.** Until the real run, the provided match has been read by the loader check only. No feature, model or
+decoder code has run on it, and nobody may look at it to debug. The training worlds corrupt external matches at
+5 Hz, in the ways the degrader was built for. This check damages the native-rate match that `predict` reads, in
+ways the degrader does not produce, and asks one thing of each case: does `label_match` finish and write a valid
+file?
+
+**What a pass means.** `label_match` returned. Every frame in the graded halves is H, A or D, and every other
+frame is X. The CSV passed the official checks (`pipeline.write_submission`). A second labelling of the same case
+gave the same labels (`--twice`). It says nothing about accuracy: the labels of a damaged match are not scored.
+
+Every case but the first starts from `target_like`. The last two columns give, for information, the share of
+graded frames whose label differs from that case's.
+
+| Case | What is damaged | F: frames relabelled | F3: frames relabelled |
+|---|---|---|---|
+| `as_exported` | The match as exported: 22 identified players, the provider's ball | 2.5% | 2.8% |
+| `target_like` | 46 anonymous slots, tracks cut into fragments, 41% of the ball missing in bursts (the reference) |  |  |
+| `target_like_through_the_file` | The same, written as an ATD bundle and read back |  |  |
+| `away_team_absent_second_half` | No away slot tracked in the second half | 4.7% | 4.3% |
+| `ball_absent_everywhere` | No ball on any frame | 46.8% | 35.5% |
+| `ball_absent_first_half` | No ball in the first half | 25.3% | 18.4% |
+| `ball_flickers` | The ball missing on a random half of the frames, frame by frame | 1.8% | 1.7% |
+| `ball_frozen_everywhere` | The ball on the centre spot whenever it is seen | 32.9% | 39.8% |
+| `ball_off_pitch` | 2% of ball samples up to 30 m off the pitch, 0.5% up to 10 km away | 1.5% | 2.4% |
+| `ball_one_coordinate` | On a tenth of the frames, only x or only y of the ball | 1.6% | 2.2% |
+| `ball_random_every_frame` | The ball at a random place on every frame | 14.7% | 33.3% |
+| `ball_seen_10_percent` | The ball seen on 10% of frames | 12.2% | 9.4% |
+| `everyone_on_one_spot` | Every player on one point for 5 minutes | 4.2% | 4.1% |
+| `everything_absent_5_minutes` | Nothing tracked for 5 minutes of each half | 7.1% | 7.3% |
+| `ghost_duplicates` | Eight slots repeat another slot for a third of the match | 0.6% | 0.9% |
+| `half_edges_empty` | Nothing tracked in the first and last 2 minutes of each half | 4.0% | 4.3% |
+| `heavy_jitter` | 1 m of noise per frame on every player and the ball | 16.3% | 13.4% |
+| `home_team_absent_everywhere` | No home slot tracked at all | 20.9% | 24.6% |
+| `infinite_values` | 400 ball samples and 0.01% of player samples infinite | 0.0% | 0.1% |
+| `players_absent_5_minutes` | No player tracked for 5 minutes of each half; the ball stays | 2.9% | 3.0% |
+| `players_frozen_10_minutes` | Every player frozen for 10 minutes | 6.5% | 6.2% |
+| `players_off_pitch` | 1% of player samples up to 500 m away | 1.1% | 1.2% |
+| `slots_trade_teams` | 40 stretches of 20 to 120 s in which a home and an away slot swap | 0.4% | 0.5% |
+| `speed_absent` | No speed value | 0.0% | 0.0% |
+| `speed_garbage` | Random speed values | 0.0% | 0.0% |
+| `teams_do_not_change_ends` | The second half mirrored, so the teams keep their ends | 0.0% | 0.0% |
+| `teams_overlap` | Every player within a metre of the halfway line, so no attack direction can be read | 41.0% | 41.8% |
+| `three_slots_per_team` | Three slots per team | 24.1% | 16.6% |
+| `tracked_outside_the_halves` | Tracking present outside the graded halves too | 0.0% | 0.0% |
+| `tracks_flicker` | Every slot seen on a random 30% of frames | 6.3% | 5.4% |
+
+- **Through the file format.** The reference case was also written as an ATD bundle with 46 slots and read back
+  by `load_target`: every field is equal and no label differs.
+- **Four damages change no label** in either model: no speed values, random speed values, teams that keep their
+  ends, and tracking outside the halves. So the features do not read the speed column, and the attack direction
+  comes from the positions alone.
+- **Infinite values behave like missing ones** (0.0% and 0.1% of frames).
+- **The largest effects are the expected ones.** With no ball at all, a third to a half of the graded frames
+  change, most of them to D: its share rises from 0.41 to 0.76 (F3) and 0.88 (F). With no attack direction to
+  read, 41% change.
+- **Cost.** 26 to 75 s a case for the two labellings, about 20 minutes (F) and 29 (F3) for the 30 cases beside
+  another heavy job.
+
+**Not covered.** Damage to the file itself (malformed lines, missing frames, another number of slots): the loader
+check on the real file is the test of that, and it passed 16 of 16 on Nov 7. Several damages at once. Accuracy.
+
+**No failure was found, so no code changed.** Tables: `D:/katena/logs/stress/stress_F.json` and `stress_F3.json`.
+`tests/test_stress_predict.py` checks on a synthetic match that each case does the damage its name says.
 
 ### A bare Linux and an outside read of the documents: what would have stopped a reproduction (PR #28)
 

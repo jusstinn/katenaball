@@ -1,12 +1,12 @@
 {
- "about": "Model hashes of the submission model (spec F) as scripts/make_submission.py trains it on the team's Windows PC. scripts/real_run.py compares the trained model's manifest.json with these: a different gbdt hash stops the run (the training data changed); a different tcn or bundle.pkl hash alone is a warning (torch's CPU kernels changed). Update these only together with a change to the model (W6), never to make a run pass.",
- "spec": "F",
+ "about": "Model hashes of the submission model (spec F3) as scripts/make_submission.py trains it on the team's Windows PC. scripts/real_run.py compares the trained model's manifest.json with these: a different gbdt hash stops the run (the training data changed); a different tcn or bundle.pkl hash alone is a warning (torch's CPU kernels changed). Update these only together with a change to the model (W6), never to make a run pass.",
+ "spec": "F3",
  "machine": "the team's Windows PC (x86-64), with the locked environment of uv.lock",
- "recorded": "2026-11-08",
- "source": "docs/decision-log.md (J3 on Windows); docs/real-run.md, step 2",
+ "recorded": "2026-11-11",
+ "source": "docs/decision-log.md (2026-11-11, F3 on the Windows PC: the reproduction checks); docs/real-run.md, step 2",
  "sha256": {
-  "gbdt": "b2146150e006ead3b543f2ee424c84d9a12446ff551dd505f9480eb6a582ec0e",
-  "tcn": "01488c84721327147b3975886e3b758a13f049531146bc54985b88976e8f6eb3",
-  "bundle.pkl": "cb0ea4fc546014665888a69ae86e4ba83f79cf7ff10dacc051f54b00f105a85c"
+  "gbdt": "056ffa8a41eaf246b741234351e30dcd8e5191446493e24e8c1ea3f2e6a5bc47",
+  "tcn": "4ec1a79e8f1303e1fa890879ffa34c983344c57fb3335139e49a35741f719bb3",
+  "bundle.pkl": "0a6359f3411082e32a9b1e97385eb430abc3eaf96198df6306a934b36e982cd9"
  }
 }

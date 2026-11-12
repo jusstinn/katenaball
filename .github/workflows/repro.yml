@@ -1,8 +1,8 @@
 # Cross-OS reproduction of the submission model (J3). What it runs and how to read it: docs/ci.md.
 #
 # It never sees the competition match. Each runner builds the public external corpus from its SHA-256-pinned
-# sources (scripts/build_external.py), builds the cache from empty, trains the chosen model spec (F, the submission
-# model, by default; F3 is the candidate of 2026-11-11) on all 30 external matches, exports
+# sources (scripts/build_external.py), builds the cache from empty, trains the chosen model spec (F3, the submission
+# model, by default; F is the model it replaced) on all 30 external matches, exports
 # one external match (IDSSE DFL-MAT-J03WMX) in the competition's ATD format, and labels it with that model, exactly
 # as the Windows reference in docs/repro/windows-reference.json was made. Uploads hashes, digests, versions, CPU
 # facts, timings and aggregates only: never a CSV, never a frame-level output. About 45 min on three runners,
@@ -20,11 +20,11 @@ on:
       spec:
         description: Model spec to train (katena.pipeline.SPECS)
         type: choice
-        default: F
-        options: [F, F3]
+        default: F3
+        options: [F3, F]
 
 concurrency:
-  group: repro-${{ github.ref_name }}-${{ inputs.spec || 'F' }}
+  group: repro-${{ github.ref_name }}-${{ inputs.spec || 'F3' }}
   cancel-in-progress: false
 
 permissions:
@@ -38,7 +38,7 @@ env:
   UV_VERSION: "0.13.1"
   UV_PYTHON: "3.11.17"
   MATCH: idsse/DFL-MAT-J03WMX     # the dressed external match of the Windows reference
-  SPEC: ${{ inputs.spec || 'F' }}
+  SPEC: ${{ inputs.spec || 'F3' }}
   PYTHONUNBUFFERED: "1"
 
 jobs:
