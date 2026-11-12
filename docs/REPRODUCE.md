@@ -56,8 +56,8 @@ shapes, hashes, run times).
   and predict on the CPU, on every OS.
 - 16 GB of RAM is enough.
 - On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model takes about 23 minutes:
-  corpus 4.5, worlds 9.5, LightGBM 0.5, TCN 8. On the team's Windows PC (4 cores) training alone takes about
-  20 minutes. Labelling the match takes well under a minute. The external download is extra.
+  corpus 4.5, worlds 9.5, LightGBM 0.5, TCN 8. On the team's Windows PC (4 cores) training takes about
+  20 minutes (23 measured with another job running). Labelling the match takes well under a minute. The external download is extra.
 - On macOS without Homebrew's libomp, the scripts load LightGBM through scikit-learn's bundled copy and
   re-execute themselves once (`gbdt.ensure_openmp`).
 
