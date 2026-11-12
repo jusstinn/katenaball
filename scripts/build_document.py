@@ -126,8 +126,12 @@ def find_browser(given: str | None = None) -> Path | None:
 
 
 def print_pdf(browser: Path, page: Path, out: Path, timeout: float = 180.0) -> tuple[int, str]:
-    """Run the browser headless on ``page`` and print it to ``out``. Returns its exit status and last output."""
-    with tempfile.TemporaryDirectory(prefix="katena-doc-profile-") as profile:
+    """Run the browser headless on ``page`` and print it to ``out``. Returns its exit status and last output.
+
+    The browser's helper processes can hold a file of the temporary profile for a moment after it exits (seen on
+    Windows with Edge on 2026-11-12, under load), so a profile that cannot be removed at once is left to the OS:
+    the PDF is already written by then."""
+    with tempfile.TemporaryDirectory(prefix="katena-doc-profile-", ignore_cleanup_errors=True) as profile:
         cmd = [str(browser), "--headless", "--disable-gpu", "--no-first-run", "--disable-extensions",
                f"--user-data-dir={profile}", "--no-pdf-header-footer", f"--print-to-pdf={out}", page.as_uri()]
         try:
@@ -176,7 +180,7 @@ def main(argv=None) -> int:
     out = (a.out or SUBMISSIONS / f"{a.team}.pdf").resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     page_html = to_html(text, f"{a.team}: technical document")
-    with tempfile.TemporaryDirectory(prefix="katena-doc-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="katena-doc-", ignore_cleanup_errors=True) as tmp:
         page = Path(tmp) / "document.html"
         page.write_text(page_html, encoding="utf-8", newline="\n")
         if out.exists():

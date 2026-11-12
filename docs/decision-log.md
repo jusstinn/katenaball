@@ -38,6 +38,35 @@ takes about 20 minutes on the PC, and the hashes it expects are gbdt `056ffa8a..
 
 **Still open, and not Claude's to do:** the team name and the real run, which only David can do.
 
+### The submitted technical document is a short one (decision)
+
+**`docs/technical-document.md` is now 5 pages, and the 9-page text is `docs/technical-document-full.md`.** The
+organisers ask for "a few pages". David handed this decision over with the adoption, and Claude decided to cut.
+
+- **What the short one keeps.** The six things `SUBMISSION.md` asks for: the approach, the assets used and
+  dropped, every labelled dataset with its source and who labelled it, the possession rules, the limitations and
+  the reproduction. One results table takes the model from the starter algorithm to F3. No number is new: each
+  is in the long version or in this log.
+- **What went to the long version only.** The feature-group table, the severity table and the world formulas,
+  the bench table, the per-package tables of F and F3, the per-variant rows of the label conventions, the list of
+  machines, the cost table and the map of the repository.
+- **Where the real run's blanks are.** Only in the short document: its three `TODO(after the real run)` markers
+  (the public-window result, the tagged commit, the file's SHA-256). `scripts/build_document.py` prints the
+  short one and refuses while a marker is left.
+
+**The three disclosure points of the plan are decided: all three are disclosed**, in section 9 of the short
+document and section 10 of the long one.
+
+| Point | What the document says |
+|---|---|
+| A hosted AI assistant | Most of the code and of the document was written with one, under the team's direction. The competition's data was kept away from it: the repository's rules forbid it the data folder, only team members ran anything on the provided match, and those runs print pass or fail and aggregates only |
+| The Zenodo record | An automated agent searching for external datasets opened a public record that held statistics about the provided game. The file was deleted and nothing from it was used |
+| StatsBomb | 35 matches were downloaded to a temporary folder before the agreement was read. They were not used |
+
+**David has to confirm the first row.** It says what was and was not shown to an assistant, and only David and
+Justin know that for their own sessions. If a file, a frame or a per-frame value of the provided match ever
+reached one, the sentence has to change before the document is submitted.
+
 ### The night's other work (the four entries below)
 
 Claude on David's PC, overnight; David had read none of it when it was written. None of the four changes a
@@ -143,23 +172,21 @@ steps), on a folder of empty files named like the bundle and on a published base
 - `make validate TEAM="My Team"` validates the file and prints the hash `sha256sum` gives.
 - Without `libgomp.so.1`, the first step prints the package to install.
 
-**The read's other findings** are in the technical document's commit of today: the summary now names the one
+**The read's other findings** are fixed in the technical document's long version: the summary names the one
 Smart Tagging input, the machine lists match the tables of Nov 10 and 11, "ten gated packages" says what it
 leaves out, and section 8 lists six steps. It checked and found right: every command and flag in the
 documents, the library versions against `uv.lock`, F's and F3's sizes against the code, and the hashes in
 `expected-windows.json` and `real-run.md` against this log.
 
-**Not done: shortening the technical document.** It prints to 9 pages and the organisers ask for "a few". The
-read's cuts, least loss first, would bring it to about 5: section 9 (the README has the same map); the bake-off
-table to one sentence; the cross-machine list and the cost table to a few lines; the second F table; the bench
-table; the label-convention rows merged. Whether to cut is the team's decision.
+**Its list of cuts** became the short technical document (the entry above).
 
 ### The technical document as a PDF (PR #27)
 
 `uv run scripts/build_document.py --team <team_name>` writes `submissions/<team_name>.pdf`, the name the form
 asks for: A4, page numbers, the team name in place of `<team_name>`. It refuses while a `TODO(` marker is left
 (`--draft` builds anyway). Markdown goes to HTML with `markdown-it-py`, which the script declares for itself, so
-`uv.lock` is unchanged; Edge or Chrome prints the page headless. Today's draft: 9 pages.
+`uv.lock` is unchanged; Edge or Chrome prints the page headless. The long document printed to 9 pages; the short
+one (the entry above) prints to 5.
 
 ### For the record: F3's dressed-match scores to six decimals
 

@@ -76,7 +76,7 @@ shapes, hashes, run times).
   the CPU vendor differs, because torch picks other kernels.
 - `.github/workflows/repro.yml` trained the model from an empty cache on GitHub's Linux, Windows and macOS
   runners and on the team's own machines. An external match exported in the provided format got a
-  byte-identical CSV every time (`docs/technical-document.md`, section 7; `docs/decision-log.md`, J3). That
+  byte-identical CSV every time (`docs/technical-document-full.md`, section 7; `docs/decision-log.md`, J3). That
   was shown on an external match, not on the provided one.
 
 ## Faster rebuild from a bake-off cache
