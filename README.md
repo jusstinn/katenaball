@@ -19,7 +19,7 @@ make submit TEAM=<team_name>     # external data -> model -> submissions/<team_n
 | `src/katena/` | Features (`featurize/`), noise simulation (`sim/`), models (`models/`), decoder (`decode/`), the gates (`eval/`), the provided match's loader (`target/`) |
 | `scripts/` | One script per experiment or check. Each one's docstring says what it ran and where it is logged |
 | `evaluation/` | The organisers' scorer and validator, unchanged |
-| `docs/technical-document.md` | The method, the training data and the results, for the submission |
+| `docs/technical-document.md`, `scripts/build_document.py` | The method, the training data and the results, for the submission; and the script that prints it as `<team_name>.pdf` |
 | `docs/decision-log.md` | Every decision with its pre-registration and result, newest first |
 | `docs/REPRODUCE.md`, `docs/real-run.md` | How to regenerate the file, and the checklist for the run on the provided match |
 | `docs/external-data.md`, `docs/label-convention.md` | The external corpus and how its labels map to H, A and D |

@@ -110,7 +110,15 @@ Get-FileHash -Algorithm SHA256 submissions\<team_name>.csv
 1. Tag the exact commit that produced the file: `git tag submission-v1` then `git push origin submission-v1`.
    The release workflow refuses a tag whose commit is not on `main`.
 2. Fill the hash, tag and public-window result into `docs/technical-document.md` (the `TODO(after the real
-   run)` markers), and export it as `<team_name>.pdf` or keep it as `.md`.
+   run)` markers) and commit it. Then build the PDF the form asks for:
+
+   ```powershell
+   uv run scripts\build_document.py --team <team_name>
+   ```
+
+   It writes `submissions\<team_name>.pdf` (A4, 9 pages on 2026-11-12) with the team name in the title, and
+   prints its page count and SHA-256. It refuses to build while a marker is left; `--draft` builds anyway. It
+   needs Edge or Chrome, which it runs headless, and no network. The form also accepts the `.md`.
 3. Submit through the organisers' Google Form (link by email by 2026-11-14; deadline 2026-11-17 23:59 CET):
    - the team name;
    - `submissions\<team_name>.csv`, after validating that exact file;
