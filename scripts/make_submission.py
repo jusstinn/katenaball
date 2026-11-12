@@ -69,7 +69,7 @@ def main(argv=None) -> int:
                     help=f"the model to train or predict with (default: the submission model, {PL.SUBMISSION_SPEC})")
     chk = ap.add_argument_group("dressed-match check only (scripts/dressed_check.py), never for the submission")
     chk.add_argument("--hold-out", action="append", default=[], metavar="KEY",
-                     help="train / predict with the model that leaves this external match out (model_without_*/)")
+                     help="train / predict with the model that leaves this external match out (model*_without_*/)")
     chk.add_argument("--timeline", type=Path, default=None,
                      help="predict: the exported match's timeline JSON in place of games.py's")
     a = ap.parse_args(argv)

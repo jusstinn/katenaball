@@ -66,7 +66,7 @@ WORKERS = 2
 # katena.pipeline's names (tests/test_real_run.py checks they agree); imported, it would pull in torch.
 MODEL_DIR, MANIFEST, BUNDLE = "model", "manifest.json", "bundle.pkl"
 HASH_KEYS = ("gbdt", "tcn", BUNDLE)
-N_EXTERNAL = 30                            # external matches F trains on
+N_EXTERNAL = 30                            # external matches the model trains on
 # The bundle files the run reads: the tactical tracking and tags (predict and check_target), and the
 # broadcast metadata (check_target_layout only). Existence only: nothing here opens them.
 NEEDED = {"tactical": ("atd_meta", "atd_raw", "smart_tagging")}
@@ -309,7 +309,7 @@ def environment(run: Run, a) -> None:
                 problems.append("no external matches under KATENA_EXTERNAL")
                 say("FAIL  no external matches under canonical/ (run scripts/build_external.py)")
             elif n != N_EXTERNAL:
-                run.warn(f"{n} external matches under canonical/, F trains on {N_EXTERNAL}: expect another gbdt hash")
+                run.warn(f"{n} external matches under canonical/, the model trains on {N_EXTERNAL}: expect another gbdt hash")
             else:
                 say(f"PASS  {n} external matches under canonical/")
     if run.env.get("KATENA_WORK"):

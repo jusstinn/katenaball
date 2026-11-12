@@ -90,4 +90,7 @@ days before the cut-off: PR #26 and the decision log of 2026-11-12. Justin put F
 confirmed the merge itself, and undoing it is one revert. From that merge on, `scripts/real_run.py` trains and
 checks F3. F stays in the code (`--spec F`).
 
+The technical document was cut to 5 pages the same night, and the three disclosure points are written into its
+section 9. David has to confirm that section: only he and Justin know what they showed an assistant.
+
 **Left for the humans:** the team name, the real run on David's PC, the `submission-v1` tag and the form.

@@ -15,7 +15,8 @@ Stages, each cached under ``KATENA_WORK`` (``scripts/make_submission.py`` sets i
     corpus   ground truth, base features and pools of every external match: copied from a finished
              bake-off cache when one is given (byte-identical inputs), otherwise built
     worlds   the ``d2j`` worlds' features, their touch columns, and the ``d2j`` pools with touch columns
-    train    the LightGBM member, the TCN member and the priors, saved to ``model/`` with sha256 hashes
+    train    the LightGBM member, the TCN member and the priors, saved with sha256 hashes to ``model_dir()``:
+             ``model/`` for F, ``model_<spec>/`` for another spec
     predict  the real match from ``data/``: features at 5 Hz from the real ATD, touch columns from the real
              25 Hz ball, blend, Viterbi, one label per video frame, the kickoff rule (frames of a graded half
              before its Smart Tagging ``Kick Off (Start)`` become D), the submission file, validation
