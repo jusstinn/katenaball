@@ -441,8 +441,8 @@ def gate(nm: Names, dev: list, folds: list, n: int, steps: int) -> dict:
                     out["info"][f"world/{wld}/{tag}"] = g
                     print(_row(f"{cand} vs F3, {wld}, {tag}", g))
 
-    print(f"\n## Information: frame-level parts, target\n| folds | truth | model | alive/dead F1 | team accuracy | "
-          f"predicted possessions per true one |\n|---|---|---|---|---|---|")
+    print("\n## Information: frame-level parts, target\n| folds | truth | model | alive/dead F1 | team accuracy | "
+          "predicted possessions per true one |\n|---|---|---|---|---|---|")
     for tag, refs, suffix, truth in (("IDSSE + Metrica", im_refs, "", "one"), ("SkillCorner", sc_refs, "", "standing"),
                                      ("SkillCorner", sc_refs, "@act", "action")):
         for name in ("F3", cand):
