@@ -6,6 +6,46 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-12
 
+### Linux on an Intel CPU: both models give this PC's CSV (result)
+
+**F3 and F, trained from an empty cache under Linux on the PC's Intel CPU, each give the Windows reference's CSV
+for the dressed match.** That was the one pair of OS and CPU that F3's cross-machine check had not covered
+(Nov 11, "Not covered"). Claude on David's PC, overnight. External matches only; no fold was scored.
+
+**What ran.** `D:/katena/tools/wsl_repro.sh`: the steps of `repro.yml`, by hand, at `8f3040d` (main before the
+adoption; both specs are named on the command line), in the Ubuntu 24.04 already installed under WSL 1 on the PC
+(Intel i7-7700). It installed uv 0.13.1 and the locked environment (torch 2.15.0+cu132, LightGBM 4.7.0), and
+copied the raw external downloads from the Windows side, as `actions/cache` restores them on a runner. Everything
+else it built from empty: the 30 canonical matches, the cache, both models and the dressed bundle. All of it
+lives in one folder of that distribution, and Ubuntu's `libgomp1` package was unpacked there, not installed.
+
+| | F3 | F |
+|---|---|---|
+| Training inputs: 861 cache files, compared by content | Same as the Windows reference | Same |
+| LightGBM member | `056ffa8a...`, same | `b2146150...`, same |
+| TCN weights | `61bc4699...`, differs | `a7623330...`, differs |
+| Dressed CSV | `72d7c3fb...`, **same** | `909f4ffa...`, **same** |
+
+- **F's TCN is the one GitHub's Ubuntu runner on an Intel Xeon gave on Nov 10** (`a7623330`). So this run
+  behaves as Linux on Intel does elsewhere, although under WSL 1 the kernel is Windows' and only the libraries
+  are Linux's.
+- **F3 now has five sets of TCN weights and one CSV**: the seven OS and CPU combinations of GitHub's runners and
+  this PC (the entry on the adoption, below), and this one.
+- The HSMM duration prior differs by OS, as on Nov 10. Viterbi never reads it.
+- **Which OpenMP runtime LightGBM gets did not matter.** F was trained once more with the `libgomp.so.1` that torch ships in its wheel, in place of Ubuntu's package: the same `bundle.pkl`, byte for byte.
+
+**What this is not.** A second physical machine: the CPU is the reference's own. And a real Linux kernel: numpy
+warns under WSL 1 that `long double` is not the type it expects. Nothing in the pipeline uses that type, and
+every array of every stage equals the reference's.
+
+**Times.** Corpus 23.5 min and worlds 37.2 min with 2 workers. F3's `train` took 85.5 min: 73 for the tree model
+while other heavy jobs shared the PC's four cores (it takes 3 alone on Windows), and 11 for the TCN. F's
+`train` took 4.3 min once the PC was quiet: 29 s for the trees and 2.7 min for the TCN. So the slow tree model
+was the shared machine, not Linux. `predict` took about a minute.
+
+**It also found a missing library.** Its first attempt stopped at once because this Ubuntu has no
+`libgomp.so.1`; that became PR #28 (below). Reports: `D:/katena/logs/wsl`.
+
 ### F3 is the submission model (decision)
 
 **F3 replaces F as the submission model, from the merge of PR #26 on 2026-11-12.** That is two days before the
@@ -148,7 +188,7 @@ check on the real file is the test of that, and it passed 16 of 16 on Nov 7. Sev
 **Seven problems, all fixed, none of which touches a label.** They came from two places:
 
 - **A Linux that is not a GitHub runner.** The pipeline's first run on Ubuntu 24.04 under WSL on the Windows PC,
-  as installed, with nothing added (the entry on Linux on Intel, below).
+  as installed, with nothing added (the entry on Linux on Intel, above).
 - **An outside read.** A fresh agent got the repository and the organisers' `SUBMISSION.md`, and was asked to
   regenerate the file as an organiser would and to report what stops or misleads. It read only; it ran nothing
   but `--help`.
