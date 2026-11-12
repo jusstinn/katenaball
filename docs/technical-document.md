@@ -1,14 +1,15 @@
 # <team_name>: technical document
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Draft of 2026-11-11.
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Draft of 2026-11-12.
 Every number comes from `docs/decision-log.md` and the evidence pages it
 links. `TODO(after the real run)` marks what only the final run on the provided match can fill in.
 
 ## 1. Summary
 
-- We label each frame H, A or D from the automatic tracking (ATD) alone. A LightGBM model and a temporal
+- We label each frame H, A or D from the automatic tracking (ATD). A LightGBM model and a temporal
   convolutional network (TCN) each predict whether the ball is alive and which team has it. We average
-  them in logit space and decode with a 3-state Viterbi.
+  them in logit space and decode with a 3-state Viterbi. The only other input is one Smart Tagging kickoff
+  tag per half (section 6).
 - Models are trained and selected on public external matches only (IDSSE/DFL, Metrica, SkillCorner): 28
   for development, and all 30 for the final model. A degrader corrupts their tracking to look like
   automatic tracking.
@@ -127,14 +128,15 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   | Metrica `Sample_Game_2` | target-like | 0.6820 | 0.6311 | +0.0509 |
   | Metrica `Sample_Game_2` | severe | 0.5945 | 0.5371 | +0.0574 |
 
-  F is ahead in 15 of the 16 bench-and-world pairs; the exception loses 0.003. M2 retrained here
+  F is ahead in 15 of the 16 pairs of bench and evaluation world (2 benches, 8 worlds; the table shows the 4
+  registered ones); the exception loses 0.003. M2 retrained here
   reproduces the bake-off's recorded bench scores to the 3 decimals printed. The final model also trains
   on these two matches, so this read is of the 28-match model, not the submitted one.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
   on it, which is also what the organisers' clarification of 2026-11-03 requires. We used only DATA.md's
   published aggregates (46 slots, 20.5 tracked objects, 41% ball missing) and the published half
-  boundaries. Human-run checks on the real file (loader, slot layout, domain-gap alarms) print aggregates
-  only and never choose between versions. Nobody compared our output with the video.
+  boundaries. Human-run checks on the real file (the loader, the slot layout, a touch-feature alarm and
+  the kickoff tags) print pass or fail and aggregates only, and never choose between versions. Nobody compared our output with the video.
 - **The public 5 minutes are a pipeline check only.** CI reads them only to check that the official scorer
   still reproduces the published scores of the published baseline files. The final file is checked on the
   window by `scripts/check_public_window.py`, which prints pass or fail only, never a score. It checks four
@@ -159,7 +161,7 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
 
 ### 3.2 Bake-off (2026-11-06)
 
-Development folds, target-like noise, T = 2 s labels.
+Development folds, target-like noise, T = 2 s labels (section 6).
 
 | Model | spellF1 | Outcome |
 |---|---|---|
@@ -371,7 +373,9 @@ D over the first 60 and 120 s of each half, as an aggregate.
 - **The development estimate is optimistic.** D1, D2 and D3 were gated on the same 28 folds before F
   combined them. F was registered before its own score, but its parts were chosen knowing their results.
   Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, six more packages
-  were gated on the same folds (sections 3.4 and 4), each registered before its score: ten in all. The two
+  were gated on the same folds (sections 3.4 and 4), each registered before its score: ten in all, besides
+  the bake-off's models and the six label-convention variants of section 4, which were scored on these folds
+  too. The two
   locked benches are the only matches no choice was made on. F's one read there gains about as much as on
   the development folds (section 3.1). With two matches, that read is a sanity check, not a second
   estimate, and nothing after F was read on them.
@@ -388,11 +392,12 @@ D over the first 60 and 120 s of each half, as an aggregate.
   A fresh clone, with a fresh download of the external corpus and an empty cache, reproduced every stage byte
   for byte: corpus, features, worlds, pools, both models and a dressed-match CSV (`docs/decision-log.md`, J3 W1).
   Across machines we trained F 11 times on 7 OS and CPU combinations (`.github/workflows/repro.yml`):
-  - Windows 10 and Windows Server on Intel, Windows on AMD, Ubuntu on AMD and on Intel, macOS on Apple M1.
+  - Windows 10 on Intel (the reference machine), Windows Server on Intel and on AMD, Ubuntu on two AMD models
+    and on Intel, macOS on Apple M1.
   - Every training input is equal in content everywhere. On macOS only NaN sign bits differ, and nothing reads them.
   - The LightGBM model, the scaler and the decoder priors are identical everywhere.
   - The TCN's weights differ in their last bits whenever the OS or the CPU vendor differs, because torch picks
-    different kernels. Windows on two other Intel CPUs reproduced the reference machine bit for bit.
+    different kernels. Windows on another Intel CPU reproduced the reference machine bit for bit, in two runs.
   - The dressed external match (IDSSE `DFL-MAT-J03WMX`, 173,528 frames, in the provided ATD format) got a
     byte-identical CSV in all 11 trainings.
 
@@ -405,7 +410,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
 
 **With more time** we would recalibrate the D2 worlds inside each fold, and make native-ball noise as
 smooth and correlated as real tracking. We would also re-run the `tail` gate after its label fix, add a
-head aimed at the team label (where the oracle puts the points), and test Smart Tagging as features.
+head aimed at the team label (where the oracle puts the points), and test more of Smart Tagging than the
+set-piece tags, which failed their gate (section 4).
 
 ## 8. Reproduction
 
@@ -419,7 +425,8 @@ export MTAH_DATA_DIR=/path/to/data/bundle        # the unpacked competition bund
 make submit TEAM=<team_name>                     # writes submissions/<team_name>.csv, validates it, prints its sha256
 ```
 
-`make submit` runs five steps:
+`make submit` runs six steps:
+- `scripts/make_submission.py bundle` checks that the bundle's three files exist, before anything else;
 - `scripts/build_external.py` downloads the 30 external matches and checks every file's SHA-256;
 - `scripts/make_submission.py corpus` builds the base features;
 - `scripts/make_submission.py worlds` builds the `d2j` worlds, touch columns and pools;
@@ -430,7 +437,7 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
 Without `make` (the team's Windows PC), run the same steps one by one; `docs/REPRODUCE.md` lists them.
 `predict` is the only step that opens the provided match, and it prints aggregates only.
 
-- **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (CPU), numpy 2.2.6, pandas 2.3.3, numba
+- **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (run on the CPU on every OS), numpy 2.2.6, pandas 2.3.3, numba
   0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
 - **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and the
   model byte for byte in 1 h 39 min, including the download.
@@ -459,6 +466,6 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 | Models and blend | `src/katena/models/gbdt.py`, `tcn.py`, `ensemble.py` |
 | Decoder | `src/katena/decode/hmm.py` |
 | Gates | `src/katena/eval/` (`lomo`, `bootstrap`, `score`, `d2`, `d3`, `touch_gate`, `tmix`, `final`), `scripts/run_*.py` |
-| Target reader and checks | `src/katena/target/`, `scripts/check_target.py`, `check_target_layout.py`, `check_domain_gap.py`, `check_touch_target.py` |
-| Submission | `src/katena/pipeline.py`, `scripts/make_submission.py`, `Makefile`, `docs/REPRODUCE.md`; checks: `scripts/dressed_check.py`, `scripts/check_public_window.py`, `tests/test_pipeline_atd.py` |
+| Target reader and checks | `src/katena/target/`, `scripts/check_target.py`, `check_target_layout.py`, `check_touch_target.py`, `check_kickoff_tags.py`, `check_domain_gap.py` |
+| Submission | `src/katena/pipeline.py`, `scripts/make_submission.py`, `Makefile`, `docs/REPRODUCE.md`; the real run: `scripts/real_run.py`, `docs/real-run.md`; checks: `scripts/dressed_check.py`, `scripts/stress_predict.py`, `scripts/check_public_window.py`, `tests/test_pipeline_atd.py`; this document as a PDF: `scripts/build_document.py` |
 | Firewall and CI | `scripts/firewall_check.py`, `.github/workflows/`, `docs/ci.md` |
