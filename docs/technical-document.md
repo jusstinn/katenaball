@@ -73,8 +73,8 @@ cut the jitter to the level of real broadcast tracking. Both models train on an 
   with the official `possession_metrics.evaluate`, unchanged. In fold k, no model, scaler or prior sees
   match k.
 - **A gate registered before each score.** A change is adopted if, at target-like noise, it wins at least
-  70% of the folds and the paired 95% bootstrap interval of the mean difference lies above 0, and it is not
-  worse at severe noise.
+  70% of the folds and the paired 95% bootstrap interval of the mean difference lies above 0. From F on, it
+  must also not be worse at severe noise.
 - **Two locked bench matches** stayed out of every choice. F was read on them once, after its adoption, and
   beat the model before it on both (+0.013 to +0.057). F3 has no bench read.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
@@ -184,10 +184,10 @@ crosses D or X.
 
 ## 7. Limitations
 
-- **Simulated noise is not the real ATD.** A classifier tells real broadcast tracking from every degraded
-  world with AUC 1.00, mostly on jitter, which the degrader makes 10 to 30 times rougher. One world in five
-  of the training mix has realistic jitter. At inference the touch features read the real 25 Hz ball, which
-  no development world reproduces.
+- **Simulated noise is not the real ATD.** A classifier tells real tracking (SkillCorner, Metrica) from
+  every degraded world with AUC 1.00, mostly on jitter, which the degrader makes 10 to 30 times rougher. One
+  world in five of the training mix has realistic jitter. At inference the touch features read the real
+  25 Hz ball, which no development world reproduces.
 - **SkillCorner is 20 of the 28 folds**, it has no dead ball, and F3 gains least there.
 - **The development estimate is optimistic.** The same 28 folds gated ten changes one after another, besides
   the first comparison of models and the label conventions. The two bench matches are the only ones no
