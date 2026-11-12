@@ -6,6 +6,41 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-12
 
+### AW (pre-registration): A with possession-length weights; an amendment to A's entry
+
+**Written at 14:00 PST on Nov 12, before any score of A or of AW had been read.** A's LightGBM stage was at fold
+5 of 28 and its gate had not run; nobody has opened a table of it. Claude, at Justin's request ("maybe there is a
+way of combining the two ... the actions one with more weight for shorter possessions ... so it doesn't smooth
+out too much"); David has not seen it. The 15th package on the same 28 folds. Code: `scripts/run_aw.py`.
+
+**Amendment to A's entry (below).** It says "No other time constant, T, weighting or variant is tried, whatever
+the result". That sentence was mine, an hour old, and Justin asked for one weighting before any result existed.
+AW is that one. The sentence stands for everything else, and for AW too: no other weight, clip or T follows.
+
+**Why this one.** S1 and S2 (Nov 10 and 11) put the weight `1 / L` on each training frame of the team heads, `L`
+the length of the frame's possession in seconds, clipped to [1, 30]. Each gained on the 8 IDSSE + Metrica folds
+and did nothing on SkillCorner, and failed on folds won (17/28). The probe of Nov 12 offers a reason: the
+standing SkillCorner label has no short possession of the kind the weight is meant to protect. A changes those
+labels, so the same weights may now act on all 28 matches. The weights were never run in both members at once.
+
+**The change, and nothing else.** AW is A, plus `lenweight.inv_length` of the label each frame trains on (the
+action label on SkillCorner, the standing one elsewhere) as the frame's weight in the LightGBM team head and in
+the TCN's team loss. Same constants as S1 and S2, never tuned. The alive head and the TCN's alive loss carry no
+weight, so AW's LightGBM alive probabilities must equal A's byte for byte: checked on every fold.
+
+**Rules.** The two rules of A's entry, word for word, with AW in A's place, against F3. Rule 2 counts only with
+David's and Justin's names, as there.
+
+**Which of A and AW stands, under whichever rule is in force.** If only one of them passes it, that one. If both
+pass it, AW when AW minus A at `target` on that rule's folds (28 for rule 1, the 8 IDSSE + Metrica folds for
+rule 2) has a paired 95% interval above 0, otherwise A, the simpler one. If neither passes, F3. Adoption is
+David's and Justin's either way, before Nov 14, 18:00 CET.
+
+**Information, decides nothing:** the weights in one member only; each member alone; true possessions found by
+length for F3, A and AW on each truth; predicted possessions per true one.
+
+**Run.** After A's stages: `aw-gbdt` (about an hour), `aw-tcn` (about 4 hours, on the charger), `aw-gate`.
+
 ### A (pre-registration): SkillCorner training labels from its own action events
 
 **Written before any score of A.** Claude, on Justin's word ("yes js do that", after reading the probe below);
