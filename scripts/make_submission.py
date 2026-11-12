@@ -2,12 +2,17 @@
 """Regenerate the submission: train candidate F on the 30 external matches, then label the real match.
 
     uv run python scripts/make_submission.py all  --out submissions/<team>.csv   # every stage, in order
+    uv run python scripts/make_submission.py bundle                             # are the bundle's files there?
     uv run python scripts/make_submission.py corpus [--seed-from work/bakeoff]  # external corpus features
     uv run python scripts/make_submission.py worlds [--workers N]               # d2j worlds and touch columns
     uv run python scripts/make_submission.py train                              # model/bundle.pkl + manifest
     uv run python scripts/make_submission.py predict --out submissions/<team>.csv
 
-Needs the external corpus (``scripts/build_external.py``) and, for ``predict``, the data bundle in ``data/``.
+Needs the external corpus (``scripts/build_external.py``) and, for ``predict``, the data bundle in ``data/`` or
+wherever ``MTAH_DATA_DIR`` points. ``bundle`` checks that the three files ``predict`` reads exist (the tactical
+ATD metadata and raw tracking, and the Smart Tagging file the kickoff rule reads); it opens none of them. ``all``
+runs it first, and so does ``predict`` on the competition match, so a misplaced bundle stops the run before an
+hour of training, and a missing Smart Tagging file cannot silently give other labels.
 The cache is ``KATENA_WORK`` (default ``work/final``). ``predict`` prints aggregates only: counts, shares,
 shapes, hashes and run times of the real match, never a frame-level value. See ``katena.pipeline``.
 """
@@ -35,15 +40,31 @@ gbdt.ensure_openmp()                               # macOS without Homebrew libo
 from katena import pipeline as PL  # noqa: E402
 from katena.eval import protocol as P  # noqa: E402
 
+BUNDLE_FILES = ("atd_meta", "atd_raw", "smart_tagging")     # what predict reads, all from the tactical source
+
+
+def check_bundle(data_dir: Path | None = None) -> int:
+    """0 when the files ``predict`` reads exist where it will look for them, else 1 with the missing paths.
+    Existence only (``games.require``): nothing is opened."""
+    import games
+    try:
+        paths = games.require(BUNDLE_FILES, data_dir=str(data_dir) if data_dir else None)
+    except OSError as e:
+        print(f"bundle: {e}\nSee docs/REPRODUCE.md, \"Where the data bundle goes\".", flush=True)
+        return 1
+    PL.log(f"bundle: {len(paths)} files found under {Path(paths[0]).parent.parent}")
+    return 0
+
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("stage", choices=("all", "corpus", "worlds", "train", "predict"))
+    ap.add_argument("stage", choices=("all", "bundle", "corpus", "worlds", "train", "predict"))
     ap.add_argument("--out", type=Path, default=REPO / "submissions" / "submission.csv")
     ap.add_argument("--seed-from", type=Path, default=None,
                     help="a finished bake-off cache to copy the corpus files from (default: build them)")
     ap.add_argument("--workers", type=int, default=1, help="processes for the corpus and worlds stages")
-    ap.add_argument("--data-dir", type=Path, default=None, help="the data bundle (default: data/)")
+    ap.add_argument("--data-dir", type=Path, default=None,
+                    help="the data bundle (default: $MTAH_DATA_DIR, else data/)")
     ap.add_argument("--spec", choices=sorted(PL.SPECS), default=PL.SUBMISSION_SPEC,
                     help=f"the model to train or predict with (default: the submission model, {PL.SUBMISSION_SPEC})")
     chk = ap.add_argument_group("dressed-match check only (scripts/dressed_check.py), never for the submission")
@@ -54,6 +75,12 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     t0 = time.time()
     PL.log(f"cache {P.WORK}; spec {a.spec}; env {json.dumps(PL.env_report(), sort_keys=True)}")
+    competition = a.timeline is None and not a.hold_out      # not the dressed-match check
+    if a.stage == "bundle" or (competition and a.stage in ("all", "predict")):
+        if check_bundle(a.data_dir):
+            return 1
+        if a.stage == "bundle":
+            return 0
     refs = PL.training_refs() if a.stage != "predict" else None
     if a.stage in ("all", "corpus"):
         PL.log(f"corpus {PL.stage_corpus(refs, a.seed_from, a.workers)}")
