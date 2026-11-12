@@ -6,6 +6,103 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-12
 
+### SkillCorner's own action events against the label we train on (description only; Claude, Justin has not read it yet)
+
+**Nothing was fitted, scored or chosen.** `scripts/probe_sc_actions.py`, on the 20 SkillCorner development matches
+(external), aggregates only. Justin asked for another approach to short possessions, "something like an action
+focus". The pinned SkillCorner commit ships `*_dynamic_events.csv` for every match: about 936 `player_possession`
+events a match (first touch to last, with team, start type and end type) and flags for game interruptions. We
+downloaded them and use them for nothing (`docs/external-data.md`). The probe sets them beside the frame label
+(`possession.group`, null -> X).
+
+| Question | Answer, pooled over 20 matches |
+|---|---|
+| What is X (46% of in-play frames)? | 96% of X frames lie between a player possession flagged as followed by an interruption (throw-in, goal kick, corner, free kick, goal) and the next player possession. Half of those have no tracking (the broadcast cut away). Under 3% of X is a gap between possessions in open play |
+| Does the frame label follow the last touch? | No. On labelled frames the team of the most recent player possession agrees with it on 82% |
+| What does it do with a short possession of the other team? | It gives it to the team around it: 153 player possessions a match (17%), median 0.7 s, are labelled as the other team's. 22% of them start as an interception, 21% as a recovery |
+| When does it switch? | A median of 1.0 s before the new team's first touch (25th to 75th percentile: 0.3 to 2.3 s) |
+| What would last-touch labels with the interruption gaps as dead ball look like? | 247 possessions a match, median 6.9 s, 16% under 2 s, 33% under 4 s. IDSSE at T = 2: 324 a match, median 5.7 s, 15% under 2 s |
+
+**What this suggests, and it is a hypothesis.** The SkillCorner label is a phase-level one: it swallows the other
+team's short possessions, changes before the other team touches the ball, and marks dead ball as unknown. Those
+are 72% of the team head's training rows and 20 of the 28 gate folds, and on those folds the scorer cuts spells
+at X, so they do not test where a possession starts or ends, or dead ball. It would explain why S1, S2, K1 and K
+each helped the 8 IDSSE + Metrica folds and did nothing on SkillCorner. The events would give SkillCorner labels
+with the mechanics the target's ground truth is described as having: the owner changes at the other team's first
+touch, dead ball is a label, and short possessions exist.
+
+**Caveats.** SkillCorner's events are produced automatically from the same broadcast tracking, not by a person.
+An interruption gap as defined here starts at the last touch before the stoppage and ends at the first reception
+after it, so it runs a second or two long at each end. Relabelling changes the ground truth of 20 gate folds, so
+it is not a candidate under the standing rule: it needs a registration that says which folds and which truth
+decide, and David's and Justin's names. **Nothing is built and nothing is proposed for adoption here.**
+
+**Literature, the same day** (a research agent, web only, nothing downloaded): candidate-based touch detection
+(ELASTIC: local minima of player-ball distance and maxima of ball acceleration, 98% of true touches covered on
+clean 25 Hz data), possession-gain rules (Vidal-Codina 2022, `databallpy`), boundary heads with segment voting
+(ASRF) and ball-free transit states (PathCRF). All need a mostly clean ball or identified players. Our touch
+features already do the acceleration half of the first.
+
+### K: result (Claude; Justin has not read it yet)
+
+**K fails the registered rule on the win count. F3 stands, and the label-kind column is closed.** One run on the
+Mac, 01:00 to 05:07 PST on Nov 12, on the charger with Low Power Mode off: the TCN on 28 folds (245.6 min, 494 to
+625 s a fold), then the gate. HEAD was `5315154`, the merge of main (F3's adoption) into the branch that holds
+the registration of Nov 11 (`63e439f`); the merge changes no file the run reads besides an error message in
+`gbdt.ensure_openmp`. External development matches only. Nothing in the registration was changed. Tables:
+`work/final/run_k2.log`; verdict: `k_gate.json`, `registered_run: true`.
+
+**Checks the run printed.** F3 re-decoded equals its stored scores on 56 of 56 values. No finite value was lost
+when the sequences were stored as float16.
+
+**K gate: the label-kind column in both members, against F3, 28 folds.**
+
+| Comparison | Folds | K | F3 | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|---|
+| `target`, all (rule) | 28 | 0.6267 | 0.6180 | +0.0086 | [+0.0043, +0.0131] | 17/28 |
+| `severe`, all (rule: not worse) | 28 | 0.5919 | 0.5840 | +0.0079 | [+0.0038, +0.0122] | 16/28 |
+| `target`, SkillCorner (rule: not worse) | 20 | 0.6086 | 0.6103 | -0.0017 | [-0.0059, +0.0026] | 9/20 |
+| `severe`, SkillCorner | 20 | 0.5802 | 0.5816 | -0.0014 | [-0.0061, +0.0033] | 10/20 |
+| `target`, IDSSE + Metrica | 8 | 0.6720 | 0.6374 | +0.0345 | [+0.0242, +0.0444] | 8/8 |
+| `severe`, IDSSE + Metrica | 8 | 0.6213 | 0.5900 | +0.0313 | [+0.0221, +0.0407] | 6/8 |
+
+K fails on the win count: 17 of 28 at `target`, the rule needs 20. The interval is above 0 and both guards hold
+(neither interval on SkillCorner is below 0). It is the split K1 showed, twice as large: on the 8 IDSSE + Metrica
+folds the gain doubles (+0.0345 against K1's +0.0175), and the 20 SkillCorner folds neither gain nor lose.
+
+Information only:
+
+- **Against K1:** +0.0041 [+0.0009, +0.0074] on 28 folds, 13/28; +0.0170 on IDSSE + Metrica (6/8).
+- **The column in the TCN only, with `T1200`:** +0.0049 on 28 (17/28), +0.0221 on IDSSE + Metrica (8/8).
+- **Members alone:** the TCN +0.0075 on 28 (16/28) and +0.0356 on IDSSE + Metrica (8/8), with -0.0038 on
+  SkillCorner (8/20); the LightGBM member as in K1's entry.
+- **Other worlds:** `mild` +0.0107 (17/28), `target_ids` +0.0100 (19/28), `target_smooth` +0.0110 (20/28); the
+  two coupled worlds +0.045 and +0.042 (8/8 each).
+- **Predicted possessions per true one at `target`:** 0.729 to 0.815 on IDSSE + Metrica, 0.760 to 0.741 on
+  SkillCorner.
+
+**K read with the other value of the column** (what a wrong value would cost; information, decides nothing).
+
+| Folds, `target` | Wrong value against F3 | Wrong value against K |
+|---|---|---|
+| All (28) | -0.0361 [-0.0417, -0.0300], 0/28 | -0.0447 [-0.0514, -0.0379], 1/28 |
+| IDSSE + Metrica read as kind 1 (8) | -0.0448 [-0.0549, -0.0349], 0/8 | -0.0793 [-0.0925, -0.0655], 0/8 |
+| SkillCorner read as kind 0 (20) | -0.0326 [-0.0396, -0.0255], 0/20 | -0.0309 [-0.0383, -0.0236], 1/20 |
+
+With the column in the TCN the wrong value costs four to seven times what it cost K1 (-0.006 to -0.009 against
+F3). So K is a larger bet than K1 in both directions: about +0.035 if the provided match's ground truth follows
+the IDSSE and Metrica process, as `CHALLENGE.md` describes it, and about -0.045 against F3 if it does not. No
+external match tells us which, and the provided match may not.
+
+**What stands, as registered: F3.** K1 failed and K failed, each on folds won, and neither is re-gated on 8
+folds. No other encoding of the column, and no other use of it, is tried. With B1 these were the 11th to 13th
+packages gated on the same 28 folds; the technical documents now say thirteen.
+
+**What this does not say.** The same open question as in the K1 entry, now with a larger number behind it: all
+four candidates since F3 that helped at all (S1, S2, K1, K) helped the 8 IDSSE + Metrica folds and did not help the
+20 SkillCorner folds, and the rule counts folds. Whether to judge such a change another way is
+David's and Justin's to decide before Nov 14, 18:00 CET; this entry does not reopen it and adopts nothing.
+
 ### Linux on an Intel CPU: both models give this PC's CSV (result)
 
 **F3 and F, trained from an empty cache under Linux on the PC's Intel CPU, each give the Windows reference's CSV

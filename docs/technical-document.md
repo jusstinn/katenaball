@@ -85,7 +85,9 @@ cut the jitter to the level of real broadcast tracking. Both models train on an 
   and the file beats the published smooth50 baseline. A fail means a bug to find, not something to tune.
   `TODO(after the real run)`: the result of that run. Once, we also counted the public window's possessions
   and their lengths, with no prediction and no score, to ask whether our label convention looks
-  implausible. It does not, and nothing was changed.
+  implausible. It does not, and nothing was changed. One team member also watched the window's tactical
+  video beside the public labels, to understand what counts as possession, as the organisers' clarification
+  of Nov 3 allows. No prediction of ours was on screen, and nothing was changed.
 - **The submission path equals the evaluation path.** An external match exported in the provided ATD format
   and labelled by the submission code gets, from the official scorer, exactly the score the evaluation code
   gives the same model, with every probability and label bit-identical.
@@ -134,6 +136,8 @@ cut the jitter to the level of real broadcast tracking. Both models train on an 
 | The TCN reading the touch columns at 1,200 steps | +0.0017, 16/28 | Failed alone; adopted with the longer training (F3) |
 | Set-piece features from Smart Tagging, with imitation tags built from external events | +0.0046, 16/28 | Failed: the gain is all on the 8 folds that have events |
 | Weights by possession length, in either model | +0.005 and +0.011, 17/28 each | Failed on folds won |
+| A column that tells the models which dataset's labelling a training row follows | +0.0045, 18/28 (one model); +0.0086, 17/28 (both) | Failed on folds won: +0.035 on the 8 IDSSE and Metrica folds, nothing on SkillCorner |
+| A model of possession changes that moves the decoder's switch cost | +0.0003, 13/28 | Failed |
 | A second TCN seed averaged in | -0.005 on 8 folds | Dropped |
 | Training on smooth positions only | 8 folds, not registered: +0.02 if the real positions are smooth, -0.09 to -0.13 if not | Not used: choosing it would need a statistic of the provided match |
 | No SkillCorner match in the team head | 8 folds, not registered: +0.035 | Not used: no unseen fold was left to test it on |
@@ -189,7 +193,7 @@ crosses D or X.
   world in five of the training mix has realistic jitter. At inference the touch features read the real
   25 Hz ball, which no development world reproduces.
 - **SkillCorner is 20 of the 28 folds**, it has no dead ball, and F3 gains least there.
-- **The development estimate is optimistic.** The same 28 folds gated ten changes one after another, besides
+- **The development estimate is optimistic.** The same 28 folds gated thirteen changes one after another, besides
   the first comparison of models and the label conventions. The two bench matches are the only ones no
   choice was made on, and only F was read on them.
 - **The TCN seed matters.** With another seed, F's gain on 8 folds was about a quarter smaller. Seed 0 was
@@ -241,7 +245,8 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
   (Claude Code), working under the team's direction. The competition's data was kept away from it. The
   repository's rules (`CLAUDE.md`) forbid it to open the data folder, only team members ran anything on the
   provided match, and what those runs print is pass or fail and aggregates: counts, shares and hashes, never
-  a file, a frame or a per-frame value.
+  a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
+  5 minutes (section 3) described to it what he saw, with estimated times. It saw no image and no file.
 - **A public file we opened and did not use.** While searching the web for external datasets, an automated
   agent opened a public record that turned out to hold statistics about the provided game. The file was
   deleted. Nothing from it entered the code, the training data or any decision.
