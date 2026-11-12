@@ -250,6 +250,17 @@ def c_ghost_duplicates(m, rng):
     return m
 
 
+def c_slots_trade_teams(m, rng):
+    home, away = np.flatnonzero(m.team == 0), np.flatnonzero(m.team == 1)
+    for _ in range(40):                               # forty stretches of 20 to 120 s: a home and an away slot swap
+        i, j = int(rng.choice(home)), int(rng.choice(away))
+        a = int(rng.integers(0, m.n))
+        s = slice(a, min(m.n, a + int(rng.uniform(20, 120) * m.fps)))
+        m.P[s, i], m.P[s, j] = m.P[s, j].copy(), m.P[s, i].copy()
+        m.speed[s, i], m.speed[s, j] = m.speed[s, j].copy(), m.speed[s, i].copy()
+    return m
+
+
 def c_everyone_on_one_spot(m, rng):
     s = span(m, 1, 0.35, 300)
     m.P[s] = np.where(np.isfinite(m.P[s]), np.float32(40.0), np.nan)
