@@ -6,6 +6,82 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-12
 
+### A (pre-registration): SkillCorner training labels from its own action events
+
+**Written before any score of A.** Claude, on Justin's word ("yes js do that", after reading the probe below);
+David has not seen it. It is outside the final-week plan, adopts nothing, and is the 14th package on the same 28
+folds. Code: `katena.external.skillcorner_actions`, `scripts/run_a.py`, `tests/test_skillcorner_actions.py`.
+
+**Hypothesis.** The SkillCorner frame label (`possession.group`) is a phase-level label with other mechanics
+than the target's ground truth is described as having (the probe, next entry). Relabelling the 20 SkillCorner
+matches from SkillCorner's own `player_possession` events gives 20 more matches whose labels change owner at the
+other team's first touch and carry dead ball, on the only real broadcast tracking we have.
+
+**The change, and nothing else.**
+
+- **Owner.** From the first frame of a player possession to the first frame of the next one in the same period,
+  the ball is that player's team's.
+- **Dead ball.** A gap between two player possessions holds a stoppage when SkillCorner flags the earlier one
+  `game_interruption_after` or the later one `game_interruption_before`. The ball goes dead at the first gap
+  frame where it is outside the pitch or the frame has no tracking, or 1.0 s after the last touch when neither
+  happens, and at once after a foul. Play restarts 1.0 s before the next possession when that one starts as the
+  reception or interception of the restart, and at its first frame otherwise. From the restart on, the ball is
+  the taking team's.
+- **Unknown.** Frames before a period's first player possession, and dead-ball frames with no tracking at all.
+- **The two times (1.0 s each) are fixed here** from what a throw-in or a pass takes, not fitted to anything.
+- **Then as every other label:** the sandwich merge at T = 2.
+- **Training.** Both members exactly as F3's (rows, sequences, features, 1,200 trees, 4,800 steps, seeds), with
+  two differences on SkillCorner rows only: the label, and `dead_ok` (they now train the alive head and the TCN's
+  alive output). No IDSSE or Metrica row changes. The decoder's priors are F3's.
+
+**What was looked at before this was written (no model output, no score).**
+
+| | Home | Away | Dead | Unknown | Possessions a match | Median | Under 2 s | Under 4 s |
+|---|---|---|---|---|---|---|---|---|
+| Standing SkillCorner label, T = 2 | 0.275 | 0.266 | 0 | 0.459 | 272 | 7.2 s | 13.9% | 31.6% |
+| Action label, T = 2 | 0.280 | 0.273 | 0.206 | 0.242 | 239 | 8.7 s | 9.3% | 25.0% |
+
+The two agree on the team on 84.7% of the frames where both name one. `a-check`: a pool row's cached label is
+the standing truth at its sample for all 28 matches; `gbdt.fit_heads` on the standing labels gives F3's cached
+LightGBM probabilities of one fold byte for byte; no row outside SkillCorner changes; 148,637 of 443,350
+SkillCorner rows change label; the alive head's rows go from 171,452 to 507,549 and the team head's from 334,270
+to 339,490. The TCN stage is `run_k.py`'s loop with these labels, not checked against a cache.
+
+**Two truths for a SkillCorner fold.** *Standing*: the label every gate so far has scored on, with predicted
+dead ball read as no call. *Action*: the label above, scored as an IDSSE fold is. An IDSSE or Metrica fold has
+one truth, and A does not change it.
+
+**Rule 1, the standing rule, unchanged.** A against F3 on the 28 folds, every fold on its standing truth: at
+`target` at least 70% of folds won and the paired 95% interval above 0; not worse at `severe`; not worse at
+`target` on the 20 SkillCorner folds. I expect A to fail it: the standing SkillCorner truth is the label A stops
+training on, so on those 20 folds A is scored against a convention it no longer learns.
+
+**Rule 2, declared here and not standing.** The same thresholds on the 8 IDSSE + Metrica folds, whose truth A
+does not touch: at `target` at least 70% of folds won (6 of 8) and the interval above 0; not worse at `severe`
+on those 8; and on the 20 SkillCorner folds against the action truth, not worse than F3 at `target`. The 8 folds
+have been seen by every package since Nov 6, and four of them passed this kind of test and were not adopted (S1,
+S2, K1, K), so rule 2 is weaker evidence than rule 1 and says so. **It counts only if David and Justin both put
+their names to it before the cut-off (Nov 14, 18:00 CET), as a change of protocol the technical document
+states.** This entry does not adopt it.
+
+**What stands.** If A passes rule 1 it is a candidate that passed the standing rule, and adopting it is David's
+and Justin's decision. If it fails rule 1, F3 stands unless they adopt rule 2 and A meets it. Either way the
+submission pipeline does not change here: adopting A would also need the all-30 training on action labels, new
+expected hashes and the documents. No other time constant, T, weighting or variant is tried, whatever the result.
+
+**Information, decides nothing:** each member swapped alone; the action team head with F3's alive head (is it
+the owner labels or the dead-ball labels that move the score?); A against K on the folds both have; every other
+evaluation world; alive/dead F1, team accuracy and predicted possessions per true one; true possessions found by
+length, on each truth.
+
+**What it cannot show.** That the action labels are right: SkillCorner makes its events automatically from the
+same tracking, and a stoppage's two ends are approximations. That the target's ground truth follows them. And a
+SkillCorner score against the action truth favours A by construction; it is a guard and a description, not
+evidence that A is better.
+
+**Run.** `a-gbdt` (about 50 minutes), `a-tcn` (about 4 hours, on the charger), `a-gate`. Smoke runs carry a tag
+and are not the candidate.
+
 ### SkillCorner's own action events against the label we train on (description only; Claude, Justin has not read it yet)
 
 **Nothing was fitted, scored or chosen.** `scripts/probe_sc_actions.py`, on the 20 SkillCorner development matches
