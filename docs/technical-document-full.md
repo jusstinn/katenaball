@@ -420,7 +420,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
   F3 (section 3.4) was checked the same way: seven combinations (Windows 10 and Windows Server on Intel,
   Windows Server on AMD, Ubuntu on three AMD models, macOS on Apple M1), four different sets of TCN weights,
   one CSV; and the same LightGBM model on an eighth machine. GitHub's Ubuntu runners never drew an Intel CPU
-  for F3.
+  for F3, so that pair was run under WSL on the reference PC, with Ubuntu's libraries on its Intel CPU: a
+  fifth set of TCN weights, and the same CSV.
 
   So expect the same file on another machine. That has been shown on an external match in the provided format,
   not on the provided match itself, where a near-tie could still flip a label.

@@ -199,10 +199,10 @@ crosses D or X.
   possessions under 2 s, and 85 to 91% of those over 16 s.
 - **Model bytes differ across machines; the labels did not.** The LightGBM model is byte-identical
   everywhere. The TCN's weights differ in their last bits with the OS and the CPU vendor. Trained from an
-  empty cache on seven OS and CPU combinations (Windows, Ubuntu and macOS; Intel, AMD and Apple), F3 gave an
-  external match in the provided format the same CSV, byte for byte. So expect the same file on another
-  machine; that was shown on an external match, not on the provided one, where a near-tie could flip a
-  label.
+  empty cache on seven OS and CPU combinations (Windows, Ubuntu and macOS; Intel, AMD and Apple), and once
+  more under Linux on an Intel CPU, F3 gave an external match in the provided format the same CSV, byte for
+  byte. So expect the same file on another machine; that was shown on an external match, not on the provided
+  one, where a near-tie could flip a label.
 
 **With more time** we would make the simulated positions as smooth and correlated as real tracking, add a
 model aimed at the team label, and test more of Smart Tagging than the set-piece tags.
