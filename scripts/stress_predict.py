@@ -17,7 +17,8 @@ What a case must do to pass: ``label_match`` returns; every frame inside the gra
 other frame is X; the CSV passes the official checks (``pipeline.write_submission``); labelling the same case
 twice gives the same labels when ``--twice`` is given. It says nothing about accuracy: the labels of a damaged
 match are not scored. One case also goes through the file format (``dress.write_bundle`` and ``load_target``) and
-must come back equal.
+must come back equal. For information, each row also carries the share of graded frames whose label differs from
+the target-like case's: 0 means the damage changed no label.
 
 The match is the dressed external match of ``scripts/dressed_check.py export`` (IDSSE ``DFL-MAT-J03WMX``); the
 model is the one ``make_submission.py train`` saved for ``--spec`` under ``KATENA_WORK``, read and never
@@ -355,7 +356,10 @@ def check_codes(m: Match, codes: np.ndarray) -> list:
     return bad
 
 
-def run_case(name: str, m: Match, model, PL, twice: bool) -> dict:
+def run_case(name: str, m: Match, model, PL, twice: bool, ref: np.ndarray | None = None) -> tuple[dict, np.ndarray | None]:
+    """One case: the row for the table, and its labels (None when it raised). ``ref`` is the target-like case's
+    labels, to count the graded frames this damage relabelled."""
+    codes = None
     row = {"case": name, "ok": False, "slots": int(m.n_slots),
            "ball_missing_in_halves": round(float(np.isnan(m.ball[inside(m), 0]).mean()), 3),
            "attack_dir": {str(k): int(v) for k, v in m.attack_dir.items()}}
@@ -374,11 +378,15 @@ def run_case(name: str, m: Match, model, PL, twice: bool) -> dict:
         row.update(ok=not problems, problems=problems, rows=sub["rows"], spells_5hz=rep["spells_5hz"],
                    share_H=shares["H"], share_A=shares["A"], share_D=shares["D"],
                    touches=rep.get("touch_events"), seconds=round(time.time() - t0, 1))
+        if ref is not None and ref.shape == codes.shape:
+            ins = inside(m)
+            row["relabelled_vs_target_like"] = round(float((codes[ins] != ref[ins]).mean()), 4)
     except Exception as e:  # noqa: BLE001  an external match: the message may be shown
+        codes = None
         tb = traceback.extract_tb(e.__traceback__)[-1]
         row.update(problems=[f"{type(e).__name__}: {str(e)[:300]}"],
                    where=f"{Path(tb.filename).name}:{tb.lineno} in {tb.name}", seconds=round(time.time() - t0, 1))
-    return row
+    return row, codes
 
 
 def through_the_file(m: Match, model, PL) -> dict:
@@ -438,14 +446,16 @@ def main(argv=None) -> int:
           f"cache {os.environ.get('KATENA_WORK')}", flush=True)
     tlike = finish(target_like(clone(base), np.random.default_rng(SEED)))
 
-    rows = []
+    rows, ref = [], None
+    if not only or set(only) - {"target_like", "target_like_through_the_file"}:
+        row0, ref = run_case("target_like", tlike, model, PL, a.twice)          # the reference every row is compared with
     for i, name in enumerate(names):
         if only and name not in only:
             continue
         if name == "as_exported":
-            row = run_case(name, base, model, PL, a.twice)
+            row, _ = run_case(name, base, model, PL, a.twice, ref)
         elif name == "target_like":
-            row = run_case(name, tlike, model, PL, a.twice)
+            row = row0 if ref is not None else run_case(name, tlike, model, PL, a.twice)[0]
         elif name == "target_like_through_the_file":
             row = through_the_file(tlike, model, PL)
         else:
@@ -454,11 +464,13 @@ def main(argv=None) -> int:
             except Exception as e:  # noqa: BLE001
                 row = {"case": name, "ok": False, "problems": [f"building the case: {type(e).__name__}: {str(e)[:200]}"]}
             else:
-                row = run_case(name, m, model, PL, a.twice)
+                row, _ = run_case(name, m, model, PL, a.twice, ref)
         rows.append(row)
         tail = "" if row["ok"] else "  " + "; ".join(row.get("problems", [])) + ("  @ " + row["where"] if "where" in row else "")
+        moved = row.get("relabelled_vs_target_like")
         print(f"  {'PASS' if row['ok'] else 'FAIL'}  {name:34s} {row.get('seconds', 0):6.1f}s  "
-              f"D {row.get('share_D', float('nan')):.3f}  spells {row.get('spells_5hz', '-')}{tail}", flush=True)
+              f"D {row.get('share_D', float('nan')):.3f}  spells {row.get('spells_5hz', '-'):>4}  "
+              f"relabelled {'-' if moved is None else format(moved, '.4f')}{tail}", flush=True)
 
     failed = [r["case"] for r in rows if not r["ok"]]
     print(f"[stress] {len(rows) - len(failed)} of {len(rows)} cases passed" + (f"; failed: {failed}" if failed else ""))
