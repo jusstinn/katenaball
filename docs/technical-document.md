@@ -158,6 +158,13 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   "predicted D counts as X" rule for SkillCorner is applied (`scripts/dressed_check.py`). A synthetic
   bundle on the provided match's own timeline (199,319 frames, the graded halves of `games.py`) runs
   through the same path in CI, and the official validator accepts its CSV (`tests/test_pipeline_atd.py`).
+- **The submission path does not break on damaged tracking.** No feature, model or decoder code had run on
+  the provided match before the real run. `scripts/stress_predict.py` puts the same exported external match
+  on 46 anonymous slots with 41% of the ball missing, then damages it in 27 further ways that the training
+  worlds do not produce: no ball at all, nothing tracked for five minutes, one team missing, positions far
+  off the pitch, infinite values, slots that change team. In every case, with F and with F3, labelling
+  finished and the file passed the official checks. This shows the path does not crash, not that the labels
+  are good.
 
 ### 3.2 Bake-off (2026-11-06)
 
@@ -437,8 +444,10 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
 Without `make` (the team's Windows PC), run the same steps one by one; `docs/REPRODUCE.md` lists them.
 `predict` is the only step that opens the provided match, and it prints aggregates only.
 
-- **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (run on the CPU on every OS), numpy 2.2.6, pandas 2.3.3, numba
-  0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
+- **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (run on the CPU on every OS), numpy 2.2.6,
+  pandas 2.3.3, numba 0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
+- **Needed on Linux:** the system's OpenMP runtime, `libgomp.so.1` (`apt-get install libgomp1`). Slim container
+  images lack it; `make submit` then stops at its first step and names the package.
 - **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and the
   model byte for byte in 1 h 39 min, including the download.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before

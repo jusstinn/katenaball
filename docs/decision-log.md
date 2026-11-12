@@ -4,6 +4,69 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-12
+
+Claude on David's PC, overnight. David has read none of it. Nothing in this day's entries changes a model, a
+feature, a label or a hash. Nothing ran on the provided match and no fold was scored. F is still the submission
+model; whether F3 replaces it is still David's and Justin's decision (PR #26).
+
+### Stress check of the submission path: `scripts/stress_predict.py` (result)
+
+STRESS_RESULT
+
+### A bare Linux and an outside read of the documents: what would have stopped a reproduction (PR #28)
+
+**Seven problems, all fixed, none of which touches a label.** They came from two places:
+
+- **A Linux that is not a GitHub runner.** The pipeline's first run on Ubuntu 24.04 under WSL on the Windows PC,
+  as installed, with nothing added (the entry on Linux on Intel, below).
+- **An outside read.** A fresh agent got the repository and the organisers' `SUBMISSION.md`, and was asked to
+  regenerate the file as an organiser would and to report what stops or misleads. It read only; it ran nothing
+  but `--help`.
+
+| Problem | Found by | Fix |
+|---|---|---|
+| Without the system's `libgomp.so.1`, every script stopped with "install it (brew install libomp)". LightGBM's Linux wheel takes that library from the system; GitHub's runners have it, a bare WSL distribution and slim container images do not | The WSL run | `gbdt.ensure_openmp` names the platform's package (`apt-get install libgomp1`, `dnf install libgomp`) and quotes the loader's error |
+| A misplaced data bundle was noticed only by `predict`, after the download and the training, with no path in the message | The read | `make_submission.py bundle` checks that the three files `predict` reads exist (names only). `make submit` and `make_submission.py all` run it first |
+| With no Smart Tagging file, `predict` skipped the kickoff rule and went on; only a line of its report said so. The result is a valid CSV with other labels | The read | `predict` on the competition match stops when the file is missing. An exported external match (`--timeline`) is unchanged |
+| `make validate` ended with `shasum -a 256`, which is not on every Linux | The read | Python computes the hash |
+| `$(OUT)` was unquoted, so a team name with a space broke `make submit` | The read | Quoted in every recipe |
+| `REPRODUCE.md` did not say where the bundle goes, and left out git, network access, the uv version, `libgomp1`, and that torch's Linux wheels add about 6 GB | Both | A "Where the data bundle goes" section and a fuller Requirements list |
+| `real-run.md` said `check_kickoff_tags.py` runs "once that script is on main"; the by-hand list and `make check-target` left it out | The read | One list in all three places |
+
+**The Makefile was run with a real GNU make** (4.3, under WSL; `make` is on neither the Windows PC nor in CI's
+steps), on a folder of empty files named like the bundle and on a published baseline file:
+
+- `make -n submit TEAM="My Team"` prints the eight commands with the name quoted.
+- With no bundle, `make submit` stops at its first step, names the three missing paths, and creates no cache
+  and starts no download.
+- `make validate TEAM="My Team"` validates the file and prints the hash `sha256sum` gives.
+- Without `libgomp.so.1`, the first step prints the package to install.
+
+**The read's other findings** are in the technical document's commit of today: the summary now names the one
+Smart Tagging input, the machine lists match the tables of Nov 10 and 11, "ten gated packages" says what it
+leaves out, and section 8 lists six steps. It checked and found right: every command and flag in the
+documents, the library versions against `uv.lock`, F's and F3's sizes against the code, and the hashes in
+`expected-windows.json` and `real-run.md` against this log.
+
+**Not done: shortening the technical document.** It prints to 9 pages and the organisers ask for "a few". The
+read's cuts, least loss first, would bring it to about 5: section 9 (the README has the same map); the bake-off
+table to one sentence; the cross-machine list and the cost table to a few lines; the second F table; the bench
+table; the label-convention rows merged. Whether to cut is the team's decision.
+
+### The technical document as a PDF (PR #27)
+
+`uv run scripts/build_document.py --team <team_name>` writes `submissions/<team_name>.pdf`, the name the form
+asks for: A4, page numbers, the team name in place of `<team_name>`. It refuses while a `TODO(` marker is left
+(`--draft` builds anyway). Markdown goes to HTML with `markdown-it-py`, which the script declares for itself, so
+`uv.lock` is unchanged; Edge or Chrome prints the page headless. Today's draft: 9 pages.
+
+### For the record: F3's dressed-match scores to six decimals
+
+The technical document on `david/f3-adopt` quotes them, and this log had four decimals (R2, Nov 11). From
+`D:/katena/logs/f3/compare_held.log`: spellF1 0.722130 and macroF1 0.941533 on the evaluation path and from the
+official scorer on the CSV, 260 predicted possessions against 341 true. One fold at clean input, as R2 said.
+
 ## 2026-11-11
 
 ### F3 on the Windows PC: the gate (result)
