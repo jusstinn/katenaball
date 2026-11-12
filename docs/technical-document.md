@@ -13,10 +13,11 @@ links. `TODO(after the real run)` marks what only the final run on the provided 
   for development, and all 30 for the final model. A degrader corrupts their tracking to look like
   automatic tracking.
 - No model was trained, tuned or selected on the provided match. Nobody labelled any frame by hand.
-- The adopted model, F, beat the previous baseline, M2, under a rule registered before F was scored:
-  spellF1 0.6019 against 0.5861 on 28 leave-one-match-out development folds at target-like noise,
-  +0.0158 [+0.0111, +0.0205], 22 of 28 folds won. These are development estimates, not a prediction of
-  the hidden score.
+- The submitted model, F3, came from two gated steps, each under a rule registered before its score, on
+  28 leave-one-match-out development folds at target-like noise. F beat the previous baseline, M2: spellF1
+  0.6019 against 0.5861, +0.0158 [+0.0111, +0.0205], 22 of 28 folds won. F3 is F with a larger LightGBM
+  model and a longer-trained TCN, and it beat F: 0.6180 against 0.6019, +0.0161 [+0.0118, +0.0207], 21 of
+  28 folds won. These are development estimates, not a prediction of the hidden score.
 
 ## 2. Approach
 
@@ -53,18 +54,20 @@ it and another over the 0.4 s after. A touch is a velocity break of at least 2 m
 times a local jitter estimate. It goes to the nearest player within 3 m who is clearly nearer than the
 nearest opponent. Per sample we then compute time since and until each team's touches, who touched last,
 turnovers, touch counts and balance in 0.5-2 s windows, each team's closest approach and control margin in
-0.2-1 s windows, ball speed and flight. Only the LightGBM member gets these columns (213 in total).
+0.2-1 s windows, ball speed and flight. Both members get these columns (213 in total); in F only the
+LightGBM member did.
 
 ### 2.3 Models and decoder
 
 - **LightGBM heads** (`katena.models.gbdt`). The *alive* head trains on IDSSE and Metrica rows only,
   because SkillCorner has no dead-ball label. The *team* head ("the focal team has the ball") trains on H
-  and A rows from all three sources. The parameters were fixed before the bake-off and never tuned: 150
-  trees, learning rate 0.1, 31 leaves, at least 50 rows per leaf, feature and bagging fractions 0.5,
-  `max_bin` 63, seed 0, deterministic, 8 threads.
+  and A rows from all three sources. The parameters were fixed before the bake-off and never tuned, apart
+  from the number of trees: 1,200 (F had 150; section 3.4). Learning rate 0.1, 31 leaves, at least 50 rows
+  per leaf, feature and bagging fractions 0.5, `max_bin` 63, seed 0, deterministic, 8 threads.
 - **TCN** (`katena.models.tcn`). Six residual blocks of 48 channels with dilations 1 to 32, looking both
-  ways in time, with the same two heads. It sees the 160 base columns and trains for 1,200 AdamW steps on
-  random 256-sample windows, with seed 0, 4 threads and deterministic algorithms.
+  ways in time, with the same two heads. It sees all 213 columns and trains for 4,800 AdamW steps on
+  random 256-sample windows, with seed 0, 4 threads and deterministic algorithms (F: the 160 base columns
+  and 1,200 steps; section 3.4).
 - **Blend** (`katena.models.ensemble`). `logit p = 0.5 logit p_lgbm + 0.5 logit p_tcn` per head. The
   weight was fixed before any result.
 - **Decoder** (`katena.decode.hmm`). With pa = p(alive) and ph = p(home), the class probabilities are
@@ -96,7 +99,7 @@ D2 added worlds that keep each severity's overall ball loss (`katena.sim.worlds`
 - **`_ids`** adds identity switches in crowds, at assumed rates.
 - **`_smooth`** cuts jitter to the level of SkillCorner's development matches at 5 Hz.
 
-F trains on the `d2j` mix. Each severity's rows are split evenly over five worlds for IDSSE and Metrica
+F and F3 both train on the `d2j` mix. Each severity's rows are split evenly over five worlds for IDSSE and Metrica
 (`s`, `s_cpl50`, `s_cpl100`, `s_ids`, `s_smooth`) and over three for SkillCorner, which has no D (`s`,
 `s_ids`, `s_smooth`). LightGBM sees every 4th 5 Hz sample, with a random focal orientation per row. The
 TCN sees one whole-match sequence per match and world. For the `touch` columns, each world's ball
@@ -129,7 +132,8 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
 
   F is ahead in 15 of the 16 bench-and-world pairs; the exception loses 0.003. M2 retrained here
   reproduces the bake-off's recorded bench scores to the 3 decimals printed. The final model also trains
-  on these two matches, so this read is of the 28-match model, not the submitted one.
+  on these two matches, so this read is of F trained on 28 matches, not of the submitted model. F3 has no
+  bench read: the benches were spent by then.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
   on it, which is also what the organisers' clarification of 2026-11-03 requires. We used only DATA.md's
   published aggregates (46 slots, 20.5 tracked objects, 41% ball missing) and the published half
@@ -152,7 +156,8 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   loader (`katena.target.atd.load_target`). We trained F without it and labelled it with
   `make_submission.py predict`. Scored with the official scorer, the CSV gives spellF1 0.650611 and
   macroF1 0.930641, exactly what the evaluation code gives for the same model. Every probability and graded
-  label is bit-identical on both paths. A SkillCorner match (10 Hz) also agrees, once the evaluation's
+  label is bit-identical on both paths. The same check with F3 gives 0.722130 and 0.941533 on both paths.
+  A SkillCorner match (10 Hz) also agrees, once the evaluation's
   "predicted D counts as X" rule for SkillCorner is applied (`scripts/dressed_check.py`). A synthetic
   bundle on the provided match's own timeline (199,319 frames, the graded halves of `games.py`) runs
   through the same path in CI, and the official validator accepts its CSV (`tests/test_pipeline_atd.py`).
@@ -252,8 +257,7 @@ registered before its score. Four failed (section 4). Two passed:
   before any result, and tried no other weight.
 - **Reproduction.** F3 trained twice on the PC gives the same model file. A dressed external match gets a
   byte-identical CSV on six OS and CPU combinations and with other torch kernels (section 7).
-- **Status.** F3 has passed its gates and its reproduction checks. The submitted model is the one named in
-  section 1.
+- **Adopted.** F3 passed its gates and its reproduction checks, and it is the submitted model.
 
 ## 4. Assets, and what we tried and dropped
 
@@ -335,8 +339,8 @@ than not to be deliberate at about 3.5 s. That describes control in DFL data, bu
 at the gate (H3.5). The convention matters a lot: the same M2 predictions score 0.495 to 0.653 across the
 conventions.
 
-**The output.** The decoder applies no explicit 2 s rule; it learns transitions from the labels. F
-under-segments, with 0.738 predicted possessions per true one at target-like. On the development folds it
+**The output.** The decoder applies no explicit 2 s rule; it learns transitions from the labels. F3
+under-segments, with 0.751 predicted possessions per true one at target-like (F: 0.738). On the development folds it
 never writes X on a graded frame.
 
 **Second-half kickoff.** The second half is graded from frame 110,808 but kicks off later (FAQ.md), and
@@ -361,7 +365,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
   25 Hz ball, which no development world reproduces.
 - **SkillCorner is 20 of the 28 folds.** It has no dead ball, and null possession splits its spells. At
   10 Hz the touch features get two native frames per sample. Its "target-like" world keeps 15.3 tracked
-  objects, not 20.5. Five of F's six losing folds are SkillCorner; the worst fold loses 0.0181.
+  objects, not 20.5. Against M2, five of F's six losing folds are SkillCorner, and the worst
+  loses 0.0181. Against F, all seven of F3's losing folds are SkillCorner.
 - **Metrica's dead spans run long.** The event rule keeps D through live play after an untagged restart,
   and Metrica gives about a quarter of the alive head's rows. The cleaner rule (MR) was neutral.
 - **Pooled calibration.** The D2 coupling constants come from Metrica Games 1 and 3, and the smooth jitter
@@ -378,7 +383,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
 - **The TCN seed matters.** F's TCN uses seed 0, fixed in advance. Averaging in a second seed lowered the
   8-fold score by 0.005 (1 of 8 folds won), so seed 0 does unusually well on those folds. With seed 1, F is
   still about +0.02 above M2 there, so roughly a quarter of the 8-fold gain depends on the seed. The 28-fold
-  gate is the better guide.
+  gate is the better guide. Both tests were run on F's 1,200-step TCN and were not repeated for F3's, which
+  keeps seed 0.
 - **Unknown label convention.** The absolute score is uncertain by about 0.15. About 35 touch-then-out
   flips per IDSSE match (11% of spells) remain in our labels.
 - **Assumed identity-switch rates.** No external source measures them.
@@ -423,7 +429,7 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
 - `scripts/build_external.py` downloads the 30 external matches and checks every file's SHA-256;
 - `scripts/make_submission.py corpus` builds the base features;
 - `scripts/make_submission.py worlds` builds the `d2j` worlds, touch columns and pools;
-- `scripts/make_submission.py train` trains F's two members and saves `bundle.pkl` with its hashes;
+- `scripts/make_submission.py train` trains the two members and saves `bundle.pkl` with its hashes;
 - `scripts/make_submission.py predict` labels the provided match, writes the CSV and runs the official checks
   on the exact bytes written.
 
@@ -432,16 +438,18 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 
 - **Pinned stack:** Python 3.11, LightGBM 4.7.0, torch 2.15.0 (CPU), numpy 2.2.6, pandas 2.3.3, numba
   0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
-- **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and the
-  model byte for byte in 1 h 39 min, including the download.
+- **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and F's
+  model byte for byte in 1 h 39 min, including the download. F3 changes only the training step, and F3
+  trained twice there gives the same model file.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
   import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
 - **Cost:**
 
   | Machine | Cache build (corpus, worlds) | Train | Predict | Disk and memory |
   |---|---|---|---|---|
-  | Windows 10, i7-7700, CPU only, 2 workers | 18 + 34 min | 4.5 min | about a minute | 19 GB cache, 4.0 GB peak |
-  | Apple-silicon laptop, 3 workers | 18 min, corpus to trained model | included | under a minute | |
+  | Windows 10, i7-7700, CPU only, 2 workers | 18 + 34 min | 23 min with another job running (LightGBM 3, TCN 20) | about a minute | 19 GB cache |
+  | Apple-silicon laptop, 3 workers | 14 min | 9 min (LightGBM 0.5, TCN 8) | under a minute | |
+  | GitHub runners: Ubuntu, Windows, macOS | | 8, 13 and 37 min | under a minute | 5.7 GB peak in training (Ubuntu) |
 
   The external download (about 5 GB) is extra.
 - **The submitted file:** `TODO(after the real run)`: SHA-256 of `<team_name>.csv` and its commit.

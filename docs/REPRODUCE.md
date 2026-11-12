@@ -33,10 +33,11 @@ check opens nothing.
 | External corpus | `scripts/build_external.py` | Public IDSSE, Metrica and SkillCorner data, downloaded and checked by SHA256 (`scripts/external_manifest.json`) | `external_data/` |
 | Corpus features | `make_submission.py corpus` | `external_data/canonical/` | `work/final/{gt,pool,feat}` |
 | Training worlds | `make_submission.py worlds` | The same | The `d2j` world features, touch columns, and pools |
-| Model | `make_submission.py train` | The same | `work/final/model/bundle.pkl`, `manifest.json` (hashes) |
+| Model | `make_submission.py train` | The same | `work/final/model_F3/bundle.pkl`, `manifest.json` (hashes) |
 | Labels | `make_submission.py predict` | The bundle: ATD metadata and raw tracking, and the Smart Tagging file for the kickoff rule | `submissions/<team>.csv` |
 
-The model is candidate F (`docs/decision-log.md`). It trains on all 30 external matches, and nothing from the
+The model is F3 (`docs/decision-log.md`, 2026-11-11): candidate F with a 1,200-tree LightGBM member and a
+4,800-step TCN that also reads the touch columns. It trains on all 30 external matches, and nothing from the
 provided match. The provided match is read only by `predict`, which prints aggregates only (counts, shares,
 shapes, hashes, run times).
 
@@ -54,9 +55,9 @@ shapes, hashes, run times).
   about 6 GB, because torch's Linux wheels bring the CUDA libraries. Nothing runs on a GPU: both models train
   and predict on the CPU, on every OS.
 - 16 GB of RAM is enough.
-- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model took 18 minutes:
-  corpus 4.5, worlds 9.5, LightGBM 0.25, TCN 3.5. Labelling the match takes well under a minute. The
-  external download is extra.
+- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model takes about 23 minutes:
+  corpus 4.5, worlds 9.5, LightGBM 0.5, TCN 8. On the team's Windows PC (4 cores) training takes about
+  20 minutes (23 measured with another job running). Labelling the match takes well under a minute. The external download is extra.
 - On macOS without Homebrew's libomp, the scripts load LightGBM through scikit-learn's bundled copy and
   re-execute themselves once (`gbdt.ensure_openmp`).
 
@@ -114,8 +115,8 @@ Every step skips what is already built, so a run that stopped can be started aga
 - `tests/test_pipeline_atd.py` writes a synthetic ATD bundle in the real file format on the competition's own
   timeline (199,319 frames, the graded halves of `games.py`) and runs `predict` on it through
   `katena.target.atd.load_target`; the CSV must pass `evaluation/validate_submission.py` unchanged.
-- `scripts/dressed_check.py` exports an external match in the ATD format, trains F without it
-  (`make_submission.py train --hold-out <key>`, saved to `model_without_<key>/`, never `model/`), labels it with
+- `scripts/dressed_check.py` exports an external match in the ATD format, trains the model without it
+  (`make_submission.py train --hold-out <key>`, saved to `model_F3_without_<key>/`, never `model_F3/`), labels it with
   `predict --hold-out <key> --data-dir <bundle> --timeline <timeline.json>`, and compares the official score of
   that CSV with the evaluation path's score for the same model. Both options refuse the competition data.
 - `scripts/cache_digests.py dump` hashes every training input and the model stage by stage; `diff` on two

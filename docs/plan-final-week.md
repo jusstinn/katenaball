@@ -82,3 +82,12 @@ this plan was written, and both had passed F's rule on his Mac: a 1,200-tree Lig
 **This plan fixed its own two candidates, so F3 is not adopted by it.** Whether F3 replaces F is David's and
 Justin's decision. The cut-off above still holds: nothing is adopted after Nov 14, 18:00 CET. The change is
 prepared on `david/f3-adopt`. Until it is merged, F is the submission model and `scripts/real_run.py` trains F.
+
+## Status, 2026-11-12: F3 is the submission model
+
+David gave the decision to Claude ("make the best decisions you see fit"), and F3 was adopted that night, two
+days before the cut-off: PR #26 and the decision log of 2026-11-12. Justin put F3 forward in PR #23; he has not
+confirmed the merge itself, and undoing it is one revert. From that merge on, `scripts/real_run.py` trains and
+checks F3. F stays in the code (`--spec F`).
+
+**Left for the humans:** the team name, the real run on David's PC, the `submission-v1` tag and the form.
