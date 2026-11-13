@@ -158,6 +158,149 @@ part of any registered test.
 **Not shown.** That the action labels are right; that the provided match follows them; anything about a second
 machine for AW, AT and ATW (the PC fits AW after its own A; the Mac's A and AW are still to come). The cut-off
 is Nov 14, 18:00 CET, and adoption needs Justin's name on rule 2 and both names on the candidate.
+### K at kind 0, S1 and S2 against the action truth: result (Claude; Justin has not read it yet)
+
+**Read at 04:05 CET on Nov 13**, after the entry below was pushed (`c463d70`). `scripts/read_act.py`, 28 s,
+`work/final/read_act.json`. 20 SkillCorner folds, action truth, 20 of 20 with every member; A's TCN on none.
+
+| Comparison | `target` | `severe` |
+|---|---|---|
+| **K at kind 0 vs F3** | 0.6359 vs 0.6094, **+0.0265 [+0.0178, +0.0349], 18/20** | +0.0243 [+0.0165, +0.0320], 17/20 |
+| K at its own kind vs F3 | -0.0141 [-0.0190, -0.0091], 2/20 | -0.0102 [-0.0153, -0.0053], 4/20 |
+| K at kind 0 vs K at its own kind | +0.0405 [+0.0313, +0.0497], 18/20 | +0.0346 [+0.0259, +0.0428], 19/20 |
+| S1 vs F3 | +0.0083 [+0.0022, +0.0150], 14/20 | +0.0094 [+0.0040, +0.0149], 15/20 |
+| S2 vs F3 | -0.0057 [-0.0123, +0.0011], 5/20 | -0.0061 [-0.0125, +0.0004], 9/20 |
+| A1 (interim) vs K at kind 0 | -0.0086 [-0.0155, -0.0012], 7/20 | -0.0077 [-0.0145, -0.0009], 6/20 |
+
+True possessions found at IoU 0.5 by true length, `target`:
+
+| Model | under 2 s | 2-4 s | 4-8 s | 8-16 s | over 16 s |
+|---|---|---|---|---|---|
+| F3 | 0.05 | 0.22 | 0.55 | 0.75 | 0.85 |
+| K at kind 0 | 0.12 | 0.39 | 0.69 | 0.80 | 0.88 |
+| K at its own kind | 0.05 | 0.18 | 0.51 | 0.73 | 0.84 |
+| S1 | 0.07 | 0.31 | 0.63 | 0.80 | 0.88 |
+| S2 | 0.08 | 0.30 | 0.64 | 0.81 | 0.87 |
+| A1 | 0.10 | 0.31 | 0.61 | 0.81 | 0.89 |
+
+**Read as the entry below said.**
+
+- **K at kind 0 is ahead of F3 with the interval above 0, so the mechanics of IDSSE and Metrica carry over to
+  real broadcast tracking** when the truth changes owner at the first touch: 18 of 20 folds, and 39% of the 2-4 s
+  possessions found against 22%. Neither model trained on that truth. The same reading lost on every fold
+  against the standing truth (-0.0326, 0 of 20; K's entry). On SkillCorner the truth decides the verdict, as the
+  transfer probe said with one head.
+- **Kind 0 is the value K's registration fixed for the provided match.** So K, read the way it would be used,
+  is ahead of F3 on the 8 IDSSE + Metrica folds (+0.0345, 8 of 8) and on these 20 against the action truth.
+  **That does not reopen K.** It failed the rule it was registered under, rule 2 was declared for A, and this
+  reading was chosen after K's scores were known. It says what K's column is worth to a model that still
+  trains on the standing SkillCorner labels, and it is the bar A has to clear: A1 is 0.0086 behind it here with
+  the interval below 0, with half of A (K1, the comparable half of K, was +0.0175 on the 8 folds where A1 is
+  +0.0232).
+- **The length weights split by member.** S1 is ahead (14 of 20); S2 is not (5 of 20, interval touching 0). Both
+  were trained with weights taken from the standing SkillCorner labels, whose short possessions are the ones
+  the action labels disagree with, so this is not AW's or ATW's TCN; it is a reason to read their TCN members
+  alone when their gates print.
+
+**What it does not show.** That the action truth is right or that the provided match follows it (A's entry).
+And the action truth was built by this team from SkillCorner's events with two constants; a model can gain on
+it by sharing those constants only if it trained on them, which K, S1, S2 and F3 did not.
+
+### K at kind 0, S1 and S2 against the action truth (information; written before the read)
+
+**Written at 03:55 CET on Nov 13, before `scripts/read_act.py` was run without `--dry`.** Claude on Justin's Mac;
+Justin said to go ahead with it (his message of 03:25 CET) and has not read this entry. It adopts nothing, no
+candidate comes out of it, and it changes no registration. Asked for by David's side (PR #31, comment of 02:44
+CET, point 3). External matches only; no model is fitted; a few minutes.
+
+**The question.** The same as the transfer probe's below, with whole models: on real broadcast tracking, scored
+against a truth whose owner changes at the first touch, are the models that learned IDSSE's and Metrica's
+mechanics ahead of F3? None of K, S1, S2 or F3 trained on an action label, and the action labels were built
+after all four were trained.
+
+**What is read.** The 20 SkillCorner folds, `target` and `severe`, cached out-of-fold probabilities, decoded as
+F3's are, scored against the action labels of `run_a.py` (`gt_act`) the way an IDSSE fold is scored.
+
+| Name | Members |
+|---|---|
+| F3 | `g1_gbdt1200` + `g2_tcn4800t` |
+| K0 | K's two members with the label-kind column read at 0, the value of the IDSSE and Metrica rows (`run_k.py` stored this reading on SkillCorner folds as its "Kx") |
+| K | K's two members at the fold's own value, 1 |
+| S1, S2 | `s1_gbdt1200w` + F3's TCN; F3's LightGBM + `s2_tcn4800tw` |
+| A1 | A's LightGBM member + F3's TCN (trained on the action labels; see "already seen") |
+| A | A's two members, only once A's TCN is cached on the Mac for all 20 folds |
+
+Printed: K0 vs F3, K vs F3, K0 vs K, S1 vs F3, S2 vs F3, A1 vs K0, and A vs K0 when it exists; means, paired 95%
+interval, folds won; possessions found by true length. The dry run found every file and key on 20 of 20 folds
+and A's TCN on none.
+
+**How it will be read.** K0 ahead of F3 with the interval above 0: the gain on the 8 folds carries over to real
+automatic tracking, on 20 folds no package was chosen on by this truth. K0 behind F3: the gain on the 8 folds
+may belong to the simulated noise, and that is to be said wherever A, AW, AT or ATW is discussed. S1 and S2 say
+the same for the length weights that AW and ATW carry. Whatever comes out, the two rules stand as written.
+
+**Already seen on this side, so this is not a blind read of everything in it.**
+
+- **A's interim gate on the Mac (A1: A's LightGBM member with F3's TCN; not the registered run).** Claude read
+  it at 23:57 CET on Nov 12 and told Justin. Rule 1 fails as A's entry expected: `target`, 28 folds, -0.0023
+  [-0.0073, +0.0025], 12 of 28; the 20 SkillCorner folds on the standing truth -0.0125 [-0.0183, -0.0066], 4 of
+  20. On the 8 IDSSE + Metrica folds +0.0232 [+0.0144, +0.0323], 8 of 8 (`severe` +0.0191, 7 of 8); on the 20
+  SkillCorner folds against the action truth +0.0179 [+0.0111, +0.0245], 16 of 20. A1 vs K on the 8 folds:
+  -0.0113. A's TCN has not started on the Mac (it waits for the charger), so nothing of A itself is known here.
+  **Justin has therefore seen an interim score of A before giving or refusing his name to rule 2.**
+- **K's gate** (entry of Nov 12), on the standing truth, including K read with the other kind (-0.0361 on all
+  28).
+- **The transfer probe's result** (entry below): +0.0115 on the action truth, 15 of 20.
+- `run_a.py` computed K at its own kind against the action truth into `a_scores.pkl`; it was never printed.
+
+### Three research reads on the evening of Nov 12 (description only; what was looked at)
+
+**Written at 03:55 CET on Nov 13.** Justin asked for two or three research agents on how to improve further
+(01:45 CET). Three ran on the Mac, each a Claude subagent: read-only on the repo, external matches only,
+aggregates only, no model fitted, no spellF1 of any new variant computed. None read A's or AW's cached
+probabilities. They are listed here because any later registration has to count them as seen.
+
+**1. Decoder and metric** (F3's cached members, 28 folds, `target` and `severe`).
+
+- Looked at: found share and credit by length; why each missed possession is missed; the team probability over
+  true possessions; runs the Viterbi discards and dips with p(other team) of 0.4 or more against the truth; the
+  credit of F3's predicted possessions by length and neighbour; transition lags; reliability tables of both
+  heads; costs of single errors on synthetic sequences with the official scorer.
+- Found: of the missed 2-4 s possessions, 4.4% had the right team in the probabilities and lost it in the
+  decoder, 2.2% were called dead, and in 64% the team probability was wrong on most frames (mean p of the true
+  team 0.27, against 0.77 on found possessions). In most of the rest the prediction ran on because the
+  neighbouring opponent possession was missed. An oracle that restored every decoder-smoothed miss would add
+  0.009 to 0.017; a rule without the oracle about 0. **The decoder has no sandwich merge:** the T = 2 merge
+  defines the truth and the training labels only, and applying it to predictions would change 3 of 5,922
+  possessions. Claude's earlier statement to Justin that the merge erases short predicted flips was wrong.
+- Not recommended: any decoder candidate. The precision of the p of 0.4 or more dips (43 to 59%) has been seen.
+
+**2. Data and labels** (web, licences, and the public external files).
+
+- No further open dataset is usable before the cut-off: PFF's World Cup 2022 set publishes no licence text; the
+  rest is in use already, gated, or carries no possession label.
+- A's SkillCorner labels: the fixed 1.0 s restart differs from the start of SkillCorner's own following phase
+  (`*_phases_of_play.csv`) by more than 0.5 s on 51% of received restarts; and on 11 stoppages a match the ball
+  goes dead only at the broadcast cutting away, a median 8.1 s after the last touch. David's side found the
+  second one independently (AT's entry).
+- IDSSE's label changes owner a median 0.16 s after the new team's player is within 1.5 m (2 matches, 709
+  changes); Metrica's at the new team's first pass, carry or recovery, with no lag.
+- One probe printed event-type counts of `Sample_Game_2`, a locked bench (counts only, no score, no label).
+
+**3. Model** (F3's and the closed S1/S2 members' cached probabilities, `target`; SkillCorner folds read against
+the action truth).
+
+- Team accuracy by position in the true possession, F3: 0.988 more than 4 s from both ends; 0.49 in the first
+  second after a direct change of owner and 0.68 in the next (IDSSE + Metrica); 0.97 in the first second after
+  dead ball.
+- Timing of the 0.5 crossing at true direct changes, within 0.4 s: F3 0.21 (IDSSE), 0.43 (Metrica), 0.27
+  (SkillCorner, action truth); with the length weights (S1 and S2 together) 0.38, 0.63, 0.40. Split by whether
+  the ball is in view around the change, with the weights: 0.48 in view against 0.30 not (IDSSE), 0.72 against
+  0.31 (Metrica).
+- **This is a look at the length weights on the action truth before AW's or ATW's score is known**, in timing
+  terms, not spellF1.
+- Read in the code: the feature set has team velocity only over centred windows of 2 s and 5 s either side and
+  no one-sided window, no acceleration and no rate of the lines or the spread (`featurize/build.py`).
 
 ### AT and ATW (pre-registration): A's team labels with F3's alive/dead training; and the candidates on GitHub's runners
 
