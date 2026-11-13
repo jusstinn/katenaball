@@ -6,6 +6,59 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A2 and AW2: result; and the PC's own all-30 fits of A and AW (Claude on David's PC; neither David nor Justin has read it)
+
+**Both pass their registered rule: a TCN trained for 9,600 steps is ahead of the same candidate at 4,800 on
+every kind of fold. So the candidate that stands is AW2, AW with the longer TCN. Nothing is adopted here.** Read
+at 08:00 CET on Nov 13. `gate.yml` at `b5a8afd` (runs 43367189118 and 43367192771), 28 folds each on Ubuntu
+runners, about 12 minutes a fold; the gate on the PC, `scripts/run_x2.py --tag gha --inc f3_gbdt,f3_tcn`, log
+`D:/katena/logs/a-win/gha_x2_gate.log`. External development matches only; nothing in the registration changed.
+
+| The longer TCN against its own base | A2 minus A | AW2 minus AW |
+|---|---|---|
+| **28 folds, action truth on SkillCorner, `target` (rule)** | **+0.0067 [+0.0040, +0.0093], 23/28** | **+0.0071 [+0.0046, +0.0096], 20/28** |
+| The same at `severe` (rule: not worse) | +0.0082 [+0.0050, +0.0114], 24/28 | +0.0077 [+0.0047, +0.0106], 24/28 |
+| 8 IDSSE + Metrica folds, `target` (rule: not worse) | +0.0075 [+0.0034, +0.0120], 7/8 | +0.0070 [+0.0018, +0.0118], 6/8 |
+| 20 SkillCorner folds, action truth, `target` (rule: not worse) | +0.0064 [+0.0031, +0.0095], 16/20 | +0.0071 [+0.0044, +0.0099], 14/20 |
+| Verdict | Passes: A2 replaces A | Passes, with exactly the 20 folds the rule asks for: AW2 replaces AW |
+
+| spellF1, `target` | F3 | A | A2 | AW | AW2 |
+|---|---|---|---|---|---|
+| 8 IDSSE + Metrica folds | 0.6374 | 0.6763 | 0.6838 | 0.6923 | **0.6993** |
+| 20 SkillCorner folds, action truth | 0.6094 | 0.6647 | **0.6712** | 0.6586 | 0.6657 |
+| All 28, action truth on SkillCorner | 0.6174 | 0.6680 | 0.6748 | 0.6682 | 0.6753 |
+| IDSSE (6) | 0.6024 | 0.6453 | 0.6571 | 0.6725 | 0.6814 |
+| Metrica (2) | 0.7427 | 0.7692 | 0.7642 | 0.7517 | 0.7530 |
+
+- **The gain is about 0.007 everywhere**, on the 8 folds and on SkillCorner alike, at both severities. It is the
+  first change since `LT` to win folds of both kinds, and it is the same kind of change.
+- **Against F3 the candidates now stand at** +0.0464 (A2) and +0.0618 (AW2) on the 8 folds, 8 of 8 each, and
+  +0.0617 and +0.0563 on SkillCorner against the action truth (20 and 18 of 20).
+- **The weights read the same at 9,600 steps** (information; the registered test was at 4,800): AW2 minus A2 is
+  +0.0155 [+0.0032, +0.0275] on the 8 folds (6 of 8), -0.0055 [-0.0131, +0.0024] on SkillCorner against the
+  action truth, and -0.0103 [-0.0183, -0.0025] there at `severe`. They gain on IDSSE and lose on the other two.
+- The longer TCN leaves the count alone: 0.80 and 1.02 predicted possessions per true one for A2, 0.98 and 1.23
+  for AW2, on the 8 folds and on SkillCorner.
+- As registered, no other step count is tried.
+
+**The PC's own fits of A and AW on all 30 matches** (`D:/katena/tools/pc_ref.sh`, in `D:/katena/work-submit`
+beside F3's model, which is untouched; 07:29 to 08:00 CET).
+
+| | A | AW |
+|---|---|---|
+| LightGBM member | `eb1030c8ec94...`: the three runners' | `55de693c7ea2...`: the three runners' |
+| TCN weights | `209beece8bf2...`: its own | `7f21c128504d...`: the Windows runner's (also Intel) |
+| `bundle.pkl` | its own | `33bae152771c...`: the Windows runner's, byte for byte |
+| Dressed CSV | `98b2919621653c99...`: the three runners' | `280060af276f1665...`: the three runners' |
+| `train` | 15 minutes | 15 minutes |
+
+So for each of the two, four machines (this PC and one runner each of macOS, Ubuntu and Windows) give one
+LightGBM model and one CSV. `repro.yml` is running for A2 and AW2, and the PC is fitting them.
+
+**Still open before anything can be adopted.** Justin's name on rule 2; both names on a candidate; the three
+OSes and the PC for the 9,600-step models; the equality of the pipeline's training with the gate's on a fold;
+the Mac's own A and AW; the documents and the expected hashes.
+
 ### A on the Windows PC: result (the registered second-machine run)
 
 **The PC's own run of A gives the runners' verdicts and the runners' numbers: A fails rule 1 and meets rule 2.**
