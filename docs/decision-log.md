@@ -6,6 +6,37 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A2 and AW2 on four machines, and the pipeline's training against the gate's (result)
+
+**Trained on all 30 matches on this PC and on macOS, Ubuntu and Windows runners, A2 and AW2 each give one
+LightGBM model and one dressed CSV. And the pipeline trains, byte for byte, what the gate trained.** Nov 13,
+08:01 to 09:31 CET. External matches only. Nothing is adopted by it.
+
+**Four machines** (`repro.yml` at `761a599`, runs 43382929535 for A2 and 43382925800 for AW2; the PC's fits by
+`D:/katena/tools/pc_ref.sh` in `D:/katena/work-submit`, beside F3's model).
+
+| | A2 | AW2 |
+|---|---|---|
+| Machines | This PC (Windows 10, Intel i7-7700); macOS 15 on Apple M1; Ubuntu 24.04 on AMD EPYC 7763; Windows Server 2025 on AMD EPYC 9V74 | This PC; macOS 15 on Apple M1; Ubuntu 24.04 on AMD EPYC 9V74; Windows Server 2025 on AMD EPYC 7763 |
+| LightGBM member | `eb1030c8ec94...` on all four: A's | `55de693c7ea2...` on all four: AW's |
+| TCN weights | four sets (the PC's: `0f5b9b27ea54...`) | four sets (the PC's: `78a241f571ad...`) |
+| Dressed CSV | `edb8c25495976693...` on all four | `4e0ab1d06ba721a0...` on all four |
+| `bundle.pkl` on the PC | `dfda7e14c88242e6...` | `9b4c2cfaa553af43...` |
+| `train` on the PC | 27 minutes | 26 minutes |
+
+The LightGBM member does not change with the TCN's steps, so it is A's and AW's, which four machines had
+already agreed on. The TCN's bytes differ by OS and CPU, as always, and no label changes with them.
+
+**The pipeline's training against the gate's** (`D:/katena/tools/a_equiv.py`, on the PC, in the gate's cache).
+`katena.pipeline.stage_train` with spec A on the 28 development matches, `idsse/DFL-MAT-J03WMX` held out, gives
+the hashes the gate's fold stored: LightGBM `fad2db189fbe...` and TCN `20c48773980a...`, both equal. So
+`katena.eval.actlabels` hands the final model the labels, the rows and the sequences that `run_a.py` handed the
+gate. The weights' path (AW) has the synthetic test of `tests/test_pipeline.py` and no fold of this kind yet: no
+AW fold has been fitted on the PC.
+
+**Running on the PC until about 13:15:** for AW2 and then A2, the checks F3 had before its adoption (the same
+machine twice, the held-out model down both paths, other torch kernels) and the stress check.
+
 ### A2 and AW2: result; and the PC's own all-30 fits of A and AW (Claude on David's PC; neither David nor Justin has read it)
 
 **Both pass their registered rule: a TCN trained for 9,600 steps is ahead of the same candidate at 4,800 on
