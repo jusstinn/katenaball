@@ -41,6 +41,22 @@ runners, about 12 minutes a fold; the gate on the PC, `scripts/run_x2.py --tag g
   for AW2, on the 8 folds and on SkillCorner.
 - As registered, no other step count is tried.
 
+**A2 and AW2 against F3, with intervals** (the same score file, read on the PC at 08:20 CET; for the documents).
+
+| | A2 against F3 | AW2 against F3 |
+|---|---|---|
+| 8 IDSSE + Metrica folds, `target` | 0.6838 vs 0.6374, +0.0464 [+0.0355, +0.0575], 8/8 | 0.6993 vs 0.6374, +0.0618 [+0.0462, +0.0772], 8/8 |
+| The same at `severe` | 0.6357 vs 0.5900, +0.0457 [+0.0351, +0.0564], 7/8 | 0.6581 vs 0.5900, +0.0681 [+0.0535, +0.0830], 7/8 |
+| 20 SkillCorner folds, action truth, `target` | 0.6712 vs 0.6094, +0.0617 [+0.0528, +0.0706], 20/20 | 0.6657 vs 0.6094, +0.0563 [+0.0455, +0.0666], 18/20 |
+| The same at `severe` | 0.6207 vs 0.5615, +0.0593 [+0.0505, +0.0682], 20/20 | 0.6105 vs 0.5615, +0.0490 [+0.0392, +0.0595], 19/20 |
+| All 28, action truth on SkillCorner, `target` | 0.6748 vs 0.6174, +0.0573 [+0.0503, +0.0644], 28/28 | 0.6753 vs 0.6174, +0.0579 [+0.0494, +0.0657], 26/28 |
+| Rule 1: 28 folds, standing truth, `target` | 0.6120 vs 0.6180, -0.0060 [-0.0123, +0.0002], 10/28 | 0.5996 vs 0.6180, -0.0184 [-0.0264, -0.0108], 8/28 |
+| Rule 1: the 20 SkillCorner folds, standing truth | 0.5833 vs 0.6103, -0.0270 [-0.0349, -0.0190], 2/20 | 0.5597 vs 0.6103, -0.0505 [-0.0598, -0.0412], 0/20 |
+
+Both still fail rule 1 and meet rule 2. The weights at 9,600 steps, by the process that made the truth (AW2 minus
+A2, `target`): +0.024 on the six IDSSE folds, -0.011 on the two Metrica folds, -0.006 on SkillCorner against the
+action truth. Fit times of the PC's all-30 AW: LightGBM 165 s, the TCN 716 s.
+
 **The PC's own fits of A and AW on all 30 matches** (`D:/katena/tools/pc_ref.sh`, in `D:/katena/work-submit`
 beside F3's model, which is untouched; 07:29 to 08:00 CET).
 
