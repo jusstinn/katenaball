@@ -6,6 +6,42 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### KIN: result of the registered gate (Claude on David's PC; neither David nor Justin has read it)
+
+**KIN fails its registered rule for both bases: beside the 9,600-step TCNs the 35 columns add +0.0015 (AK2
+against A2, 16 of 28) and +0.0008 (AWK2 against AW2, 13 of 28) at `target`, with intervals that include 0. The
+candidates stay AW2 and A2, and KIN is closed.** Read at 13:35 CET on Nov 13. The team heads were fitted on
+GitHub's runners (`gate.yml` at `8efd184`, run 43399700582, 28 folds each); the gate ran on the PC from the Mac's
+commit `fdfa2a9`: `scripts/run_kin.py kin-gate --tag gha --inc f3_gbdt,f3_tcn`, log
+`D:/katena/logs/a-win/gha_kin_gate.log`. The script prints "registered run" for both. External development
+matches only; nothing in the registration was changed.
+
+| The 35 columns against the same model without them | AK2 minus A2 | AWK2 minus AW2 |
+|---|---|---|
+| **28 folds, action truth on SkillCorner, `target` (rule)** | **+0.0015 [-0.0018, +0.0047], 16/28** | **+0.0008 [-0.0016, +0.0032], 13/28** |
+| The same at `severe` (rule: not worse) | +0.0074 [+0.0041, +0.0109], 19/28 | +0.0028 [-0.0003, +0.0061], 17/28 |
+| 8 IDSSE + Metrica folds, `target` (rule: not worse) | +0.0039 [-0.0031, +0.0110], 5/8 | +0.0017 [-0.0028, +0.0066], 3/8 |
+| 20 SkillCorner folds, action truth, `target` (rule: not worse) | +0.0005 [-0.0035, +0.0045], 11/20 | +0.0005 [-0.0021, +0.0033], 10/20 |
+| Verdict | Fails: 57% of folds, interval through 0 | Fails: 46% of folds, interval through 0 |
+
+- **The longer TCN already holds what the columns add.** Beside F3's TCN they were worth about +0.009 (the
+  Mac's interim read), beside A's own 4,800-step TCN +0.0031 here (20 of 28; the Mac read +0.0033), and beside
+  the 9,600-step TCN +0.0015. For AW the same ladder is +0.0095, -0.0002 and +0.0008.
+- **They still help at `severe`** beside A2 (+0.0074, interval above 0), which is where the Mac's read put the
+  gain. The rule is on `target`, and there nothing is left.
+- Nothing is worse with the columns on either kind of fold. Against F3 both still meet rule 2's three tests,
+  which is the bases' doing.
+- **As registered, KIN is closed:** no subset of the columns, no other window and no other member is tried. It
+  would also have been the first change of this family to touch the inference path.
+
+**Interrupted on the PC, and restarted.** The Claude Code session on the PC ended at about 11:00 CET and took
+its child processes with it: the first run of this gate (it had written its score file and no table) and the
+reproduction checks of AW2 and A2. Both were restarted at 13:24 CET as detached processes. AW2's first check had
+finished before the interruption: two fresh trainings on the PC give `bundle.pkl` `9b4c2cfaa553...`, which is
+also what the fit of 08:27 gave. The stress check of AW2 had finished too: 30 of 30 cases labelled and passing
+the official checks, as for F and F3. The held-out model down both paths, the other torch kernels and all of
+A2's checks are still running.
+
 ### A on Justin's Mac: result (A's third machine), and KIN beside A's own TCN on all 28 folds (information)
 
 **The Mac's own run of A gives the PC's numbers to the fourth decimal in every row: A fails rule 1 and meets
