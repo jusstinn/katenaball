@@ -6,6 +6,36 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A on the Windows PC: result (the registered second-machine run)
+
+**The PC's own run of A gives the runners' verdicts and the runners' numbers: A fails rule 1 and meets rule 2.**
+The registered run of the entry "A on the Windows PC (pre-registration)", at `abe8079`, 02:43 to 07:29 CET on
+Nov 13: LightGBM 84 minutes (151 s a fold), the TCN 198 minutes in two processes (810 s a fold), the gate 5
+minutes. `registered_run: true`. External development matches only; nothing in A's registration was changed.
+Logs: `D:/katena/logs/a-win`.
+
+| A against F3, `target` | This PC (Windows, Intel i7-7700) | GitHub runners (Ubuntu, AMD EPYC 7763) |
+|---|---|---|
+| Rule 1: 28 folds, standing truth | 0.6093, -0.0087 [-0.0149, -0.0024], 10/28 | 0.6092, -0.0088 [-0.0150, -0.0025], 10/28 |
+| Rule 2: 8 IDSSE + Metrica folds | 0.6763, +0.0389 [+0.0276, +0.0498], 8/8 | the same |
+| Rule 2: the same at `severe` | 0.6263, +0.0363 [+0.0254, +0.0470], 8/8 | the same |
+| Rule 2: 20 SkillCorner folds, action truth | 0.6645, +0.0551 [+0.0461, +0.0639], 20/20 | 0.6647, +0.0553 [+0.0461, +0.0641], 20/20 |
+| All 28, action truth on SkillCorner | 0.6679 | 0.6680 |
+
+- **The agreement asked for in the registration holds:** the same verdict under both rules, and every mean
+  within 0.0002, against a limit of 0.002.
+- **27 of the 28 folds score the same on the two machines to the last digit**, at both severities and on both
+  truths. The TCNs differ in their last bits, as always, and no decoded possession changes with them.
+- **The one fold that differs is `skillcorner/2010085`,** the fold whose LightGBM team head grew other trees on
+  Linux (entry below): by 0.0018 at `target` on the standing truth and by 0.0036 on the action truth. That is
+  what a LightGBM difference between two machines costs on one match, and it is the size to keep in mind for a
+  reproduction of the final file on another machine.
+- The Mac's run of A is still to come; with it A will have three machines.
+
+**What it is not.** New evidence: the folds are the same. It adopts nothing. AW, AT and ATW have one machine
+kind each (the runners); this entry is the reason to read their numbers as stable to the fourth decimal unless a
+LightGBM fold flips.
+
 ### A and AW trained on all 30 matches on three OSes: one LightGBM model and one CSV each (result)
 
 **The all-30 model of A, and of AW, gives the same dressed-match CSV on macOS, Ubuntu and Windows runners, and
