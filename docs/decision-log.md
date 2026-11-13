@@ -6,6 +6,36 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A and AW trained on all 30 matches on three OSes: one LightGBM model and one CSV each (result)
+
+**The all-30 model of A, and of AW, gives the same dressed-match CSV on macOS, Ubuntu and Windows runners, and
+its LightGBM member is byte-identical on all three.** `repro.yml` at `575c958`, runs 43366847192 (A) and
+43366843380 (AW), 05:37 to 06:35 CET on Nov 13. Each runner built the corpus and the cache from empty, trained
+the spec through `make_submission.py train --spec`, exported IDSSE `DFL-MAT-J03WMX` in the provided format and
+labelled it. External matches only. Nothing is adopted by it.
+
+| | A | AW |
+|---|---|---|
+| Runners | macOS 15 on Apple M1, Ubuntu 24.04 on AMD EPYC 9V45, Windows Server 2025 on AMD EPYC 7763 | macOS 15 on Apple M1, Ubuntu 24.04 on Intel Xeon 6973P-C, Windows Server 2025 on Intel Xeon Platinum 8573C |
+| LightGBM member | `eb1030c8ec94...` on all three | `55de693c7ea2...` on all three |
+| Its alive head | `59bfcd31dc1e...` | the same: the weights touch the team head only |
+| TCN weights | three sets | three sets |
+| Dressed CSV | `98b2919621653c99...` on all three | `280060af276f1665...` on all three |
+| Rows of the alive head / the team head | 549,880 / 363,838 of 657,133 | the same |
+
+- **This is the check the differing fold asked for** (entry below: one of A's 28 fold models grew other trees on
+  Linux than on the PC). For the model that would be submitted, three OSes and five CPU models agree. The PC's
+  own all-30 fit is still to be compared with these hashes; it is the reference machine.
+- **It is also the first end-to-end run of the new training path** (`katena.eval.actlabels`, the specs in
+  `katena.pipeline`): the action labels are built from the pinned raw files on each runner, and the label counts
+  in the three manifests agree.
+- The TCN's bytes differ by OS and CPU, as F's and F3's do, and the labels do not.
+- The dressed match is one of the 30 training matches here, so its score says nothing and is not quoted.
+
+**What it does not show.** The same file on the provided match, where a near-tie could flip a label; and a fold
+has now shown that LightGBM itself can differ between two machines. If A or AW is adopted, section 7 of the
+technical document has to say both.
+
 ### A2 and AW2 (pre-registration): the same two candidates with a TCN trained twice as long
 
 **Written at 05:40 CET on Nov 13, before any score of either.** Claude on David's PC; neither David nor Justin
