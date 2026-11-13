@@ -83,6 +83,42 @@ against A and AT against AW.
 follows them. And four related candidates on eight seen folds is a choice among four, which the two tests above
 are there to keep honest: each step away from A needs its own interval above 0.
 
+### When each provider's owner changes (web research, public pages only; nothing downloaded besides three PDFs read)
+
+**Nothing was fitted, scored or chosen.** A research agent, at Claude's request on David's PC, read providers'
+public documentation for one question: at a change of possession, when does the per-frame owner switch? It
+bears on which training labels have the mechanics of the provided match's ground truth, which is the bet
+behind A, AW and rule 2.
+
+| Source | What its documentation says | How sure |
+|---|---|---|
+| **Metrica Sports** (organiser; the ground truth comes from its corrected tracking, `OVERVIEW.md`, `DATA.md`) | Event definitions of its open sample data: a player is in possession "as soon as they touch the ball"; possession is not lost when an opponent's touch has no significant impact; the ball is out of play when it leaves the pitch or the referee stops play, and a set-piece event brings it back. Its open tracking carries no per-frame owner, so how the corrected tracking fills that field is not public | High for the definitions, low for the field |
+| **SkillCorner dynamic events** (`player_possession`, the events A labels from) | A player possession "starts from the first touch of the player up to the last touch" and needs control; a block does not count; team possession "shifts to Team B at the start of their player possession" | High |
+| **SkillCorner tracking** (`possession.group`, the standing label) | One line of description; how it is produced is not documented. Nothing public explains the switch about 1.0 s before the first touch that the probe of Nov 12 measured | Low |
+| **DFL / TRACAB** (`BallPossession`, `BallStatus`; IDSSE) | "Defined by the player in control of the ball"; the ball is inactive "when the match is interrupted by the referee"; status is logged by human observers during the match. No minimum duration or timing study found | Medium |
+
+Sources: Metrica's `events-definitions.pdf` in `metrica-sports/sample-data`; SkillCorner's Dynamic Events CSV
+specification (2025-02-16); Bassek et al. 2025 and Lang et al. 2022 for DFL; kloppy's readers for the fields.
+
+**What it says for us, and it is an inference.**
+
+- The organiser's own definitions, SkillCorner's event specification and `CHALLENGE.md` agree: the owner changes
+  at the first touch of the player who takes control, and stays with the last team while the ball is loose.
+  SkillCorner's frame label is the one that does not.
+- Our Metrica labels are derived from the events those definitions describe, so the two Metrica development
+  folds and the Metrica bench are the matches whose labelling process is nearest the provided match's.
+- None of this says how the corrected tracking times the change to the frame. It is still a bet.
+
+**Two public competitor repositories, self-reported and not comparable** (found by the same search): one trains
+gradient-boosted frame classifiers with a Viterbi decoder on degraded Metrica sample games only, weighting every
+possession equally, and reports 0.77 leave-one-game-out on those games; one tunes rule-based state machines on
+degraded SkillCorner matches and reports 0.35 on the public window. Nothing was taken from either.
+
+**Method ideas it listed, none tried here:** possession-length weights (that is AW), a boundary-offset head for
+timing below the 5 Hz grid, distilling a model trained on clean tracking into the one trained on degraded
+tracking, and averaging weights or seeds. Mirroring the pitch across its long axis gives nothing: every lateral
+feature is already an absolute value.
+
 ### A team head that never saw a SkillCorner label, on the action truth (information; written before the read)
 
 **Written at 02:50 CET on Nov 13, before the script was run.** Claude on David's PC. It adopts nothing, no
