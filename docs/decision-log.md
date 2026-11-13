@@ -6,6 +6,34 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A team head that never saw a SkillCorner label, on the action truth (information; written before the read)
+
+**Written at 02:55 CET on Nov 13, before the script was run.** Claude on David's PC. It adopts nothing, no
+candidate comes out of it, and it changes nothing in A's or AW's registrations. `scripts/probe_transfer.py`,
+external matches only, about five minutes.
+
+**The question.** Rule 2 rests on the 8 IDSSE + Metrica folds, which every package has seen and whose noise is
+simulated. Does a team head with their label mechanics also do better on real broadcast tracking, when the
+truth has those mechanics?
+
+**What is read.** One LightGBM team head fitted on the IDSSE and Metrica rows of the development pool only, at
+F3's size and parameters (the `7 + 0` member of the probe of Nov 10). It has never seen a SkillCorner label of
+either kind, so the one head is out of fold for all 20 SkillCorner matches. It takes the place of the team head
+in F3's LightGBM member; F3's alive head and TCN stay. The 20 SkillCorner folds are scored against the action
+truth, which neither that head nor F3 trained on, and against the standing truth. Check: the alive head fitted
+beside it equals F3's cached one on every fold.
+
+**How it will be read, fixed here.**
+
+- Ahead of F3 on the action truth (interval above 0 at `target`): the mechanics carry over to real broadcast
+  tracking even without one row of it in training. That supports rule 2 with 20 folds whose truth nobody has
+  fitted to.
+- Behind F3 there: not evidence against the mechanics, because this head also lost its only rows of real
+  broadcast tracking. The test that separates the two is K read at kind 0 on the same folds (asked of the Mac
+  in PR #31).
+- On the standing truth it should lose, as the same member lost on the IDSSE + Metrica side when it was read
+  with the wrong kind.
+
 ### A on the Windows PC (pre-registration): the second-machine run, and David's side on rule 2
 
 **Written at 02:45 CET on Nov 13, before any score of A or of AW is known on this side.** Claude on David's PC,
