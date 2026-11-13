@@ -6,6 +6,54 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### KIN on the Mac: the interim read (information only; the registered gate is running on David's side)
+
+**With F3's TCN the 35 columns add about +0.009 for both bases, on both kinds of fold. With A's own 4,800-step
+TCN, on the 20 folds the Mac has of it, the gain at `target` is +0.0018 with an interval that includes 0. The
+second reading is the nearer one to the registered test, so this does not say KIN will pass. Nothing is decided
+or adopted.** Claude on Justin's Mac, read at 11:00 CET on Nov 13; Justin has not read it. Registered as
+information in the entry below before it was read. `scripts/run_kin.py kin-gbdt kin-gate` at `8efd184`, the
+Mac's own cache; 56 team heads, about 48 s each, 45 minutes. External development matches only.
+
+| `target`, spellF1 | Folds | With the columns | Base | Diff [95% CI] | Wins |
+|---|---|---|---|---|---|
+| **AK against A, F3's TCN**, all 28, action truth on SkillCorner | 28 | 0.6454 | 0.6368 | +0.0086 [+0.0050, +0.0122] | 24/28 |
+| The same, 8 IDSSE + Metrica folds | 8 | 0.6675 | 0.6606 | +0.0069 [+0.0002, +0.0131] | 7/8 |
+| The same, 20 SkillCorner folds, action truth | 20 | 0.6366 | 0.6273 | +0.0093 [+0.0050, +0.0137] | 17/20 |
+| **AWK against AW, F3's TCN**, all 28, action truth on SkillCorner | 28 | 0.6637 | 0.6542 | +0.0095 [+0.0060, +0.0131] | 23/28 |
+| The same, 8 IDSSE + Metrica folds | 8 | 0.6944 | 0.6814 | +0.0131 [+0.0062, +0.0198] | 8/8 |
+| The same, 20 SkillCorner folds, action truth | 20 | 0.6514 | 0.6434 | +0.0080 [+0.0038, +0.0124] | 15/20 |
+| **AK against A, A's own 4,800-step TCN**, the 20 folds the Mac has | 20 | 0.6781 | 0.6763 | +0.0018 [-0.0021, +0.0059] | 14/20 |
+| The same, 8 IDSSE + Metrica folds | 8 | 0.6785 | 0.6763 | +0.0022 [-0.0044, +0.0086] | 6/8 |
+| The same, 12 SkillCorner folds, action truth | 12 | 0.6778 | 0.6762 | +0.0016 [-0.0032, +0.0066] | 8/12 |
+
+| `severe`, all folds, action truth on SkillCorner | Folds | Diff [95% CI] | Wins |
+|---|---|---|---|
+| AK against A, F3's TCN | 28 | +0.0126 [+0.0088, +0.0165] | 23/28 |
+| AWK against AW, F3's TCN | 28 | +0.0113 [+0.0072, +0.0153] | 23/28 |
+| AK against A, A's own 4,800-step TCN | 20 | +0.0088 [+0.0048, +0.0128] | 14/20 |
+
+- **Beside a TCN that never saw an action label, the columns help everywhere**: every row with F3's TCN has its
+  interval above 0, at both severities, and 23 or 24 of 28 folds are won. Possessions of 2 to 4 s found at IoU
+  0.5 go from 0.31 to 0.35 (A) and from 0.42 to 0.47 (AW) on SkillCorner against the action truth, and from 0.41
+  to 0.46 (AW) on the 8 folds. Predicted possessions per true one rise by 0.02.
+- **Beside A's own TCN most of the `target` gain is gone**, +0.0018 where it was +0.0086. A TCN trained on the
+  action labels already turns at a change of owner, and the blend takes half of what the team head adds. The
+  gain at `severe` stays (+0.0088). The Mac has this TCN on 20 of 28 folds (all 8 IDSSE + Metrica, 12 of 20
+  SkillCorner); the rest are training.
+- **The LightGBM member alone** (`target`, 28 folds, action truth on SkillCorner): AK against A +0.0080 [+0.0037,
+  +0.0124], 17/28; AWK against AW +0.0018 [-0.0021, +0.0058], 13/28. With the weights the columns gain on the 8
+  folds (+0.0134 [+0.0057, +0.0213]) and not on SkillCorner (-0.0029 [-0.0072, +0.0017]).
+- **On the standing SkillCorner truth nothing moves** (all 28, `target`, F3's TCN: +0.0006 and +0.0005).
+- Against F3 every reading above meets rule 2's three tests. That is the base's doing, not the columns'.
+- Check: F3's scores in this gate equal the stored ones, 56 of 56.
+
+**What it does not show.** The registered test: AK2 against A2 and AWK2 against AW2 with the 9,600-step TCNs,
+which the Mac does not have. Anything about AWK beside AW's own TCN. Anything about the provided match.
+
+**The registered run.** David's side dispatched it at `8efd184` (GitHub run 43399700582, 4 jobs) and will gate
+on the PC. This entry will be amended with the 28-fold reading beside A's own TCN when the Mac's run finishes.
+
 ### KIN (pre-registration): 35 ball-free timing columns in the LightGBM team head of A and of AW
 
 **Written at 10:15 CET on Nov 13, before any score of it.** Claude on Justin's Mac. Justin asked on Nov 12 for
