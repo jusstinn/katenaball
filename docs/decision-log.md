@@ -8,7 +8,7 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ### AT and ATW (pre-registration): A's team labels with F3's alive/dead training; and the candidates on GitHub's runners
 
-**Written at 03:30 CET on Nov 13, before any score of A, AW, AT or ATW is known on this side.** The PC's A run is
+**Written at 03:10 CET on Nov 13, before any score of A, AW, AT or ATW is known on this side.** The PC's A run is
 in its LightGBM stage and its gate has not run; the Mac's branch still ends at `e5550c4`, with no result. Claude
 on David's PC; Justin has not seen it. The 16th and 17th packages on the same 28 folds. Code:
 `scripts/run_at.py`. External development matches only.
@@ -85,7 +85,7 @@ are there to keep honest: each step away from A needs its own interval above 0.
 
 ### A team head that never saw a SkillCorner label, on the action truth (information; written before the read)
 
-**Written at 02:55 CET on Nov 13, before the script was run.** Claude on David's PC. It adopts nothing, no
+**Written at 02:50 CET on Nov 13, before the script was run.** Claude on David's PC. It adopts nothing, no
 candidate comes out of it, and it changes nothing in A's or AW's registrations. `scripts/probe_transfer.py`,
 external matches only, about five minutes.
 
@@ -138,7 +138,7 @@ was trained on the action labels, so it says nothing about A itself.
 
 ### A on the Windows PC (pre-registration): the second-machine run, and David's side on rule 2
 
-**Written at 02:45 CET on Nov 13, before any score of A or of AW is known on this side.** Claude on David's PC,
+**Written at 02:40 CET on Nov 13, before any score of A or of AW is known on this side.** Claude on David's PC,
 at David's request ("pull and check what justin has done ... try out stuff ... improve the score"). The branch
 `claude/status-check-7809aa` at `e5550c4` holds A's and AW's registrations and code and no result; whether the
 Mac's run has finished is not known here. External development matches only.
