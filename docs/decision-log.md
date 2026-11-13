@@ -6,6 +6,38 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A2 and AW2 (pre-registration): the same two candidates with a TCN trained twice as long
+
+**Written at 05:40 CET on Nov 13, before any score of either.** Claude on David's PC; neither David nor Justin
+has seen it. The 18th and 19th packages on the same 28 folds. Code: `scripts/run_x2.py`. External development
+matches only. It adopts nothing.
+
+**Why.** The one change since F that passed on both kinds of fold was more fitting: 1,200 trees for 150, and a
+TCN at 4,800 steps for 1,200 (`LT`, +0.0120, 21 of 28). The step count was never screened beyond 4,800. The
+candidates of the entry above now train on labels with other mechanics on 20 matches, and the TCN is the member
+that carries them. Longer training changes no feature and no line of the inference path, so it adds no risk on
+the provided match; it doubles the TCN's share of `train` (about 11 more minutes on the PC).
+
+**The change, and nothing else.** A2 is A, and AW2 is AW, with 9,600 TCN steps in place of 4,800. The one-cycle
+schedule spans the steps, as it does now. Sequences, labels, weights, seed and threads are the base candidate's,
+and so is the LightGBM member, read from its cache. No other step count is tried, whatever comes out.
+
+**Rule, for each of the two against its own base.** F's rule on the 28 folds with the action truth on SkillCorner
+(the truth rule 2 reads): at `target` at least 70% of folds won and the paired 95% interval above 0; not worse at
+`severe`. And it must not be worse at `target` on the 8 IDSSE + Metrica folds, nor on the 20 SkillCorner folds.
+A2 can only replace A, and AW2 only AW; which of A and AW stands is settled by the entry above and by the two
+who decide, not here. A pass makes the longer TCN part of that candidate if it is adopted; a fail leaves it at
+4,800 steps.
+
+**Why this rule and not rule 2's.** The change is of the kind rule 1 was written for: it should help every kind
+of fold, so it has to win folds. The standing SkillCorner truth is not used because the candidates no longer
+train on it.
+
+**Information, decides nothing:** the TCN member alone; each against F3; predicted possessions per true one.
+
+**Run.** `gate.yml` on GitHub's runners, tag `gha2x`: `run_a.py a-tcn --steps 9600` and `run_aw.py aw-tcn --steps
+9600`, 4 jobs each. The gate runs on the PC, as the entry above.
+
 ### A, AW, AT and ATW on GitHub's runners: result (Claude on David's PC; neither David nor Justin has read it)
 
 **All four meet rule 2 and fail rule 1. By the registered tests AW stands. Nothing is adopted here.** Read on
