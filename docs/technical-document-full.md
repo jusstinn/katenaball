@@ -22,16 +22,22 @@ the file's SHA-256) is filled in there, not here.
   baseline, M2: spellF1 0.6019 against 0.5861, +0.0158 [+0.0111, +0.0205], 22 of 28 folds won. F3 is F with
   a larger LightGBM model and a longer-trained TCN, and it beat F: 0.6180 against 0.6019, +0.0161 [+0.0118,
   +0.0207], 21 of 28 folds won.
-- The submitted model, AW, is F3 with two changes to its training and none to its inference path. The 20
-  SkillCorner matches are relabelled from SkillCorner's own action events, and both team heads weigh a
-  training frame by the inverse length of its possession. The standing rule scores 20 of its 28 folds
-  against the label AW stops training on, so AW was judged under a second rule, declared before any score
-  (section 3.5). On the 8 IDSSE and Metrica folds, whose truth is untouched, AW scores 0.6923 against F3's
-  0.6374: +0.0548 [+0.0399, +0.0697], 8 of 8 folds won. On the 20 SkillCorner folds scored against the new
-  labels it scores 0.6586 against 0.6094. Under the standing rule, with SkillCorner scored on the old
-  label, it loses 0.0224 on the 28 folds and wins 8 of them. AW is a bet on how the organisers describe the
-  ground truth (section 7).
-- These are development estimates, not a prediction of the hidden score.
+- The submitted model, AW2, is F3 with three changes to its training and none to its inference path. They
+  came in two gated steps (section 3.5).
+- **AW: new labels and weights.** The 20 SkillCorner matches are relabelled from SkillCorner's own action
+  events, and both team heads weigh a training frame by the inverse length of its possession. The standing
+  rule scores 20 of its 28 folds against the label AW stops training on, so AW was judged under a second
+  rule, declared before any score. On the 8 IDSSE and Metrica folds, whose truth is untouched, AW scores
+  0.6923 against F3's 0.6374: +0.0548 [+0.0399, +0.0697], 8 of 8 folds won. On the 20 SkillCorner folds
+  scored against the new labels it scores 0.6586 against 0.6094. Under the standing rule, with SkillCorner
+  scored on the old label, it loses 0.0224 on the 28 folds and wins 8 of them.
+- **AW2: a longer-trained TCN.** AW2 is AW with a TCN trained 9,600 steps instead of 4,800. It was
+  registered before its score under its own rule and beat AW on the 28 folds with the new labels on
+  SkillCorner: +0.0071 [+0.0046, +0.0096], 20 of 28 folds won. AW2 scores 0.6993 on the 8 IDSSE and Metrica
+  folds (F3: 0.6374; +0.0618, 8 of 8), 0.6657 on the 20 SkillCorner folds against the new labels (F3:
+  0.6094; +0.0563, 18 of 20), and 0.6753 against 0.6174 on all 28.
+- AW2 is a bet on how the organisers describe the ground truth (section 7). These are development
+  estimates, not a prediction of the hidden score.
 
 ## 2. Approach
 
@@ -76,14 +82,15 @@ LightGBM member did.
 - **LightGBM heads** (`katena.models.gbdt`). The *alive* head trains on every row labelled H, A or D, and
   the *team* head ("the focal team has the ball") on the H and A rows, from all three sources. Up to F3
   the alive head saw IDSSE and Metrica rows only, because the SkillCorner label then in use has no dead
-  ball; the labels AW trains on have one (sections 3.5 and 6). The parameters were fixed before the
+  ball; the labels AW and AW2 train on have one (sections 3.5 and 6). The parameters were fixed before the
   bake-off and never tuned, apart from the number of trees: 1,200 (F had 150; section 3.4). Learning rate
   0.1, 31 leaves, at least 50 rows per leaf, feature and bagging fractions 0.5, `max_bin` 63, seed 0,
   deterministic, 8 threads.
 - **TCN** (`katena.models.tcn`). Six residual blocks of 48 channels with dilations 1 to 32, looking both
-  ways in time, with the same two heads. It sees all 213 columns and trains for 4,800 AdamW steps on
-  random 256-sample windows, with seed 0, 4 threads and deterministic algorithms (F: the 160 base columns
-  and 1,200 steps; section 3.4).
+  ways in time, with the same two heads. It sees all 213 columns and trains for 9,600 AdamW steps on
+  random 256-sample windows, with seed 0, 4 threads and deterministic algorithms. The one-cycle schedule
+  spans the steps. F trained the 160 base columns for 1,200 steps (section 3.4); F3 and AW trained 213
+  columns for 4,800 (sections 3.4 and 3.5).
 - **Possession-length weights** (`katena.models.lenweight`; new in AW, section 3.5). In both team heads a
   training frame weighs 1 / L, with L the length in seconds of the constant-label run it sits in, in the
   T = 2 labels it trains on, clipped to [1, 30]. spellF1 counts every possession once, however long it
@@ -121,10 +128,10 @@ D2 added worlds that keep each severity's overall ball loss (`katena.sim.worlds`
 - **`_ids`** adds identity switches in crowds, at assumed rates.
 - **`_smooth`** cuts jitter to the level of SkillCorner's development matches at 5 Hz.
 
-F, F3 and AW all train on the `d2j` mix. Each severity's rows are split evenly over five worlds for IDSSE and
+F, F3, AW and AW2 all train on the `d2j` mix. Each severity's rows are split evenly over five worlds for IDSSE and
 Metrica (`s`, `s_cpl50`, `s_cpl100`, `s_ids`, `s_smooth`) and over three for SkillCorner (`s`, `s_ids`,
-`s_smooth`): the mix was built when the SkillCorner label had no D, and AW keeps F3's rows and sequences
-as they are. LightGBM sees every 4th 5 Hz sample, with a random focal orientation per row. The
+`s_smooth`): the mix was built when the SkillCorner label had no D, and AW and AW2 keep F3's rows and
+sequences as they are. LightGBM sees every 4th 5 Hz sample, with a random focal orientation per row. The
 TCN sees one whole-match sequence per match and world. For the `touch` columns, each world's ball
 corruption is carried over to the native frames (`touch.lift_ball`), consistently with the 5 Hz ball.
 
@@ -147,7 +154,8 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   Rule 1 scores 20 of its 28 folds against the label AW stops learning, so it cannot pass such a change.
   Rule 2, declared before any score of the new labels, lets the 8 IDSSE and Metrica folds decide, with
   the 20 SkillCorner folds scored against the new labels as a guard. It is a change of protocol and weaker
-  evidence than rule 1. Section 3.5 gives both rules in full.
+  evidence than rule 1. Section 3.5 gives both rules in full, and the rule of the last step, the longer
+  TCN: rule 1's thresholds on the 28 folds with the new labels on SkillCorner.
 - **Two locked benches**, `DFL-MAT-J03WQQ` (chosen by hash) and Metrica `Sample_Game_2`, were scored once
   in the bake-off and no choice was made from them. After F was adopted, F was read on them once, trained on
   the 28 development matches only. The read was registered before any score, as a sanity check that
@@ -163,8 +171,8 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   F is ahead in 15 of the 16 pairs of bench and evaluation world (2 benches, 8 worlds; the table shows the 4
   registered ones); the exception loses 0.003. M2 retrained here
   reproduces the bake-off's recorded bench scores to the 3 decimals printed. The final model also trains
-  on these two matches, so this read is of F trained on 28 matches, not of the submitted model. F3 and AW
-  have no bench read: the benches were spent by then.
+  on these two matches, so this read is of F trained on 28 matches, not of the submitted model. F3, AW and
+  AW2 have no bench read: the benches were spent by then.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
   on it, which is also what the organisers' clarification of 2026-11-03 requires. We used only DATA.md's
   published aggregates (46 slots, 20.5 tracked objects, 41% ball missing) and the published half
@@ -194,7 +202,7 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   `make_submission.py predict`. Scored with the official scorer, the CSV gives spellF1 0.650611 and
   macroF1 0.930641, exactly what the evaluation code gives for the same model. Every probability and graded
   label is bit-identical on both paths. The same check with F3 gives 0.722130 and 0.941533 on both paths.
-  It was not repeated with AW, which changes the training and no line of either path.
+  It was not repeated with AW or AW2, which change the training and no line of either path.
   A SkillCorner match (10 Hz) also agrees, once the evaluation's
   "predicted D counts as X" rule for SkillCorner is applied (`scripts/dressed_check.py`). A synthetic
   bundle on the provided match's own timeline (199,319 frames, the graded halves of `games.py`) runs
@@ -205,7 +213,7 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   worlds do not produce: no ball at all, nothing tracked for five minutes, one team missing, positions far
   off the pitch, infinite values, slots that change team. In every case, with F and with F3, labelling
   finished and the file passed the official checks. This shows the path does not crash, not that the labels
-  are good. It was not repeated with AW, whose inference code is F3's.
+  are good. It was not repeated with AW or AW2, whose inference code is F3's.
 
 ### 3.2 Bake-off (2026-11-06)
 
@@ -303,13 +311,14 @@ and each registered before its score. Seven failed (section 4). Two passed:
 - **Reproduction.** F3 trained twice on the PC gives the same model file. A dressed external match gets a
   byte-identical CSV on six OS and CPU combinations and with other torch kernels (section 7).
 - **Adopted on Nov 12.** F3 passed its gates and its reproduction checks. It was the submission model
-  until AW replaced it (section 3.5), and it is the model AW is measured against.
+  until AW2 replaced it (section 3.5), and it is the model AW and AW2 are measured against.
 
-### 3.5 After F3: SkillCorner labels from its own action events, and length weights (AW, 2026-11-12 to 13)
+### 3.5 After F3: SkillCorner labels from its action events, length weights, and a longer TCN (AW and AW2, 2026-11-12 to 13)
 
 AW is F3 with other training labels on the 20 SkillCorner matches and with possession-length weights in
-both team heads. Features, members, sizes, seeds, blend, decoder and priors are F3's, and no line of the
-inference path changes.
+both team heads. AW2, the submitted model, is AW with a TCN trained 9,600 steps instead of 4,800. Features,
+members, the LightGBM size, seeds, blend, decoder and priors are F3's, and no line of the inference path
+changes. This section takes AW first, as it was chosen, and the longer TCN at its end.
 
 **What led to it.**
 
@@ -402,9 +411,9 @@ as an IDSSE fold is. An IDSSE or Metrica fold has one truth, and A does not chan
   the 8 folds, and four changes passed this kind of test before and were not adopted (S1, S2, K1, K). A
   SkillCorner score against the action truth favours a model trained on it by construction: it is a guard
   and a description, not evidence that the model is better. The registration made rule 2 count only with
-  both team members' names. Both gave them. One side agreed while no score of A or AW was known to it. The
-  other had by then seen an interim score of A (its LightGBM member blended with F3's TCN: +0.0232
-  [+0.0144, +0.0323] on the 8 folds, 8 of 8).
+  both team members' names. Both gave them (PENDING_JUSTIN_NAME). One side agreed while no score of A or AW
+  was known to it. The other had by then seen an interim score of A (its LightGBM member blended with F3's
+  TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8).
 
 **Four candidates.** Two more were registered on Nov 13, before any score of the four was known on the
 side that registered them. A's registration had said no other variant would be tried; the new
@@ -430,6 +439,23 @@ Windows PC against F3's cached members. Two checks were made before a score was 
 from the runners equals the PC's own fit on 27 of 28 folds, hash and every probability; section 7 has the
 28th. And A's LightGBM member with F3's TCN gives the other machine's interim number on the 8 folds to the
 digit.
+
+**A's gate on a second machine.** The PC then ran A's whole gate itself, as registered before any score of
+A was known there. It gives the runners' verdicts under both rules and every mean within 0.0002, against
+a registered limit of 0.002:
+
+| A against F3, target-like | The PC (Windows, Intel i7-7700) | GitHub runners (Ubuntu, AMD EPYC 7763) |
+|---|---|---|
+| Rule 1: 28 folds, frame truth on SkillCorner | 0.6093, -0.0087 [-0.0149, -0.0024], 10/28 | 0.6092, -0.0088 [-0.0150, -0.0025], 10/28 |
+| Rule 2: 8 IDSSE + Metrica folds | 0.6763, +0.0389 [+0.0276, +0.0498], 8/8 | the same |
+| Rule 2: the same at severe noise | 0.6263, +0.0363 [+0.0254, +0.0470], 8/8 | the same |
+| Rule 2: 20 SkillCorner folds, action truth | 0.6645, +0.0551 [+0.0461, +0.0639], 20/20 | 0.6647, +0.0553 [+0.0461, +0.0641], 20/20 |
+| All 28 folds, action truth on SkillCorner | 0.6679 | 0.6680 |
+
+27 of the 28 folds score the same on the two machines to the last digit, at both severities and on both
+truths. The one that differs is the fold whose LightGBM team head grew other trees (section 7). This is a
+replication, not new evidence: the folds are the same. AW, AT, ATW and the two 9,600-step candidates
+below were fitted on the runners only. The results that follow are the runners'.
 
 | spellF1 at target-like noise unless stated | F3 | A | AW | AT | ATW |
 |---|---|---|---|---|---|
@@ -486,35 +512,81 @@ Metrica also do better on real broadcast tracking, once the truth has those mech
 SkillCorner folds against the action truth, which none of these models trained on. Each was written down
 before it was read, as information that decides nothing.
 
-| Model against F3, 20 SkillCorner folds, target-like | Action truth | Frame truth |
-|---|---|---|
-| K at kind 0: the two members with the label-kind column (section 4), read with the value of the IDSSE and Metrica rows | +0.0265 [+0.0178, +0.0349], 18/20 | -0.0326 [-0.0396, -0.0255], 0/20 |
-| N: F3 with a LightGBM team head fitted on IDSSE and Metrica rows only, so it never saw a SkillCorner label of either kind | 0.6209 against 0.6094: +0.0115 [+0.0037, +0.0193], 15/20 | -0.0328 [-0.0395, -0.0261], 0/20 |
+| Model against F3, 20 SkillCorner folds | Action truth, target-like | Action truth, severe | Frame truth, target-like |
+|---|---|---|---|
+| K at kind 0: the two members with the label-kind column (section 4), read with the value of the IDSSE and Metrica rows | 0.6359 against 0.6094: +0.0265 [+0.0178, +0.0349], 18/20 | +0.0243 [+0.0165, +0.0320], 17/20 | -0.0326 [-0.0396, -0.0255], 0/20 |
+| N: F3 with a LightGBM team head fitted on IDSSE and Metrica rows only, so it never saw a SkillCorner label of either kind | 0.6209 against 0.6094: +0.0115 [+0.0037, +0.0193], 15/20 | +0.0144 [+0.0079, +0.0212], 16/20 | -0.0328 [-0.0395, -0.0261], 0/20 |
 
 - **Both are ahead of F3 on the action truth and behind it on every fold of the frame truth.** So on
   SkillCorner the choice of truth decides the verdict, and rule 1 scores 20 of its 28 folds on the truth
   the documentation does not describe.
-- **N is ahead at severe noise too** (+0.0144 [+0.0079, +0.0212], 16/20). It is the blend that gains: alone,
-  N's LightGBM member is level with F3's (-0.0050 [-0.0136, +0.0036], 8/20), having lost 72% of its team
-  rows.
+- **K at kind 0 finds more of the short possessions.** At IoU 0.5 on the action truth it finds 12% of the
+  true possessions under 2 s and 39% of those of 2 to 4 s, where F3 finds 5% and 22%.
+- **For N it is the blend that gains.** Alone, N's LightGBM member is level with F3's (-0.0050 [-0.0136,
+  +0.0036], 8/20), having lost 72% of its team rows.
 - **K at kind 0 does not reopen K.** K failed the rule it was registered under (section 4), and this
   reading of it was chosen after K's scores were known.
+- **The old weights split by member on this truth.** S1 and S2 (section 4), trained with weights taken
+  from the frame label, were read the same way: S1 is ahead of F3 (+0.0083 [+0.0022, +0.0150], 14/20), S2
+  is not (-0.0057 [-0.0123, +0.0011], 5/20). Neither is AW's member: AW's weights come from the action
+  labels.
 
 **What none of this shows.** That the action labels are right: SkillCorner makes its events automatically
 from the same tracking, and a stoppage's two ends are approximations. That the provided match's ground
 truth follows them. Section 7 lists what follows from that.
 
-**Adopted.** AW met rule 2 and the registered tests chose it among the four. Both team members put their
-names to rule 2 and to AW before the cut-off of Nov 14, 18:00 CET. AW is the submitted model.
+**The longer TCN (A2 and AW2).** The one change since F that had passed on both kinds of fold was more
+fitting: 1,200 trees for 150, and a TCN at 4,800 steps for 1,200 (section 3.4). The step count had never
+been screened beyond 4,800. A2 is A, and AW2 is AW, with 9,600 TCN steps in place of 4,800; the one-cycle
+schedule spans the steps, and labels, weights, seed, threads and the LightGBM member are the base
+candidate's. They were registered on Nov 13, before any score of either, as the 18th and 19th packages on
+the same 28 folds. The registration tried no other step count and said none would follow.
 
-**Registered and not read: a longer-trained TCN.** A2 and AW2 are A and AW with 9,600 TCN steps in place
-of 4,800, registered on Nov 13 before any score of either, each against its own base, under rule 1's
-thresholds on the 28 folds with the action truth on SkillCorner. They have no result in this version, and
-AW as described here trains 4,800 steps.
+- **Their rule, each against its own base.** F's rule on the 28 folds with the action truth on SkillCorner:
+  at target-like noise at least 70% of folds won and the paired 95% interval above 0; not worse at severe.
+  And not worse at target-like on the 8 IDSSE and Metrica folds, nor on the 20 SkillCorner folds. A2 can
+  only replace A, and AW2 only AW.
+- **Why this rule and not rule 2's.** The change is of the kind rule 1 was written for: it should help every
+  kind of fold, so it has to win folds. The frame truth is not used, because the candidates no longer
+  train on it.
 
-**Reproduction.** The all-30 model of AW was trained from an empty cache on macOS, Ubuntu and Windows
-runners: one LightGBM member, three sets of TCN weights, and one CSV for the dressed external match
-(section 7).
+| The longer TCN against its own base | A2 minus A | AW2 minus AW |
+|---|---|---|
+| **28 folds, action truth on SkillCorner, target-like (rule)** | +0.0067 [+0.0040, +0.0093], 23/28 | **+0.0071 [+0.0046, +0.0096], 20/28** |
+| The same at severe noise (rule: not worse) | +0.0082 [+0.0050, +0.0114], 24/28 | +0.0077 [+0.0047, +0.0106], 24/28 |
+| 8 IDSSE + Metrica folds, target-like (rule: not worse) | +0.0075 [+0.0034, +0.0120], 7/8 | +0.0070 [+0.0018, +0.0118], 6/8 |
+| 20 SkillCorner folds, action truth, target-like (rule: not worse) | +0.0064 [+0.0031, +0.0095], 16/20 | +0.0071 [+0.0044, +0.0099], 14/20 |
+| Verdict | Passes | Passes, with exactly the 20 folds the rule asks for |
+
+| spellF1, target-like | F3 | A | A2 | AW | AW2 |
+|---|---|---|---|---|---|
+| 8 IDSSE + Metrica folds | 0.6374 | 0.6763 | 0.6838 | 0.6923 | **0.6993** |
+| 20 SkillCorner folds, action truth | 0.6094 | 0.6647 | 0.6712 | 0.6586 | **0.6657** |
+| All 28 folds, action truth on SkillCorner | 0.6174 | 0.6680 | 0.6748 | 0.6682 | **0.6753** |
+| IDSSE (6 folds) | 0.6024 | 0.6453 | 0.6571 | 0.6725 | 0.6814 |
+| Metrica (2 folds) | 0.7427 | 0.7692 | 0.7642 | 0.7517 | 0.7530 |
+
+- **The gain is about 0.007 everywhere**, on the 8 folds and on SkillCorner alike, at both severities. It is
+  the first change since the longer TCN of F3 to win folds of both kinds, and it is the same kind of change.
+- **Against F3, AW2 stands at** +0.0618 on the 8 folds (8 of 8) and +0.0563 on SkillCorner against the
+  action truth (18 of 20). A2 stands at +0.0464 (8 of 8) and +0.0617 (20 of 20).
+- **Rule 1 was read for AW, not for AW2.** AW is -0.0224 against F3 on the 28 folds with the frame truth
+  on SkillCorner (8 of 28). The longer TCN's rule does not read the frame truth.
+- **The weights read the same at 9,600 steps** (information; the registered test was at 4,800). AW2 minus
+  A2 is +0.0155 [+0.0032, +0.0275] on the 8 folds (6 of 8), -0.0055 [-0.0131, +0.0024] on SkillCorner
+  against the action truth, and -0.0103 [-0.0183, -0.0025] there at severe noise. They gain on IDSSE and
+  lose on the other two.
+- **The longer TCN leaves the count of possessions alone:** 0.98 predicted per true one on the 8 folds and
+  1.23 on SkillCorner for AW2, 0.80 and 1.02 for A2.
+
+**Adopted.** AW met rule 2 and the registered tests chose it among the four. AW2 passed its own rule
+against AW, so the longer TCN is part of it. Both team members put their names to rule 2 and to AW2 before
+the cut-off of Nov 14, 18:00 CET (PENDING_JUSTIN_NAME). AW2 is the submitted model.
+
+**Reproduction.** The all-30 models of A and of AW were each trained from an empty cache on macOS, Ubuntu
+and Windows runners and on the reference PC: one LightGBM member and one CSV for the dressed external
+match on the four machines. AW2's all-30 model was checked the same way (PENDING_AW2_REPRO). Section 7
+has the hashes.
 
 ## 4. Assets, and what we tried and dropped
 
@@ -549,6 +621,7 @@ runners: one LightGBM member, three sets of TCN weights, and one CSV for the dre
 | A: SkillCorner training labels from its action events (section 3.5) | Rule 2: 0.6763 on the 8 IDSSE + Metrica folds, +0.0389 [+0.0276, +0.0498], 8/8; 0.6647 on SkillCorner against the action truth, +0.0553 [+0.0461, +0.0641], 20/20. Rule 1: -0.0088, 10/28 | Met rule 2, failed rule 1. Not used: the registered test prefers AW (+0.0160 [+0.0041, +0.0282] on the 8 folds, 5/8) |
 | AT: A's labels in the team heads only; alive/dead trained as in F3 | Rule 2: 0.6725, +0.0351 [+0.0253, +0.0448], 8/8; 0.6669 on SkillCorner against the action truth. Rule 1: -0.0084, 10/28 | Met rule 2, failed rule 1. Not ahead of A (-0.0038 [-0.0100, +0.0023] on the 8 folds) |
 | ATW: AT with the length weights | Rule 2: 0.6964, +0.0590 [+0.0448, +0.0733], 8/8; 0.6577 on SkillCorner against the action truth. Rule 1: -0.0191, 8/28 | Met rule 2, failed rule 1. Not ahead of AW by the registered test (+0.0041 [-0.0017, +0.0099], 6/8) |
+| A2: A with a TCN trained 9,600 steps instead of 4,800 | Against A, 28 folds with the action truth on SkillCorner: +0.0067 [+0.0040, +0.0093], 23/28. 0.6838 on the 8 IDSSE + Metrica folds, 0.6712 on SkillCorner against the action truth, 0.6748 on all 28 | Passed its rule. Not used: it can only replace A, and the registered test had chosen AW. The same step on AW is AW2, the submitted model (section 3.5) |
 | B1: a LightGBM model of owner changes within 0.4 s, whose odds scale the Viterbi switch cost frame by frame | +0.0003 [-0.0020, +0.0028], 13/28 against F3 | Failed. The model is weak (mean average precision 0.22 at a base rate of 0.04) |
 | No SkillCorner match in the LightGBM team head | 8 folds, not registered: +0.035, 8/8 | Not gated and not used. Its only folds had been seen, and it would drop the only training matches whose input is automatic broadcast tracking. Read later on the 20 SkillCorner folds as information (N, section 3.5) |
 | A smooth-only training mix | 8 folds, not registered: +0.02 in the smooth worlds, -0.09 to -0.13 in the rough ones | Not used. Choosing it would need a statistic of the provided match |
@@ -626,9 +699,11 @@ from SkillCorner's `player_possession` events instead (`katena.external.skillcor
 
 **The output.** The decoder applies no explicit 2 s rule; it learns transitions from the labels. F3
 under-segmented, with 0.751 predicted possessions per true one at target-like noise on the 28 folds of
-rule 1 (F: 0.738). By truth, AW predicts 0.90 possessions per true one on IDSSE, 1.17 on Metrica and 1.24
-on SkillCorner against the action truth, where F3 predicts 0.68, 0.91 and 0.89 (section 3.5). The output
-never has X on a graded frame: the decoder has three states, H, A and D.
+rule 1 (F: 0.738). AW2 predicts 0.98 possessions per true one on the 8 IDSSE and Metrica folds and 1.23 on
+SkillCorner against the action truth, where F3 predicts 0.73 and 0.89. By dataset the log has AW's
+figures, at 4,800 steps: 0.90 on IDSSE, 1.17 on Metrica and 1.24 on SkillCorner, where F3 predicts 0.68,
+0.91 and 0.89 (section 3.5). The output never has X on a graded frame: the decoder has three states, H, A
+and D.
 
 **Second-half kickoff.** The second half is graded from frame 110,808 but kicks off later (FAQ.md), and
 every frame in between is D. We take the kickoff from the provided Smart Tagging, Metrica's automatic
@@ -644,22 +719,26 @@ D over the first 60 and 120 s of each half, as an aggregate.
 
 ## 7. Limitations
 
-- **AW is a bet on the documentation.** Rule 2 was chosen for what public documents say, not for a score.
+- **The new labels are a bet on the documentation.** Rule 2 was chosen for what public documents say, not
+  for a score.
   CHALLENGE.md describes a ground truth with a dead-ball label, an owner on every live frame, a loose ball
   that stays with the last team, and a change of owner when the other team gains control. Metrica's
   published event definitions and SkillCorner's event specification agree with it on when the owner
   changes. That is the IDSSE and Metrica kind of label, and the action labels are built to have it;
   SkillCorner's frame label is the one that does not. But no document says how the corrected tracking
   behind the ground truth times a change to the frame. If the provided match's ground truth behaves as
-  SkillCorner's frame label does, AW loses to F3: under rule 1 it is -0.0224 on the 28 folds with 8 folds
-  won, and on the frame truth of SkillCorner the four candidates lose 0.026 to 0.053.
+  SkillCorner's frame label does, the bet loses. Under rule 1 AW, at 4,800 TCN steps, is -0.0224 against
+  F3 on the 28 folds with 8 folds won, and on the frame truth of SkillCorner the four candidates lose 0.026
+  to 0.053. AW2 was not read under rule 1: the longer TCN's rule does not use the frame truth.
 - **The action labels are our construction, and their dead-ball ends are approximate.** SkillCorner makes
   its events automatically from the same broadcast tracking; no person labelled them. Of 1,851 flagged
   stoppages, 228 take their start from the broadcast cutting away, a median of 6.5 to 9.1 s after the last
   touch, depending on the kind of stoppage; 138 of them are free kicks, where the ball never leaves the
   pitch. Placing those starts 1.0 s after the last touch instead would turn 18,267 frames (2.8% of the
-  team-labelled ones) from a team into dead ball. Restarts sit 1.0 s before the reception, by a constant.
-  In AW these rows are 66% of the alive head's rows in the development pool (336,097 of 507,549). The two
+  team-labelled ones) from a team into dead ball. Restarts sit 1.0 s before the reception, by a constant;
+  that differs by more than 0.5 s from the start of SkillCorner's own following phase
+  (`*_phases_of_play.csv`) on 51% of received restarts. In AW and AW2 these rows are 66% of the alive
+  head's rows in the development pool (336,097 of 507,549). The two
   candidates that keep them out of the alive heads (AT, ATW) were not ahead, so the late starts did not
   show in the score. And a SkillCorner score against the action truth favours a model trained on it: it is
   a guard and a description, not a second estimate.
@@ -671,16 +750,25 @@ D over the first 60 and 120 s of each half, as an aggregate.
   on two of the three truths (1.17 and 1.24 per true one). The provided match's ground truth comes from
   Metrica's corrected tracking, and A is ahead of AW on both kinds of truth that are not IDSSE's. Two
   Metrica folds are thin evidence, and the action truth is our own construction. The registered test
-  names AW.
+  names AW. With the longer TCN the picture is the same (information; the registered test was at 4,800
+  steps). AW2 minus A2 is +0.0155 [+0.0032, +0.0275] on the 8 folds (6 of 8): 0.6814 against 0.6571 on
+  IDSSE, 0.7530 against 0.7642 on Metrica. On SkillCorner against the action truth it is -0.0055 [-0.0131,
+  +0.0024] (0.6657 against 0.6712), and -0.0103 [-0.0183, -0.0025] at severe noise. On all 28 folds AW2
+  scores 0.6753 and A2 0.6748. AW2 predicts 0.98 possessions per true one on the 8 folds and 1.23 on
+  SkillCorner, A2 0.80 and 1.02.
 - **Rule 2 is weaker evidence than rule 1.** It decides on 8 folds that every package since Nov 6 has
   seen, and whose noise is simulated. Four earlier changes passed a test of this kind and were not adopted
   (S1, S2, K1, K). AW was also chosen among four related candidates on those 8 folds; the two registered
   tests are there to keep that choice honest. The two reads of section 3.5 on real broadcast tracking
-  support the label mechanics, not AW itself: neither model in them trained on an action label.
-- **AW's gate ran once.** Its fold models were fitted on GitHub's Ubuntu runners and gated on the Windows
-  PC against F3's cached members. F3's gate was repeated on a second machine before its adoption; AW's
-  was not. The TCN's weights differ by machine in their last bits (below), which is the noise floor of
-  such a comparison.
+  support the label mechanics, not AW itself: neither model in them trained on an action label. And AW2
+  passed its own rule with exactly the 20 of 28 folds it asks for.
+- **AW and AW2 were fitted on one kind of machine.** The fold models of AW, AT, ATW, A2 and AW2 were
+  fitted on GitHub's Ubuntu runners only, and gated on the Windows PC against F3's cached members. F3's
+  gate was repeated on a second machine before its adoption; theirs were not. A's was (section 3.5): the
+  PC gives the runners' verdicts and every mean within 0.0002, and 27 of 28 folds score the same to the
+  last digit. The one fold whose LightGBM team head differs (below) moves by 0.0018 at target-like noise
+  on the frame truth and by 0.0036 on the action truth. So we read the runners' numbers as stable to the
+  fourth decimal unless a LightGBM fold flips.
 - **Simulated noise is not the real ATD.** A classifier separates real SkillCorner and Metrica tracking
   from every degraded world with AUC 1.00, mostly on jitter. At 5 Hz the per-slot second difference is
   0.04-0.05 m in real data and 0.47-1.38 m in the degrader. At 25 Hz the ball's median absolute second
@@ -693,8 +781,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
   Its "target-like" world keeps 15.3 tracked objects, not 20.5. Against M2, five of F's six losing folds
   are SkillCorner, and the worst loses 0.0181. Against F, all seven of F3's losing folds are SkillCorner.
 - **Metrica's dead spans run long.** The event rule keeps D through live play after an untagged restart.
-  Metrica gave about a quarter of the alive head's rows up to F3; in AW the SkillCorner rows are the
-  larger part (above). The cleaner rule (MR) was neutral.
+  Metrica gave about a quarter of the alive head's rows up to F3; in AW and AW2 the SkillCorner rows are
+  the larger part (above). The cleaner rule (MR) was neutral.
 - **Pooled calibration.** The D2 coupling constants come from Metrica Games 1 and 3, and the smooth jitter
   from the 20 SkillCorner matches, all development folds. So a held-out match helps set a few scalars of
   its own training worlds. The first degrader calibration also used every SkillCorner and Metrica match,
@@ -704,16 +792,16 @@ D over the first 60 and 120 s of each half, as an aggregate.
   Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, nine more packages
   were gated on the same folds (sections 3.4 and 4), each registered before its score: thirteen in all, besides
   the bake-off's models and the six label-convention variants of section 4, which were scored on these folds
-  too. A, AW, AT and ATW were the 14th to 17th packages on them, and A2 and AW2 are registered as the 18th
-  and 19th (section 3.5). The two
+  too. A, AW, AT and ATW were the 14th to 17th packages on them, and A2 and AW2 the 18th and 19th
+  (section 3.5): nineteen gated packages in all. The two
   locked benches are the only matches no choice was made on. F's one read there gains about as much as on
   the development folds (section 3.1). With two matches, that read is a sanity check, not a second
   estimate, and nothing after F was read on them.
 - **The TCN seed matters.** F's TCN uses seed 0, fixed in advance. Averaging in a second seed lowered the
   8-fold score by 0.005 (1 of 8 folds won), so seed 0 does unusually well on those folds. With seed 1, F is
   still about +0.02 above M2 there, so roughly a quarter of the 8-fold gain depends on the seed. The 28-fold
-  gate is the better guide. Both tests were run on F's 1,200-step TCN and were not repeated for F3's or
-  AW's, which keep seed 0.
+  gate is the better guide. Both tests were run on F's 1,200-step TCN and were not repeated for F3's,
+  AW's or AW2's, which keep seed 0.
 - **Unknown label convention.** The absolute score is uncertain by about 0.15. About 35 touch-then-out
   flips per IDSSE match (11% of spells) remain in our labels.
 - **Assumed identity-switch rates.** No external source measures them.
@@ -721,7 +809,7 @@ D over the first 60 and 120 s of each half, as an aggregate.
   2 s, and M2 with touch features 0.169. F3 finds 7% of the true possessions under 2 s on the IDSSE and
   Metrica folds and 24% on the SkillCorner folds (frame truth), and 91% and 85% of those over 16 s. It
   finds 11% of the short possessions that follow an opponent's on the IDSSE and Metrica folds
-  (section 3.5). The count by length was not repeated for AW.
+  (section 3.5). The count by length was not repeated for AW or AW2.
 - **Model bytes differ across machines; the labels did not.** On the reference machine the rebuild is exact.
   A fresh clone, with a fresh download of the external corpus and an empty cache, reproduced every stage byte
   for byte: corpus, features, worlds, pools, both models and a dressed-match CSV (`docs/decision-log.md`, J3 W1).
@@ -741,28 +829,36 @@ D over the first 60 and 120 s of each half, as an aggregate.
   for F3, so that pair was run under WSL on the reference PC, with Ubuntu's libraries on its Intel CPU: a
   fifth set of TCN weights, and the same CSV.
 
-  AW (section 3.5) was trained on all 30 matches on three of GitHub's runners, each from an empty corpus
-  and cache: macOS 15 on Apple M1, Ubuntu 24.04 on Intel Xeon 6973P-C, and Windows Server 2025 on Intel
-  Xeon Platinum 8573C.
+  AW (section 3.5) was trained on all 30 matches on four machines. Three were GitHub runners, each from an
+  empty corpus and cache: macOS 15 on Apple M1, Ubuntu 24.04 on Intel Xeon 6973P-C, and Windows Server
+  2025 on Intel Xeon Platinum 8573C. The fourth was the reference PC.
   - The action labels are built from the pinned raw files on each runner, and the label counts in the three
     manifests agree.
-  - The LightGBM member is `55de693c7ea2...` on all three. Its alive head (`59bfcd31dc1e...`) is also the
-    alive head of A, which was trained the same way on three runners of its own: the weights touch the
-    team head only.
-  - The TCN's weights are three sets, as for F and F3.
-  - The dressed external match got one CSV, `280060af276f1665...`, on all three. That match is one of the
+  - The LightGBM member is `55de693c7ea2...` on all four. Its alive head (`59bfcd31dc1e...`) is also the
+    alive head of A: the weights touch the team head only.
+  - The TCN's weights are three sets, as for F and F3. The PC's (`7f21c128504d...`) are the Windows
+    runner's, whose CPU is also Intel, and so is its `bundle.pkl` (`33bae152771c...`), byte for byte.
+  - The dressed external match got one CSV, `280060af276f1665...`, on all four. That match is one of the
     30 training matches here, so its score says nothing and is not quoted.
-  - Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `HASH_PENDING_AW_GBDT`,
-    TCN `HASH_PENDING_AW_TCN`, bundle `HASH_PENDING_AW_BUNDLE`; the dressed match's CSV
-    `HASH_PENDING_AW_DRESSED_CSV`.
+  - A, AW without the weights, was checked the same way, on three runners of its own (macOS 15 on Apple M1,
+    Ubuntu 24.04 on AMD EPYC 9V45, Windows Server 2025 on AMD EPYC 7763) and on the PC: LightGBM
+    `eb1030c8ec94...` and dressed CSV `98b2919621653c99...` on all four.
+
+  AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on the
+  same four kinds of machine, and they gave one LightGBM member and one dressed CSV (PENDING_AW2_REPRO).
+  Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `HASH_PENDING_AW2_GBDT`, TCN
+  `HASH_PENDING_AW2_TCN`, bundle `HASH_PENDING_AW2_BUNDLE`; the dressed match's CSV
+  `HASH_PENDING_AW2_DRESSED_CSV`.
 
   **LightGBM is not byte-identical on every machine for every training set.** In the gate of section 3.5,
   A's LightGBM member fitted on the Linux runners equals the PC's own fit on 27 of 28 folds, hash and every
   probability. On the fold that holds out `skillcorner/2010085`, the alive head is identical and the team
   head is not: the two machines grew different trees, and its probabilities differ by 0.008 on average and
-  by up to 0.15. F and F3 had not shown this on any machine we tried. AW's fold models were fitted on the
-  runners only, so they have no such comparison. The all-30 models of A and of AW did not show it on the
-  three OSes and five CPU models they were trained on.
+  by up to 0.15. That moves the fold's score by 0.0018 at target-like noise on the frame truth and by
+  0.0036 on the action truth, which is the size to keep in mind for a reproduction of the final file on
+  another machine. F and F3 had not shown this on any machine we tried. The fold models of AW and AW2 were
+  fitted on the runners only, so they have no such comparison. The all-30 models of A and of AW did not
+  show it on the four machines each was trained on.
 
   So expect the same file on another machine. That has been shown on an external match in the provided format,
   not on the provided match itself, where a near-tie could still flip a label; and a fold has shown that
@@ -770,7 +866,7 @@ D over the first 60 and 120 s of each half, as an aggregate.
 
 **With more time** we would recalibrate the D2 worlds inside each fold, and make native-ball noise as
 smooth and correlated as real tracking. We would check the action labels' dead-ball ends against a second
-source and repeat AW's gate on a second machine. We would also re-run the `tail` gate after its label
+source and repeat AW2's gate on a second machine. We would also re-run the `tail` gate after its label
 fix, and test more of Smart Tagging than the set-piece tags, which failed their gate (section 4).
 
 ## 8. Reproduction
@@ -804,9 +900,10 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   images lack it; `make submit` then stops at its first step and names the package.
 - **Checked:** on the reference machine, a fresh clone with an empty cache rebuilt every file and F's
   model byte for byte in 1 h 39 min, including the download. F3 changes only the training step, and F3
-  trained twice there gives the same model file. AW also changes only the training step. Its all-30 model
-  was trained from an empty cache on three GitHub runners with one LightGBM member and one dressed CSV
-  (section 7); the hashes expected on the reference machine are listed there.
+  trained twice there gives the same model file. AW and AW2 also change only the training step. AW's
+  all-30 model gave one LightGBM member and one dressed CSV on three GitHub runners, each from an empty
+  cache, and on the reference machine. Section 7 has that check, AW2's, and the hashes expected on the
+  reference machine.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
   import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
 - **Cost:**
@@ -817,8 +914,9 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   | Apple-silicon laptop, 3 workers | 14 min | 9 min (LightGBM 0.5, TCN 8) | under a minute | |
   | GitHub runners: Ubuntu, Windows, macOS | | 8, 13 and 37 min | under a minute | 5.7 GB peak in training (Ubuntu) |
 
-  The external download (about 5 GB) is extra. The training times are F3's. AW has the same model sizes;
-  its alive head trains on more rows, and we have not timed it on these machines.
+  The external download (about 5 GB) is extra. The training times in the table are F3's. On the reference
+  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: about 30 minutes
+  (PENDING_AW2_TRAIN_TIME).
 - **The submitted file:** its SHA-256 and its commit are in the short document.
 - **No match data in the repository.** CI fails any commit that holds it (`docs/ci.md`).
 
@@ -829,12 +927,12 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 | Evidence and decisions | `docs/decision-log.md`, `docs/bakeoff.md`, `docs/bakeoff-protocol.md`, `docs/label-convention.md`, `docs/external-data.md`, `docs/audit/d5-bakeoff-audit.md` |
 | External loaders and corpus | `src/katena/external/`, `scripts/build_external.py`, `scripts/external_manifest.json` |
 | Label convention | `src/katena/labels.py`; `T_MAIN` in `src/katena/eval/protocol.py` |
-| SkillCorner action labels and length weights (AW) | `src/katena/external/skillcorner_actions.py`, `src/katena/eval/actlabels.py`, `src/katena/models/lenweight.py`; spec `AW` in `src/katena/pipeline.py`; `tests/test_skillcorner_actions.py`, `tests/test_lenweight.py` |
+| SkillCorner action labels and length weights (AW, AW2) | `src/katena/external/skillcorner_actions.py`, `src/katena/eval/actlabels.py`, `src/katena/models/lenweight.py`; spec `AW2` in `src/katena/pipeline.py`; `tests/test_skillcorner_actions.py`, `tests/test_lenweight.py` |
 | Degrader and worlds | `src/katena/sim/degrade.py`, `src/katena/sim/worlds.py`, `scripts/calibrate_degrader.py`, `scripts/d2_calibrate.py` |
 | Features | `src/katena/featurize/build.py`, `src/katena/featurize/touch.py` |
 | Models and blend | `src/katena/models/gbdt.py`, `tcn.py`, `ensemble.py` |
 | Decoder | `src/katena/decode/hmm.py` |
-| Gates | `src/katena/eval/` (`lomo`, `bootstrap`, `score`, `d2`, `d3`, `touch_gate`, `tmix`, `final`), `scripts/run_*.py`; AW and its sister candidates: `scripts/run_a.py`, `run_aw.py`, `run_at.py`, fitted on runners by `.github/workflows/gate.yml`; the label probe and the transfer read of section 3.5: `scripts/probe_sc_actions.py`, `scripts/probe_transfer.py` |
+| Gates | `src/katena/eval/` (`lomo`, `bootstrap`, `score`, `d2`, `d3`, `touch_gate`, `tmix`, `final`), `scripts/run_*.py`; AW and its sister candidates: `scripts/run_a.py`, `run_aw.py`, `run_at.py`; the longer TCN: `scripts/run_x2.py`; all fitted on runners by `.github/workflows/gate.yml`; the label probe and the two reads of section 3.5: `scripts/probe_sc_actions.py`, `scripts/probe_transfer.py`, `scripts/read_act.py` |
 | Target reader and checks | `src/katena/target/`, `scripts/check_target.py`, `check_target_layout.py`, `check_touch_target.py`, `check_kickoff_tags.py`, `check_domain_gap.py` |
 | Submission | `src/katena/pipeline.py`, `scripts/make_submission.py`, `Makefile`, `docs/REPRODUCE.md`; the real run: `scripts/real_run.py`, `docs/real-run.md`; checks: `scripts/dressed_check.py`, `scripts/stress_predict.py`, `scripts/check_public_window.py`, `tests/test_pipeline_atd.py`; this document as a PDF: `scripts/build_document.py` |
 | Firewall and CI | `scripts/firewall_check.py`, `.github/workflows/`, `docs/ci.md` |
