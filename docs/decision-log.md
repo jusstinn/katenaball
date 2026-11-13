@@ -34,6 +34,31 @@ beside it equals F3's cached one on every fold.
 - On the standing truth it should lose, as the same member lost on the IDSSE + Metrica side when it was read
   with the wrong kind.
 
+**Result** (run once at 02:53 CET, 7 minutes; `D:/katena/logs/a-win/probe_transfer.log`). N is F3 with that team
+head in its LightGBM member. Check: the alive head equals F3's cached one on 40 of 40 fold-conditions.
+
+| N against F3, 20 SkillCorner folds | N | F3 | Diff | 95% paired CI | Wins |
+|---|---|---|---|---|---|
+| Action truth, `target`, blended | 0.6209 | 0.6094 | +0.0115 | [+0.0037, +0.0193] | 15/20 |
+| Action truth, `severe`, blended | 0.5759 | 0.5615 | +0.0144 | [+0.0079, +0.0212] | 16/20 |
+| Action truth, `target`, LightGBM member alone | 0.5828 | 0.5878 | -0.0050 | [-0.0136, +0.0036] | 8/20 |
+| Standing truth, `target`, blended | 0.5775 | 0.6103 | -0.0328 | [-0.0395, -0.0261] | 0/20 |
+| Standing truth, `target`, LightGBM member alone | 0.5352 | 0.5985 | -0.0633 | [-0.0714, -0.0556] | 0/20 |
+
+- **Read as fixed above: ahead of F3 on the action truth, at both severities.** A team head trained on 8 matches
+  of simulated noise, with no row of real broadcast tracking, beats one trained on those 8 and on 19 real
+  SkillCorner matches with the standing label, once the truth changes owner at the first touch and has dead ball.
+- **It is the blend that gains.** Alone, the member is level with F3's member (it has lost 72% of its team
+  rows). Blended with F3's TCN, which still trains on the standing SkillCorner label, it is ahead.
+- **On the standing truth the same model loses 0.033, on every fold.** So on SkillCorner the choice of truth
+  decides the verdict, and rule 1 scores 20 of its 28 folds on the truth the documentation does not describe.
+- Predicted possessions per true one at `target`: 0.889 for F3 and 1.069 for N on the action truth (0.760 and
+  0.904 on the standing one). F3 no longer under-segments by a quarter when the truth is the action one, which
+  has 239 possessions a match against 272.
+
+**What it does not show.** That the action truth is right, or that the provided match follows it. Nothing here
+was trained on the action labels, so it says nothing about A itself.
+
 ### A on the Windows PC (pre-registration): the second-machine run, and David's side on rule 2
 
 **Written at 02:45 CET on Nov 13, before any score of A or of AW is known on this side.** Claude on David's PC,
