@@ -16,7 +16,7 @@ from synth import L, make_match
 
 import possession_metrics as pm
 from katena.external import idsse, metrica, skillcorner
-from katena.external.common import (derive_speed, infer_attack_dir, infer_attack_dir_gk,
+from katena.external.common import (centroid_gap_m, derive_speed, infer_attack_dir, infer_attack_dir_gk,
                                     nearest_team_agreement, validate_canonical)
 from katena.types import A, D, H, X, load_match, save_match
 
@@ -92,6 +92,14 @@ def test_attack_direction_from_positions():
     P = m.P.copy()
     P[..., 0] = L / 2                                  # both teams on the centre line: ambiguous
     assert infer_attack_dir(P, m.team, 100, 799, L) == 0
+    assert centroid_gap_m(P, m.team, 100, 799) < 0.1 and centroid_gap_m(m.P, m.team, 100, 799) > 8.0
+    P = m.P.copy()
+    P[:, m.team == 1] = np.nan                         # a team with no tracked sample: no gap to read
+    assert centroid_gap_m(P, m.team, 100, 799) == 0.0
+    gk = np.flatnonzero(m.team == 0)[0], np.flatnonzero(m.team == 1)[0]
+    P = m.P.copy()
+    P[:, gk[0]], P[:, gk[1]] = m.P[:, gk[1]], m.P[:, gk[0]]      # the two goalkeepers in each other's team
+    assert centroid_gap_m(P, m.team, 100, 799) < centroid_gap_m(m.P, m.team, 100, 799) - 5.0
 
 
 # --- Metrica event-derived labels -----------------------------------------------------------

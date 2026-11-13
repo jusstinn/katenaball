@@ -58,6 +58,21 @@ def infer_attack_dir_gk(P: np.ndarray, team: np.ndarray, first: int, last: int,
     return int(-sides[0])  # home keeper on the left (negative) defends left, attacks right (+1)
 
 
+def centroid_gap_m(P: np.ndarray, team: np.ndarray, first: int, last: int) -> float:
+    """Distance along the pitch between the two teams' mean x over frames [first, last]: what
+    ``infer_attack_dir`` reads its direction from. 0.0 when a team has no tracked sample. It was 10.9 m
+    or more on every half of the 30 external matches (docs/decision-log.md, 2026-11-13)."""
+    seg = P[first:last + 1, :, 0]
+    mx = []
+    for t in (0, 1):
+        v = seg[:, team == t]
+        v = v[np.isfinite(v)]
+        if v.size == 0:
+            return 0.0
+        mx.append(float(v.mean()))
+    return abs(mx[0] - mx[1])
+
+
 def infer_attack_dir(P: np.ndarray, team: np.ndarray, first: int, last: int,
                      length: float, min_gap_m: float = 2.0) -> int:
     """Home's attacking direction (+1 towards increasing x) in frames [first, last] from the
