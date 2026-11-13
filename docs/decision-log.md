@@ -6,6 +6,65 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A on Justin's Mac: result (A's third machine), and KIN beside A's own TCN on all 28 folds (information)
+
+**The Mac's own run of A gives the PC's numbers to the fourth decimal in every row: A fails rule 1 and meets
+rule 2. With A's TCN now on all 28 folds, the 35 KIN columns add +0.0033 [+0.0002, +0.0067] at `target` beside
+it, 20 of 28 folds: on the edge of the rule, on the Mac, with the 4,800-step TCN. The registered test of KIN is
+the one with the 9,600-step TCNs on David's side. Nothing is decided or adopted.** Claude on Justin's Mac, read
+at 12:20 CET on Nov 13; Justin has not read it. External development matches only.
+
+**A.** `scripts/run_a.py a-gbdt a-tcn a-gate`, no tag, the Mac's own cache (Apple M5, macOS): LightGBM 22:50 to
+23:36 CET on Nov 12 at `271c0aa`; the TCN 05:14 to 12:13 CET on Nov 13, 419 minutes in one process, part of it
+on battery in Low Power Mode (530 to 1,700 s a fold); the gate 1 minute, with the checkout at `9663dde`. The script prints "registered run".
+
+| A against F3, `target` | This Mac (macOS) | The PC (Windows), entry below |
+|---|---|---|
+| Rule 1: 28 folds, standing truth | 0.6093, -0.0087 [-0.0149, -0.0024], 10/28 | the same |
+| Rule 1: 20 SkillCorner folds, standing truth | 0.5825, -0.0278 [-0.0354, -0.0200], 2/20 | not in the PC's entry |
+| Rule 2: 8 IDSSE + Metrica folds | 0.6763, +0.0389 [+0.0276, +0.0498], 8/8 | the same |
+| Rule 2: the same at `severe` | 0.6263, +0.0363 [+0.0254, +0.0470], 8/8 | the same |
+| Rule 2: 20 SkillCorner folds, action truth | 0.6645, +0.0551 [+0.0461, +0.0639], 20/20 | the same |
+| All 28, action truth on SkillCorner | 0.6679, +0.0505 [+0.0436, +0.0573], 28/28 | 0.6679 |
+
+- **Three machines, one verdict.** macOS and Windows agree in every printed digit of the table; the runners
+  differ by 0.0001 to 0.0002 through the one LightGBM fold the PC's entry names. The Mac's per-fold scores were
+  not compared with the PC's: the PC's score file is not here.
+- The interim number of Nov 12 (A1, A's LightGBM member with F3's TCN) stands as it was read: 0.6158 on the
+  standing truth, A's own TCN costs a further -0.0064 [-0.0112, -0.0019] there and adds +0.0157 [+0.0081,
+  +0.0230] on the 8 folds.
+- Check: F3's scores in the gate equal the stored ones, 56 of 56.
+
+**KIN beside A's own 4,800-step TCN, all 28 folds** (`scripts/run_kin.py kin-gate` at `9663dde`; this is the
+reading the interim entry below had on 20 folds; information only, as registered).
+
+| AK against A, A's own 4,800-step TCN | Folds | AK | A | Diff [95% CI] | Wins |
+|---|---|---|---|---|---|
+| `target`, all, action truth on SkillCorner | 28 | 0.6712 | 0.6679 | +0.0033 [+0.0002, +0.0067] | 20/28 |
+| `target`, 8 IDSSE + Metrica folds | 8 | 0.6785 | 0.6763 | +0.0022 [-0.0044, +0.0086] | 6/8 |
+| `target`, 20 SkillCorner folds, action truth | 20 | 0.6682 | 0.6645 | +0.0037 [-0.0000, +0.0074] | 14/20 |
+| `severe`, all, action truth on SkillCorner | 28 | 0.6245 | 0.6168 | +0.0077 [+0.0044, +0.0111] | 19/28 |
+| `severe`, 8 IDSSE + Metrica folds | 8 | 0.6366 | 0.6263 | +0.0103 [+0.0038, +0.0169] | 6/8 |
+| `severe`, 20 SkillCorner folds, action truth | 20 | 0.6196 | 0.6130 | +0.0067 [+0.0030, +0.0107] | 13/20 |
+| `target`, all, standing truth | 28 | 0.6079 | 0.6093 | -0.0014 [-0.0043, +0.0015] | 14/28 |
+
+- **Read with the rule KIN is registered under, this reading would pass, by one fold and 0.0002**: 20 of 28
+  folds is 71% against a limit of 70%, the interval starts at +0.0002, and neither kind of fold is worse. It is
+  not the registered test (4,800 steps, the Mac, no tag), and a result this near the line can fall either way
+  with the longer TCN, which is the stronger partner in the blend.
+- **The gain is at `severe` more than at `target`** (+0.0077 against +0.0033), on both kinds of fold. That is
+  where the tracking is worst and where a team head that reads the players' movement has most to add.
+- **It is smaller than beside F3's TCN** (+0.0033 where it was +0.0086), as the 20-fold reading said. The 8
+  SkillCorner folds that arrived since gained more than the first 12 (+0.0016 on those 12, +0.0037 on all 20).
+- Possessions of 2 to 4 s found at IoU 0.5 on SkillCorner against the action truth: 0.39 to 0.41; of 4 to 8 s:
+  0.67 to 0.69. Predicted possessions per true one: 1.023 to 1.040 there, 0.784 to 0.794 on the 8 folds.
+- Against F3, AK meets rule 2's three tests (8 folds +0.0411 [+0.0293, +0.0524], 8/8; SkillCorner, action truth
+  +0.0588 [+0.0496, +0.0676], 20/20). That is the base's doing.
+
+**What it does not show.** The registered test of KIN (AK2 against A2, AWK2 against AW2, runners and the PC).
+Anything about AWK beside AW's own TCN: the Mac's AW TCN started at 12:14 CET and needs about seven hours.
+Anything about the provided match.
+
 ### KIN on the Mac: the interim read (information only; the registered gate is running on David's side)
 
 **With F3's TCN the 35 columns add about +0.009 for both bases, on both kinds of fold. With A's own 4,800-step
@@ -14,6 +73,8 @@ second reading is the nearer one to the registered test, so this does not say KI
 or adopted.** Claude on Justin's Mac, read at 11:00 CET on Nov 13; Justin has not read it. Registered as
 information in the entry below before it was read. `scripts/run_kin.py kin-gbdt kin-gate` at `8efd184`, the
 Mac's own cache; 56 team heads, about 48 s each, 45 minutes. External development matches only.
+*Amended 12:25 CET: the Mac has A's TCN on all 28 folds now; the reading beside it is in the entry above
+(+0.0033 [+0.0002, +0.0067], 20/28). The numbers of this entry are left as they were read.*
 
 | `target`, spellF1 | Folds | With the columns | Base | Diff [95% CI] | Wins |
 |---|---|---|---|---|---|
