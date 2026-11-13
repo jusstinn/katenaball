@@ -21,7 +21,7 @@ on:
         description: Model spec to train (katena.pipeline.SPECS)
         type: choice
         default: F3
-        options: [F3, F]
+        options: [F3, F, A, AW, AT, ATW]
 
 concurrency:
   group: repro-${{ github.ref_name }}-${{ inputs.spec || 'F3' }}

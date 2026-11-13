@@ -320,6 +320,8 @@ def score_all(nm: Names, dev: list, folds: list, n: int, steps: int) -> dict:
         pri, gt = B.priors_for(src, {r.key}, T), C.load_gt(r, T)
         gta = load_act(r) if r.is_sc else None
         for c in G.worlds_here(r):
+            if f"ph_{c}" not in ga or (ta is not None and f"ph_{c}" not in ta):
+                continue        # a member fitted on a cache without this information-only world (gate.yml's runners)
             gate_c = c in F.GATE_CONDS
             at = {**g0, f"ph_{c}": ga[f"ph_{c}"]}                    # the action team head with F3's alive head
             rows = [("F3", g0, t0, F.W_F), ("A1", ga, t0, F.W_F)]
