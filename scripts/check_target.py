@@ -24,6 +24,7 @@ for path in (ROOT, ROOT / "src", ROOT / "starter"):
 import games  # noqa: E402
 from baseline import smooth  # noqa: E402
 
+from katena.external.common import centroid_gap_m  # noqa: E402
 from katena.target.atd import load_target, nearest_team, read_raw, read_slot_teams  # noqa: E402
 from katena.target.tagging import read_tags  # noqa: E402
 
@@ -38,6 +39,10 @@ PUBLISHED = {
 }
 BASELINES = (("baseline_raw", 0), ("baseline_smooth25", 25), ("baseline_smooth50", 50),
              ("baseline_smooth125", 125))
+# The attack direction is read from the two teams' mean positions. On every half of the 30 external matches
+# they are 10.9 m or more apart, so less than this means the direction cannot be trusted. Fixed from external
+# matches only; the check prints pass or fail, never the distance.
+MIN_CENTROID_GAP_M = 8.0
 RESULTS = {"pass": 0, "fail": 0}
 
 
@@ -82,6 +87,9 @@ def check_loader() -> None:
     directions = [match.attack_dir[half] for half, _, _ in match.half_blocks]
     report("attack direction found for both halves, and it flips at half-time",
            0 not in directions and directions[0] == -directions[1])
+    gaps = [centroid_gap_m(match.P, match.team, first, last) for _, first, last in match.half_blocks]
+    report(f"the two teams' mean positions are at least {MIN_CENTROID_GAP_M:g} m apart along the pitch in both halves",
+           all(gap >= MIN_CENTROID_GAP_M for gap in gaps))
 
 
 def check_baselines() -> None:
