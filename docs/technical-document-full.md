@@ -585,7 +585,7 @@ the cut-off of Nov 14, 18:00 CET (PENDING_JUSTIN_NAME). AW2 is the submitted mod
 
 **Reproduction.** The all-30 models of A and of AW were each trained from an empty cache on macOS, Ubuntu
 and Windows runners and on the reference PC: one LightGBM member and one CSV for the dressed external
-match on the four machines. AW2's all-30 model was checked the same way (PENDING_AW2_REPRO). Section 7
+match on the four machines. AW2's all-30 model was checked the same way. Section 7
 has the hashes.
 
 ## 4. Assets, and what we tried and dropped
@@ -845,10 +845,10 @@ D over the first 60 and 120 s of each half, as an aggregate.
     `eb1030c8ec94...` and dressed CSV `98b2919621653c99...` on all four.
 
   AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on the
-  same four kinds of machine, and they gave one LightGBM member and one dressed CSV (PENDING_AW2_REPRO).
-  Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `HASH_PENDING_AW2_GBDT`, TCN
-  `HASH_PENDING_AW2_TCN`, bundle `HASH_PENDING_AW2_BUNDLE`; the dressed match's CSV
-  `HASH_PENDING_AW2_DRESSED_CSV`.
+  same four kinds of machine, and they gave one LightGBM member and one dressed CSV.
+  Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `55de693c7ea2...`, TCN
+  `78a241f571ad...`, bundle `9b4c2cfaa553...`; the dressed match's CSV
+  `4e0ab1d06ba7...`.
 
   **LightGBM is not byte-identical on every machine for every training set.** In the gate of section 3.5,
   A's LightGBM member fitted on the Linux runners equals the PC's own fit on 27 of 28 folds, hash and every
@@ -915,8 +915,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   | GitHub runners: Ubuntu, Windows, macOS | | 8, 13 and 37 min | under a minute | 5.7 GB peak in training (Ubuntu) |
 
   The external download (about 5 GB) is extra. The training times in the table are F3's. On the reference
-  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: about 30 minutes
-  (PENDING_AW2_TRAIN_TIME).
+  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: `train` took 26 minutes
+  there.
 - **The submitted file:** its SHA-256 and its commit are in the short document.
 - **No match data in the repository.** CI fails any commit that holds it (`docs/ci.md`).
 

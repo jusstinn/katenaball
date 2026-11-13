@@ -216,7 +216,7 @@ than 2 s, with the other team on both sides, is relabelled to the surrounding te
   one of the 28 LightGBM fold models grew other trees on a Linux runner than on our PC. The final models of
   A and of AW did not show that: each gave one LightGBM model and one CSV, byte for byte, for an external
   match in the provided format, on macOS, Ubuntu and Windows runners and on our PC. AW2's final model did
-  the same (PENDING_AW2_REPRO). So expect the same file on another machine; that was shown on an external
+  the same. So expect the same file on another machine; that was shown on an external
   match, not on the provided one, where a near-tie could flip a label.
 
 ## 8. Reproduction
@@ -241,8 +241,8 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
   numba 0.68.1, scipy 1.17.1, scikit-learn 1.9.1, locked in `uv.lock`.
 - **Determinism.** Fixed seeds, 8 LightGBM threads, 4 torch threads, torch's CPU kernels pinned before
   import. The CSV is built as bytes with LF line ends on every OS. Section 7 has the cross-machine checks.
-- **Cost.** On a 4-core PC from 2017: about an hour to build the features and worlds, about 30 minutes to
-  train (PENDING_AW2_TRAIN_TIME), a minute to label. The external download is about 5 GB.
+- **Cost.** On a 4-core PC from 2017: about an hour to build the features and worlds, about 26 minutes to
+  train, a minute to label. The external download is about 5 GB.
 - **The submitted file.** `TODO(after the real run)`: SHA-256 of `<team_name>.csv` and its commit.
 - **No match data in the repository.** CI fails any commit that holds it.
 
