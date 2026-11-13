@@ -6,6 +6,54 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### K at kind 0, S1 and S2 against the action truth: result (Claude; Justin has not read it yet)
+
+**Read at 04:05 CET on Nov 13**, after the entry below was pushed (`c463d70`). `scripts/read_act.py`, 28 s,
+`work/final/read_act.json`. 20 SkillCorner folds, action truth, 20 of 20 with every member; A's TCN on none.
+
+| Comparison | `target` | `severe` |
+|---|---|---|
+| **K at kind 0 vs F3** | 0.6359 vs 0.6094, **+0.0265 [+0.0178, +0.0349], 18/20** | +0.0243 [+0.0165, +0.0320], 17/20 |
+| K at its own kind vs F3 | -0.0141 [-0.0190, -0.0091], 2/20 | -0.0102 [-0.0153, -0.0053], 4/20 |
+| K at kind 0 vs K at its own kind | +0.0405 [+0.0313, +0.0497], 18/20 | +0.0346 [+0.0259, +0.0428], 19/20 |
+| S1 vs F3 | +0.0083 [+0.0022, +0.0150], 14/20 | +0.0094 [+0.0040, +0.0149], 15/20 |
+| S2 vs F3 | -0.0057 [-0.0123, +0.0011], 5/20 | -0.0061 [-0.0125, +0.0004], 9/20 |
+| A1 (interim) vs K at kind 0 | -0.0086 [-0.0155, -0.0012], 7/20 | -0.0077 [-0.0145, -0.0009], 6/20 |
+
+True possessions found at IoU 0.5 by true length, `target`:
+
+| Model | under 2 s | 2-4 s | 4-8 s | 8-16 s | over 16 s |
+|---|---|---|---|---|---|
+| F3 | 0.05 | 0.22 | 0.55 | 0.75 | 0.85 |
+| K at kind 0 | 0.12 | 0.39 | 0.69 | 0.80 | 0.88 |
+| K at its own kind | 0.05 | 0.18 | 0.51 | 0.73 | 0.84 |
+| S1 | 0.07 | 0.31 | 0.63 | 0.80 | 0.88 |
+| S2 | 0.08 | 0.30 | 0.64 | 0.81 | 0.87 |
+| A1 | 0.10 | 0.31 | 0.61 | 0.81 | 0.89 |
+
+**Read as the entry below said.**
+
+- **K at kind 0 is ahead of F3 with the interval above 0, so the mechanics of IDSSE and Metrica carry over to
+  real broadcast tracking** when the truth changes owner at the first touch: 18 of 20 folds, and 39% of the 2-4 s
+  possessions found against 22%. Neither model trained on that truth. The same reading lost on every fold
+  against the standing truth (-0.0326, 0 of 20; K's entry). On SkillCorner the truth decides the verdict, as the
+  transfer probe said with one head.
+- **Kind 0 is the value K's registration fixed for the provided match.** So K, read the way it would be used,
+  is ahead of F3 on the 8 IDSSE + Metrica folds (+0.0345, 8 of 8) and on these 20 against the action truth.
+  **That does not reopen K.** It failed the rule it was registered under, rule 2 was declared for A, and this
+  reading was chosen after K's scores were known. It says what K's column is worth to a model that still
+  trains on the standing SkillCorner labels, and it is the bar A has to clear: A1 is 0.0086 behind it here with
+  the interval below 0, with half of A (K1, the comparable half of K, was +0.0175 on the 8 folds where A1 is
+  +0.0232).
+- **The length weights split by member.** S1 is ahead (14 of 20); S2 is not (5 of 20, interval touching 0). Both
+  were trained with weights taken from the standing SkillCorner labels, whose short possessions are the ones
+  the action labels disagree with, so this is not AW's or ATW's TCN; it is a reason to read their TCN members
+  alone when their gates print.
+
+**What it does not show.** That the action truth is right or that the provided match follows it (A's entry).
+And the action truth was built by this team from SkillCorner's events with two constants; a model can gain on
+it by sharing those constants only if it trained on them, which K, S1, S2 and F3 did not.
+
 ### K at kind 0, S1 and S2 against the action truth (information; written before the read)
 
 **Written at 03:55 CET on Nov 13, before `scripts/read_act.py` was run without `--dry`.** Claude on Justin's Mac;
