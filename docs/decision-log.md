@@ -6,6 +6,246 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A on Justin's Mac: result (A's third machine), and KIN beside A's own TCN on all 28 folds (information)
+
+**The Mac's own run of A gives the PC's numbers to the fourth decimal in every row: A fails rule 1 and meets
+rule 2. With A's TCN now on all 28 folds, the 35 KIN columns add +0.0033 [+0.0002, +0.0067] at `target` beside
+it, 20 of 28 folds: on the edge of the rule, on the Mac, with the 4,800-step TCN. The registered test of KIN is
+the one with the 9,600-step TCNs on David's side. Nothing is decided or adopted.** Claude on Justin's Mac, read
+at 12:20 CET on Nov 13; Justin has not read it. External development matches only.
+
+**A.** `scripts/run_a.py a-gbdt a-tcn a-gate`, no tag, the Mac's own cache (Apple M5, macOS): LightGBM 22:50 to
+23:36 CET on Nov 12 at `271c0aa`; the TCN 05:14 to 12:13 CET on Nov 13, 419 minutes in one process, part of it
+on battery in Low Power Mode (530 to 1,700 s a fold); the gate 1 minute, with the checkout at `9663dde`. The script prints "registered run".
+
+| A against F3, `target` | This Mac (macOS) | The PC (Windows), entry below |
+|---|---|---|
+| Rule 1: 28 folds, standing truth | 0.6093, -0.0087 [-0.0149, -0.0024], 10/28 | the same |
+| Rule 1: 20 SkillCorner folds, standing truth | 0.5825, -0.0278 [-0.0354, -0.0200], 2/20 | not in the PC's entry |
+| Rule 2: 8 IDSSE + Metrica folds | 0.6763, +0.0389 [+0.0276, +0.0498], 8/8 | the same |
+| Rule 2: the same at `severe` | 0.6263, +0.0363 [+0.0254, +0.0470], 8/8 | the same |
+| Rule 2: 20 SkillCorner folds, action truth | 0.6645, +0.0551 [+0.0461, +0.0639], 20/20 | the same |
+| All 28, action truth on SkillCorner | 0.6679, +0.0505 [+0.0436, +0.0573], 28/28 | 0.6679 |
+
+- **Three machines, one verdict.** macOS and Windows agree in every printed digit of the table; the runners
+  differ by 0.0001 to 0.0002 through the one LightGBM fold the PC's entry names. The Mac's per-fold scores were
+  not compared with the PC's: the PC's score file is not here.
+- The interim number of Nov 12 (A1, A's LightGBM member with F3's TCN) stands as it was read: 0.6158 on the
+  standing truth, A's own TCN costs a further -0.0064 [-0.0112, -0.0019] there and adds +0.0157 [+0.0081,
+  +0.0230] on the 8 folds.
+- Check: F3's scores in the gate equal the stored ones, 56 of 56.
+
+**KIN beside A's own 4,800-step TCN, all 28 folds** (`scripts/run_kin.py kin-gate` at `9663dde`; this is the
+reading the interim entry below had on 20 folds; information only, as registered).
+
+| AK against A, A's own 4,800-step TCN | Folds | AK | A | Diff [95% CI] | Wins |
+|---|---|---|---|---|---|
+| `target`, all, action truth on SkillCorner | 28 | 0.6712 | 0.6679 | +0.0033 [+0.0002, +0.0067] | 20/28 |
+| `target`, 8 IDSSE + Metrica folds | 8 | 0.6785 | 0.6763 | +0.0022 [-0.0044, +0.0086] | 6/8 |
+| `target`, 20 SkillCorner folds, action truth | 20 | 0.6682 | 0.6645 | +0.0037 [-0.0000, +0.0074] | 14/20 |
+| `severe`, all, action truth on SkillCorner | 28 | 0.6245 | 0.6168 | +0.0077 [+0.0044, +0.0111] | 19/28 |
+| `severe`, 8 IDSSE + Metrica folds | 8 | 0.6366 | 0.6263 | +0.0103 [+0.0038, +0.0169] | 6/8 |
+| `severe`, 20 SkillCorner folds, action truth | 20 | 0.6196 | 0.6130 | +0.0067 [+0.0030, +0.0107] | 13/20 |
+| `target`, all, standing truth | 28 | 0.6079 | 0.6093 | -0.0014 [-0.0043, +0.0015] | 14/28 |
+
+- **Read with the rule KIN is registered under, this reading would pass, by one fold and 0.0002**: 20 of 28
+  folds is 71% against a limit of 70%, the interval starts at +0.0002, and neither kind of fold is worse. It is
+  not the registered test (4,800 steps, the Mac, no tag), and a result this near the line can fall either way
+  with the longer TCN, which is the stronger partner in the blend.
+- **The gain is at `severe` more than at `target`** (+0.0077 against +0.0033), on both kinds of fold. That is
+  where the tracking is worst and where a team head that reads the players' movement has most to add.
+- **It is smaller than beside F3's TCN** (+0.0033 where it was +0.0086), as the 20-fold reading said. The 8
+  SkillCorner folds that arrived since gained more than the first 12 (+0.0016 on those 12, +0.0037 on all 20).
+- Possessions of 2 to 4 s found at IoU 0.5 on SkillCorner against the action truth: 0.39 to 0.41; of 4 to 8 s:
+  0.67 to 0.69. Predicted possessions per true one: 1.023 to 1.040 there, 0.784 to 0.794 on the 8 folds.
+- Against F3, AK meets rule 2's three tests (8 folds +0.0411 [+0.0293, +0.0524], 8/8; SkillCorner, action truth
+  +0.0588 [+0.0496, +0.0676], 20/20). That is the base's doing.
+
+**What it does not show.** The registered test of KIN (AK2 against A2, AWK2 against AW2, runners and the PC).
+Anything about AWK beside AW's own TCN: the Mac's AW TCN started at 12:14 CET and needs about seven hours.
+Anything about the provided match.
+
+### KIN on the Mac: the interim read (information only; the registered gate is running on David's side)
+
+**With F3's TCN the 35 columns add about +0.009 for both bases, on both kinds of fold. With A's own 4,800-step
+TCN, on the 20 folds the Mac has of it, the gain at `target` is +0.0018 with an interval that includes 0. The
+second reading is the nearer one to the registered test, so this does not say KIN will pass. Nothing is decided
+or adopted.** Claude on Justin's Mac, read at 11:00 CET on Nov 13; Justin has not read it. Registered as
+information in the entry below before it was read. `scripts/run_kin.py kin-gbdt kin-gate` at `8efd184`, the
+Mac's own cache; 56 team heads, about 48 s each, 45 minutes. External development matches only.
+*Amended 12:25 CET: the Mac has A's TCN on all 28 folds now; the reading beside it is in the entry above
+(+0.0033 [+0.0002, +0.0067], 20/28). The numbers of this entry are left as they were read.*
+
+| `target`, spellF1 | Folds | With the columns | Base | Diff [95% CI] | Wins |
+|---|---|---|---|---|---|
+| **AK against A, F3's TCN**, all 28, action truth on SkillCorner | 28 | 0.6454 | 0.6368 | +0.0086 [+0.0050, +0.0122] | 24/28 |
+| The same, 8 IDSSE + Metrica folds | 8 | 0.6675 | 0.6606 | +0.0069 [+0.0002, +0.0131] | 7/8 |
+| The same, 20 SkillCorner folds, action truth | 20 | 0.6366 | 0.6273 | +0.0093 [+0.0050, +0.0137] | 17/20 |
+| **AWK against AW, F3's TCN**, all 28, action truth on SkillCorner | 28 | 0.6637 | 0.6542 | +0.0095 [+0.0060, +0.0131] | 23/28 |
+| The same, 8 IDSSE + Metrica folds | 8 | 0.6944 | 0.6814 | +0.0131 [+0.0062, +0.0198] | 8/8 |
+| The same, 20 SkillCorner folds, action truth | 20 | 0.6514 | 0.6434 | +0.0080 [+0.0038, +0.0124] | 15/20 |
+| **AK against A, A's own 4,800-step TCN**, the 20 folds the Mac has | 20 | 0.6781 | 0.6763 | +0.0018 [-0.0021, +0.0059] | 14/20 |
+| The same, 8 IDSSE + Metrica folds | 8 | 0.6785 | 0.6763 | +0.0022 [-0.0044, +0.0086] | 6/8 |
+| The same, 12 SkillCorner folds, action truth | 12 | 0.6778 | 0.6762 | +0.0016 [-0.0032, +0.0066] | 8/12 |
+
+| `severe`, all folds, action truth on SkillCorner | Folds | Diff [95% CI] | Wins |
+|---|---|---|---|
+| AK against A, F3's TCN | 28 | +0.0126 [+0.0088, +0.0165] | 23/28 |
+| AWK against AW, F3's TCN | 28 | +0.0113 [+0.0072, +0.0153] | 23/28 |
+| AK against A, A's own 4,800-step TCN | 20 | +0.0088 [+0.0048, +0.0128] | 14/20 |
+
+- **Beside a TCN that never saw an action label, the columns help everywhere**: every row with F3's TCN has its
+  interval above 0, at both severities, and 23 or 24 of 28 folds are won. Possessions of 2 to 4 s found at IoU
+  0.5 go from 0.31 to 0.35 (A) and from 0.42 to 0.47 (AW) on SkillCorner against the action truth, and from 0.41
+  to 0.46 (AW) on the 8 folds. Predicted possessions per true one rise by 0.02.
+- **Beside A's own TCN most of the `target` gain is gone**, +0.0018 where it was +0.0086. A TCN trained on the
+  action labels already turns at a change of owner, and the blend takes half of what the team head adds. The
+  gain at `severe` stays (+0.0088). The Mac has this TCN on 20 of 28 folds (all 8 IDSSE + Metrica, 12 of 20
+  SkillCorner); the rest are training.
+- **The LightGBM member alone** (`target`, 28 folds, action truth on SkillCorner): AK against A +0.0080 [+0.0037,
+  +0.0124], 17/28; AWK against AW +0.0018 [-0.0021, +0.0058], 13/28. With the weights the columns gain on the 8
+  folds (+0.0134 [+0.0057, +0.0213]) and not on SkillCorner (-0.0029 [-0.0072, +0.0017]).
+- **On the standing SkillCorner truth nothing moves** (all 28, `target`, F3's TCN: +0.0006 and +0.0005).
+- Against F3 every reading above meets rule 2's three tests. That is the base's doing, not the columns'.
+- Check: F3's scores in this gate equal the stored ones, 56 of 56.
+
+**What it does not show.** The registered test: AK2 against A2 and AWK2 against AW2 with the 9,600-step TCNs,
+which the Mac does not have. Anything about AWK beside AW's own TCN. Anything about the provided match.
+
+**The registered run.** David's side dispatched it at `8efd184` (GitHub run 43399700582, 4 jobs) and will gate
+on the PC. This entry will be amended with the 28-fold reading beside A's own TCN when the Mac's run finishes.
+
+### KIN (pre-registration): 35 ball-free timing columns in the LightGBM team head of A and of AW
+
+**Written at 10:15 CET on Nov 13, before any score of it.** Claude on Justin's Mac. Justin asked on Nov 12 for
+this work to start at 01:00 his time and has not read this; David has not either. The 20th and 21st packages on
+the same 28 folds. Code: `src/katena/featurize/kin.py`, `src/katena/eval/kin_gate.py`, `scripts/run_kin.py`,
+`tests/test_kin.py`. External development matches only. It adopts nothing.
+
+**Why.** The research read of Nov 12 (entry below) put F3's loss in the team head just after the owner changes:
+team accuracy 0.988 more than 4 s from both ends of a possession, 0.49 in the first second after a direct change
+and 0.68 in the next. The columns the team head reads describe team movement with windows centred on the sample
+(displacement from 2 s before to 2 s after, and from 5 s before to 5 s after). There is no one-sided window, no
+acceleration, and no rate of the lines or of the spread. A tree reads one row at a time and cannot difference
+neighbouring rows, and a centred window says the same thing at a change as half a second either side of it. Both
+teams turn towards the same goal when the ball changes owner, with or without a ball detection, and the same
+read found the team probability slowest to turn where the ball was not in view (with S1's and S2's weights it
+crossed 0.5 within 0.4 s of a true change on 0.48 of IDSSE's changes with the ball in view and on 0.30 without).
+The TCN reads the sequence and can difference it by itself, so it is left alone.
+
+**The change, and nothing else.** `katena.featurize.kin` computes 35 columns from player positions only, in the
+focal team's frame, each half by itself:
+
+- the team's mean slot displacement along x over the second before and the second after the sample, the same
+  over 2 s, for each team; after minus before for each team and for both together (14 columns);
+- the share of a team's slots moving forward minus the share moving back, 1 s before and 1 s after (4);
+- the rate of each team's defensive line, 1 s before and after (4); the rate of each team's length and width,
+  2 s before and after (8);
+- the distance of the closest pair of opposing players, and its mean over the second before and after (3);
+- each team's mean speed in the second after minus the second before (2).
+
+A slot counts in a displacement only where it is seen at both ends and did not switch player in between. The
+constants are fixed here: positions averaged over 1 sample either side before differencing; a slot moves
+"forward" above 1.0 m/s; movement above 12.5 m/s is blanked (`build.py`'s value); a slot that lies more than 5 m
+from its previous sighting at more than 12.5 m/s has switched player; a team value needs 3 slots.
+
+The columns go into the LightGBM team head and nowhere else. Two team heads are fitted on every fold with the 213
++ 35 columns: **AK** on A's rows and labels, unweighted, and **AWK** with AW's possession-length weights. Rows,
+labels, weights, parameters, 1,200 trees and seed are the base candidate's. The alive head, the TCN and the
+decoder are the base candidate's, read from its cache. No constant, window or column is changed, dropped or added
+after a score, and no subset of the columns is tried, whatever comes out.
+
+**Rule, for each of the two against its own base** (the rule of A2 and AW2, entry below). With the base's
+9,600-step TCN: AK2 against A2 and AWK2 against AW2. On the 28 folds with the action truth on SkillCorner: at
+`target` at least 70% of folds won and the paired 95% interval above 0; not worse at `severe`. And not worse at
+`target` on the 8 IDSSE + Metrica folds, nor on the 20 SkillCorner folds. A candidate that passes must also meet
+rule 2 against F3, as its base does. AK2 can only replace A2 and AWK2 only AW2. Which of A and AW stands is not
+settled here and is not reopened by this: a pass for one base and a fail for the other gives the columns to that
+base only.
+
+**A pass is not an adoption.** Unlike the longer TCN, this adds code to the inference path: the columns would be
+computed on the provided match's player tracks. Before it could be adopted it needs the pipeline's `train` and
+`predict` to carry the columns, the same model and CSV on the three OSes and the PC, and a human's look at
+aggregates on the provided match (the share of finite values of each column, against the external worlds). The
+cut-off is Nov 14, 18:00 CET. The two who decide may leave a passing KIN out for lack of time.
+
+**Where it runs.** The registered run is the one A2 and AW2 had: the team heads fitted on GitHub's runners by
+`gate.yml` (tag `gha`), the gate on the PC, where the bases' members, the 9,600-step TCNs and F3's cache are.
+The Mac has no 9,600-step TCN. Tonight the Mac fits the same team heads on its own cache and reads them with
+F3's TCN (`AK_f` against `A_f`, `AWK_f` against `AW_f`), and with A's own 4,800-step TCN if that run finishes:
+**information only, read before the registered gate, and named here so that it counts as seen.**
+
+```
+# runners (4 jobs, 7 folds each; every job builds the columns of all 28 matches, then fits its folds)
+gh workflow run gate.yml --ref <branch> -f script=run_kin.py -f stages="kin-gbdt" \
+  -f variants="gha_ak_gbdt1200ak gha_awk_gbdt1200awk" -f shards=4 -f extra="--tag gha --workers 4"
+# the gate, on the PC, after the two folders are in oof/
+uv run python scripts/run_kin.py kin-gate --tag gha --inc f3_gbdt,f3_tcn
+# the Mac, tonight
+uv run python scripts/run_kin.py kin-build --workers 4 && uv run python scripts/run_kin.py kin-check kin-gbdt kin-gate
+```
+
+A file of `run_kin.py` holds a team head's probabilities only. The gate puts them in place of the base's team
+probabilities and takes the alive probabilities and the TCN from the base's files, so a runner needs no cache of
+the base.
+
+**Checks, none of which is a score.**
+
+- `tests/test_kin.py`, synthetic matches only: the one-sided velocities reverse at a scripted turn, and the
+  reversal peaks within a sample of it; a slot that is lost, found again, or taken over by a player 30 to 40 m
+  away is not movement; swapping the teams and rotating the pitch gives the other focal's columns; rows line up
+  with `featurize`; one half does not leak into the other; no column changes when the ball is moved or removed.
+- `kin-build`: every world's corrupted match is recovered with the corpus seeds and checked against the cached
+  features of that world (rows, M0's predictions, the degrader's statistics, the attack directions) before its
+  columns are computed. Done on the Mac at 10:08 CET: 300 worlds of the 28 matches, all
+  recovered; pool 614,802 rows by 213 + 35 columns; no column is constant. On IDSSE and Metrica every column is
+  finite on every pool row. On SkillCorner 21% of pool rows have no value in any of the 35 (fewer than 3 slots
+  of a team in view), and the columns are finite on 0.70 to 0.77 of rows, as the base columns `vx_f_2s` (0.73)
+  and `vx_f_5s` (0.66) are.
+- `kin-check` on fold `idsse/DFL-MAT-J03WMX`: done on the Mac at 10:10 CET. On F3's 213 columns the script's
+  team-head fit gives A's cached team probabilities byte for byte, and with the weights AW's, at both gate
+  worlds. So the only difference between AK and A, and between AWK and AW, is the 35 columns. The pool's rows of
+  that match equal the per-world rows they were drawn from (21,842 of 21,842).
+
+**Already seen when this was written** (so nothing below is blind to them): the three research reads of Nov 12,
+which are where the idea and the 1 s and 2 s windows come from; A's interim gate on the Mac; K at kind 0, S1 and
+S2 against the action truth; the transfer probe; and the results of A, AW, AT, ATW, A2 and AW2 in the entries
+above. No model with these columns has been fitted and no score of one exists.
+
+**Information, decides nothing:** the LightGBM member alone; the reads with F3's TCN and with the 4,800-step
+TCNs; each against F3; possessions found by true length; predicted possessions per true one.
+
+### A2 and AW2 on four machines, and the pipeline's training against the gate's (result)
+
+**Trained on all 30 matches on this PC and on macOS, Ubuntu and Windows runners, A2 and AW2 each give one
+LightGBM model and one dressed CSV. And the pipeline trains, byte for byte, what the gate trained.** Nov 13,
+08:01 to 09:31 CET. External matches only. Nothing is adopted by it.
+
+**Four machines** (`repro.yml` at `761a599`, runs 43382929535 for A2 and 43382925800 for AW2; the PC's fits by
+`D:/katena/tools/pc_ref.sh` in `D:/katena/work-submit`, beside F3's model).
+
+| | A2 | AW2 |
+|---|---|---|
+| Machines | This PC (Windows 10, Intel i7-7700); macOS 15 on Apple M1; Ubuntu 24.04 on AMD EPYC 7763; Windows Server 2025 on AMD EPYC 9V74 | This PC; macOS 15 on Apple M1; Ubuntu 24.04 on AMD EPYC 9V74; Windows Server 2025 on AMD EPYC 7763 |
+| LightGBM member | `eb1030c8ec94...` on all four: A's | `55de693c7ea2...` on all four: AW's |
+| TCN weights | four sets (the PC's: `0f5b9b27ea54...`) | four sets (the PC's: `78a241f571ad...`) |
+| Dressed CSV | `edb8c25495976693...` on all four | `4e0ab1d06ba721a0...` on all four |
+| `bundle.pkl` on the PC | `dfda7e14c88242e6...` | `9b4c2cfaa553af43...` |
+| `train` on the PC | 27 minutes | 26 minutes |
+
+The LightGBM member does not change with the TCN's steps, so it is A's and AW's, which four machines had
+already agreed on. The TCN's bytes differ by OS and CPU, as always, and no label changes with them.
+
+**The pipeline's training against the gate's** (`D:/katena/tools/a_equiv.py`, on the PC, in the gate's cache).
+`katena.pipeline.stage_train` with spec A on the 28 development matches, `idsse/DFL-MAT-J03WMX` held out, gives
+the hashes the gate's fold stored: LightGBM `fad2db189fbe...` and TCN `20c48773980a...`, both equal. So
+`katena.eval.actlabels` hands the final model the labels, the rows and the sequences that `run_a.py` handed the
+gate. The weights' path (AW) has the synthetic test of `tests/test_pipeline.py` and no fold of this kind yet: no
+AW fold has been fitted on the PC.
+
+**Running on the PC until about 13:15:** for AW2 and then A2, the checks F3 had before its adoption (the same
+machine twice, the held-out model down both paths, other torch kernels) and the stress check.
+
 ### A2 and AW2: result; and the PC's own all-30 fits of A and AW (Claude on David's PC; neither David nor Justin has read it)
 
 **Both pass their registered rule: a TCN trained for 9,600 steps is ahead of the same candidate at 4,800 on
@@ -40,6 +280,22 @@ runners, about 12 minutes a fold; the gate on the PC, `scripts/run_x2.py --tag g
 - The longer TCN leaves the count alone: 0.80 and 1.02 predicted possessions per true one for A2, 0.98 and 1.23
   for AW2, on the 8 folds and on SkillCorner.
 - As registered, no other step count is tried.
+
+**A2 and AW2 against F3, with intervals** (the same score file, read on the PC at 08:20 CET; for the documents).
+
+| | A2 against F3 | AW2 against F3 |
+|---|---|---|
+| 8 IDSSE + Metrica folds, `target` | 0.6838 vs 0.6374, +0.0464 [+0.0355, +0.0575], 8/8 | 0.6993 vs 0.6374, +0.0618 [+0.0462, +0.0772], 8/8 |
+| The same at `severe` | 0.6357 vs 0.5900, +0.0457 [+0.0351, +0.0564], 7/8 | 0.6581 vs 0.5900, +0.0681 [+0.0535, +0.0830], 7/8 |
+| 20 SkillCorner folds, action truth, `target` | 0.6712 vs 0.6094, +0.0617 [+0.0528, +0.0706], 20/20 | 0.6657 vs 0.6094, +0.0563 [+0.0455, +0.0666], 18/20 |
+| The same at `severe` | 0.6207 vs 0.5615, +0.0593 [+0.0505, +0.0682], 20/20 | 0.6105 vs 0.5615, +0.0490 [+0.0392, +0.0595], 19/20 |
+| All 28, action truth on SkillCorner, `target` | 0.6748 vs 0.6174, +0.0573 [+0.0503, +0.0644], 28/28 | 0.6753 vs 0.6174, +0.0579 [+0.0494, +0.0657], 26/28 |
+| Rule 1: 28 folds, standing truth, `target` | 0.6120 vs 0.6180, -0.0060 [-0.0123, +0.0002], 10/28 | 0.5996 vs 0.6180, -0.0184 [-0.0264, -0.0108], 8/28 |
+| Rule 1: the 20 SkillCorner folds, standing truth | 0.5833 vs 0.6103, -0.0270 [-0.0349, -0.0190], 2/20 | 0.5597 vs 0.6103, -0.0505 [-0.0598, -0.0412], 0/20 |
+
+Both still fail rule 1 and meet rule 2. The weights at 9,600 steps, by the process that made the truth (AW2 minus
+A2, `target`): +0.024 on the six IDSSE folds, -0.011 on the two Metrica folds, -0.006 on SkillCorner against the
+action truth. Fit times of the PC's all-30 AW: LightGBM 165 s, the TCN 716 s.
 
 **The PC's own fits of A and AW on all 30 matches** (`D:/katena/tools/pc_ref.sh`, in `D:/katena/work-submit`
 beside F3's model, which is untouched; 07:29 to 08:00 CET).
