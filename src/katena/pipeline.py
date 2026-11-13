@@ -39,6 +39,7 @@ from pathlib import Path
 
 import numpy as np
 
+from katena.eval import actlabels as AL
 from katena.eval import corpus as C
 from katena.eval import d2
 from katena.eval import d3
@@ -50,6 +51,7 @@ from katena.eval import touch_gate as TG
 from katena.featurize import touch as TF
 
 T = F.T
+SA_SOURCE = "player_possession events: owner = last touch, interruption gaps = dead ball (katena.external.skillcorner_actions)"
 TAU = F.TAU
 W_TCN = F.W_F
 SEED = 0
@@ -65,10 +67,23 @@ class Spec:
     gbdt_trees: int        # LightGBM rounds of both heads
     tcn_steps: int         # TCN training steps (the one-cycle schedule spans them)
     tcn_touch: bool        # the TCN also reads the touch columns (213 columns instead of 160)
+    sc_actions: bool = False   # SkillCorner matches train on labels from their own action events (candidate A)
+    sc_dead: bool = False      # ... and their rows also train the alive heads (A, AW); not in AT, ATW
+    len_weights: bool = False  # 1 / possession length as the weight of both team heads (AW, ATW)
 
 
 SPECS = {"F": Spec("F", 150, 1200, False),
-         "F3": Spec("F3", F3.N_TREES, F3.STEPS, True)}
+         "F3": Spec("F3", F3.N_TREES, F3.STEPS, True),
+         # Candidates of 2026-11-12 (decision log), trainable here so that an adoption needs no new code. Neither
+         # is the submission model unless SUBMISSION_SPEC names it.
+         "A": Spec("A", F3.N_TREES, F3.STEPS, True, sc_actions=True, sc_dead=True),
+         "AW": Spec("AW", F3.N_TREES, F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True),
+         "AT": Spec("AT", F3.N_TREES, F3.STEPS, True, sc_actions=True),
+         "ATW": Spec("ATW", F3.N_TREES, F3.STEPS, True, sc_actions=True, len_weights=True),
+         # A and AW with a TCN trained twice as long (decision log, 2026-11-13, "A2 and AW2"): the LightGBM
+         # member is A's or AW's, byte for byte.
+         "A2": Spec("A2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True),
+         "AW2": Spec("AW2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True)}
 SUBMISSION_SPEC = "F3"      # the model `make submit` trains and predicts with; changed only by an adoption
 
 
@@ -264,17 +279,35 @@ def stage_train(refs: list, threads: int | None = None, steps: int | None = None
     n_rows, n_cols = pools.X.shape
     log(f"spec {sp.name}; pool: {n_rows} rows x {n_cols} columns ({pools.n_base} base)")
     used = ~np.isin(pools.keys, list(exclude))
-    heads = gbdt.fit_heads(pools.X[used], pools.o[used], pools.y[T][used], pools.dead_ok[used], pools.cols(),
-                           n_trees=sp.gbdt_trees)
+    y, dead_ok, w, wn = pools.y[T], pools.dead_ok, None, None
+    if sp.sc_actions:                 # as the gate's folds: scripts/run_a.py (a_gbdt, act_seqs)
+        n_sc = AL.build_all(refs)
+        y = AL.pool_y(refs, pools, T)
+        if sp.sc_dead:
+            dead_ok = np.ones(n_rows, bool)
+        log(f"action labels on {n_sc} SkillCorner matches: {int((y != pools.y[T]).sum())} of {n_rows} pool rows relabelled")
+    if sp.len_weights:                # as scripts/run_aw.py (aw_gbdt, aw_tcn)
+        wn = AL.native_weights(refs, T)
+        w = AL.pool_weights(refs, wn)
+        if len(w) != n_rows:
+            raise RuntimeError("possession-length weights do not line up with the pool")
+    heads = gbdt.fit_heads(pools.X[used], pools.o[used], y[used], dead_ok[used], pools.cols(),
+                           n_trees=sp.gbdt_trees, team_weight=None if w is None else w[used])
     t1 = time.time()
     log(f"LightGBM member ({sp.gbdt_trees} trees): {t1 - t0:.0f}s")
     tcn_steps = steps or sp.tcn_steps
     if sp.tcn_touch:                  # as the gate's folds: katena.eval.g1 at the spec's steps (katena.eval.f3)
         sc = G1.scaler(pools, exclude)
         seqs = G1.tcn_seqs(refs, T, SEED)
+        if sp.sc_actions:
+            AL.relabel_seqs(refs, seqs, T, dead_ok=sp.sc_dead)
+        if sp.len_weights:
+            AL.weight_seqs(refs, seqs, wn)
         net, sc = G1.fit_tcn(sc, seqs, exclude, SEED, threads, tcn_steps)
         tcn_n_in = n_cols
     else:
+        if sp.sc_actions or sp.len_weights:
+            raise ValueError(f"spec {sp.name}: action labels and length weights are only wired for a TCN on all columns")
         seqs = F.tcn_seqs(refs, T, SEED)
         net, sc = F.fit_tcn(pools, seqs, exclude, SEED, threads, tcn_steps)
         tcn_n_in = int(pools.n_base)
@@ -301,6 +334,10 @@ def stage_train(refs: list, threads: int | None = None, steps: int | None = None
         "sha256": {"gbdt": F.gbdt_hash(heads), "tcn": E.model_hash(net), BUNDLE: sha256_file(out / BUNDLE)},
         "seconds": {"gbdt": round(t1 - t0, 1), "tcn": round(t2 - t1, 1)},
     }
+    if sp.sc_actions:                 # only for these specs, so F's and F3's manifests keep their bytes
+        manifest["labels"] = {"skillcorner": SA_SOURCE, "team_rows": int((y[used] < 2).sum()),
+                              "alive_rows": int((dead_ok[used] & (y[used] < 3)).sum()),
+                              "skillcorner_trains_alive": bool(sp.sc_dead), "length_weights": bool(sp.len_weights)}
     if exclude:
         manifest["held_out"] = sorted(exclude)
         manifest["rows_used"] = int(used.sum())

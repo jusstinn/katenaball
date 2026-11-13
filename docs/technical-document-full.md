@@ -156,6 +156,12 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   median 7.6 s) and placed them among 5-minute windows of IDSSE labels under each label convention. The
   question was whether T = 2 looks implausible. It does not: the counts sit in the middle of the T = 2
   windows, and 17 possessions cannot separate T = 2 from T = 3. Nothing was changed because of this look.
+- **One look at the public window beside the tactical video, labels only.** On Nov 11 one team member watched
+  the public 5 minutes of the tactical video next to the public label file, to understand what counts as
+  possession, as the organisers' clarification of Nov 3 allows. No prediction of ours was on screen and no
+  score was computed. What he saw agrees with the IDSSE convention on loose balls and on dead ball; the two
+  possessions under 2 s in the window are too few to choose T by, and the window may not choose it anyway.
+  Nothing was changed because of this look.
 - **The submission path equals the evaluation path.** We exported an external development match
   (IDSSE `DFL-MAT-J03WMX`) in the provided ATD file format and read it back bit-identical through the real
   loader (`katena.target.atd.load_target`). We trained F without it and labelled it with
@@ -233,8 +239,8 @@ tracking (section 7).
 
 ### 3.4 After F: a larger tree model and a longer-trained TCN (F3, 2026-11-09 to 11)
 
-After F, six more packages were gated on the same 28 folds, each against the model before it and each
-registered before its score. Four failed (section 4). Two passed:
+After F, nine more packages were gated on the same 28 folds, each against the model before it and each
+registered before its score. Seven failed (section 4). Two passed:
 
 | Package | Change, everything else as F | Against | Difference [95% CI] | Wins |
 |---|---|---|---|---|
@@ -299,6 +305,9 @@ registered before its score. Four failed (section 4). Two passed:
 | G2: set-piece tag features in the LightGBM member, imitation tags from external events | +0.0046 [+0.0014, +0.0079], 16/28 (57%) against F | Failed on wins and not adopted. The 8 tagged IDSSE + Metrica folds all gain (+0.023, 8/8); the 20 SkillCorner folds have no events, so no tags, and lose slightly |
 | Possession-length weights (1 / length) in the LightGBM team head | +0.0053 [+0.0004, +0.0101], 17/28 against F3 | Failed on wins. All of the gain is on the 8 IDSSE + Metrica folds, which had been seen; the 20 SkillCorner folds lose slightly |
 | The same weights in the TCN's team loss | +0.0108 [+0.0051, +0.0165], 17/28 against F3 | Failed on wins, and worse at severe on SkillCorner |
+| K1: a label-kind column (1 on SkillCorner rows, 0 on IDSSE and Metrica rows) in the LightGBM team head | +0.0045 [+0.0013, +0.0079], 18/28 against F3 | Failed on wins. +0.0175 on the 8 IDSSE + Metrica folds (8/8), -0.0007 on the 20 SkillCorner folds. Read with the wrong value it loses 0.006 to 0.009 against F3 |
+| K: the same column in the TCN too | +0.0086 [+0.0043, +0.0131], 17/28 against F3 | Failed on wins. +0.0345 on the 8 IDSSE + Metrica folds (8/8), -0.0017 on SkillCorner. Read with the wrong value it loses 0.033 to 0.045 against F3 |
+| B1: a LightGBM model of owner changes within 0.4 s, whose odds scale the Viterbi switch cost frame by frame | +0.0003 [-0.0020, +0.0028], 13/28 against F3 | Failed. The model is weak (mean average precision 0.22 at a base rate of 0.04) |
 | No SkillCorner match in the LightGBM team head | 8 folds, not registered: +0.035, 8/8 | Not gated and not used. Its only folds had been seen, and it would drop the only training matches whose input is automatic broadcast tracking |
 | A smooth-only training mix | 8 folds, not registered: +0.02 in the smooth worlds, -0.09 to -0.13 in the rough ones | Not used. Choosing it would need a statistic of the provided match |
 | Decoder priors from another convention | Under 0.004 | No lever |
@@ -387,8 +396,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
   `Sample_Game_2` included. The effect is probably small but unmeasured.
 - **The development estimate is optimistic.** D1, D2 and D3 were gated on the same 28 folds before F
   combined them. F was registered before its own score, but its parts were chosen knowing their results.
-  Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, six more packages
-  were gated on the same folds (sections 3.4 and 4), each registered before its score: ten in all, besides
+  Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, nine more packages
+  were gated on the same folds (sections 3.4 and 4), each registered before its score: thirteen in all, besides
   the bake-off's models and the six label-convention variants of section 4, which were scored on these folds
   too. The two
   locked benches are the only matches no choice was made on. F's one read there gains about as much as on
@@ -498,7 +507,9 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   (Claude Code), working under the team's direction. The competition's data was kept away from it. The
   repository's rules (`CLAUDE.md`) forbid it to open the data folder, only team members ran anything on the
   provided match, and what those runs print is pass or fail and aggregates: counts, shares and hashes, never
-  a file, a frame or a per-frame value.
+  a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
+  5 minutes (section 3.1) described to it what he saw, in general statements and with estimated times. It
+  saw the public label file, which is in the repository, and no image and no other provided file.
 - **A public file we opened and did not use.** While searching the web for external datasets, an automated
   agent opened a public record that turned out to hold statistics about the provided game. The file was
   deleted. Nothing from it entered the code, the training data or any decision.
