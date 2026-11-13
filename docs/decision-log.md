@@ -83,6 +83,61 @@ against A and AT against AW.
 follows them. And four related candidates on eight seen folds is a choice among four, which the two tests above
 are there to keep honest: each step away from A needs its own interval above 0.
 
+### Where F3 loses, and an audit of the inference path (description; nothing changed in the model)
+
+Two fresh readers, at Claude's request on David's PC, on external matches and synthetic fixtures only. Neither
+opened anything of the provided match. Their scripts are outside the repository (the session's scratch folder),
+so this entry is the record.
+
+**1. Where F3 loses spellF1** (the 28 cached folds of the Windows gate, decoded as the gate decodes them; the
+loader reproduces 0.6180, 0.6374 and 0.6103). Gain in spellF1 from an oracle edit of F3's output:
+
+| Edit | IDSSE + Metrica (8) | SkillCorner (20) |
+|---|---|---|
+| Missed true possessions under 4 s put in | +0.194 | +0.181 |
+| Only those that follow an opponent's possession | +0.183 | +0.124 |
+| Only those where the blended probability leans to the true team | +0.025 | +0.010 |
+| Predicted possessions that match nothing taken out | +0.033 | +0.049 |
+| True alive/dead with the predicted team | +0.024 | 0 |
+| Every boundary within 1.0 s of a true one moved onto it | +0.017 | +0.007 |
+| The best fixed tau and switch cost | +0.008 | +0.002 |
+| Every label 0.2 s earlier | +0.003 | 0.000 |
+
+- **The points are in short possessions after an opponent's, and the probabilities do not show them.** They are
+  26% of the true possessions on IDSSE + Metrica, and 11% are found (46% of the short ones that follow dead
+  ball). In the missed ones the blend leans to the true team 41% of the time; where the decoder gave the spell to
+  the other team, 9%. No decoder setting recovers what the members do not see.
+- **Timing is not where the points are.** Team changes are a median of 0.2 s late on IDSSE and Metrica and on
+  time on SkillCorner; restarts are on time (quartiles -0.12 and +0.08 s). Moving team changes 0.4 s earlier
+  gives +0.004 on IDSSE + Metrica and -0.003 on SkillCorner.
+- **Dead ball is mostly found:** 93% of stoppages (IDSSE 95%, Metrica 85%), and 96% of the predicted ones are
+  real. Metrica's stoppages start a median of 0.9 s late, as section 7 of the technical document says of its labels.
+- **The labels have a step at 2 s and the model has a ramp.** An opponent's spell between two spells of the
+  same team is decoded as one 26% of the time at 1.5 to 2 s, 33% at 2 to 2.5 s, 55% at 3 to 4 s and 78% at 4 to
+  6 s.
+- **The TCN is the better member almost everywhere** (right in 66% of the samples where the two disagree on
+  IDSSE + Metrica), but both are wrong on 36% of the samples inside possessions under 4 s. A TCN weight of 0.75
+  is +0.0041 on 28 folds with 17 won: it fails the rule.
+- **The same output scored against labels that also merge a short touch running straight out of play**
+  (`tail`, section 6 of the technical document) is 0.6728 on IDSSE + Metrica, against 0.6374. That is the size
+  of what the unknown convention can do to the level, in either direction, with no model change.
+
+**2. Audit of the inference path** (the real loader, `label_match`, features, both members, decoder, expansion to
+frames; experiments on the dressed external match and on synthetic hand-overs).
+
+| Finding | Evidence | What was done |
+|---|---|---|
+| Training and inference are time-aligned | Dressed match: all transitions -0.65 +- 0.72 frames, median 0; synthetic exact hand-overs: median +3 frames; the score peaks at zero shift; the 5 Hz phase of a half moves boundaries by under 0.2 frames | Nothing to do |
+| The decoder subtracts class priors that differ for H and A (0.295 and 0.258, from the external labels), although the team probability is symmetric by construction | It asks for p(home) above 0.534. With the two averaged: +0.0000 at `target` (12/28), +0.0027 at `severe`, +0.0036 in `target_smooth` (18/28) | Left: no gain at `target`, and it would change F3's decoder |
+| The TCN is applied to a whole half in one pass, but trained on 256-sample windows, so its GroupNorm sees other statistics | Held-out model on the dressed match, five conditions: applying it in 256-sample windows lowers its log-loss by 1 to 9% (alive) and about 1% (team) every time; spellF1 moves by -0.0002 to +0.0056 | Left: one match, and a change to the inference path three days before the deadline |
+| `spd_nearest_f` and `spd_nearest_o` read the speed of each team's first slot when no ball is available | 0.3% of split gain; forcing them empty changes 40 frames of 70,507 and no score | Left for the next retrain of features, which is not planned |
+| A ball tracked outside the lines carries the alive head (three such features in its top eight). If the provided tracking never reports the ball off the pitch, the dressed match loses 0.03 at clean and at target-like input | Dressed match with the ball removed when outside: 0.722 to 0.688, 0.679 to 0.648 | Nothing chosen. The coupled worlds of `d2j` already train with the ball mostly missing in stoppages |
+| `check_target.py` passed when a direction was found and flipped at half-time, which a direction wrong in both halves also does | The two teams' mean positions are 10.9 m or more apart on all 60 external halves | PR #33: the check also asks for 8 m in both halves, pass or fail only |
+
+Checked and fine: tracked frames outside the halves and 14 extra empty slots change no label; no feature uses a
+frame index, the clock or the pitch size; a half that opens 117 s before its kickoff is labelled dead to within 4
+frames of the kickoff by the model alone; the 213 column names, the scaler and the clipping before the logit.
+
 ### When each provider's owner changes (web research, public pages only; nothing downloaded besides three PDFs read)
 
 **Nothing was fitted, scored or chosen.** A research agent, at Claude's request on David's PC, read providers'
