@@ -6,6 +6,83 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### AT and ATW (pre-registration): A's team labels with F3's alive/dead training; and the candidates on GitHub's runners
+
+**Written at 03:30 CET on Nov 13, before any score of A, AW, AT or ATW is known on this side.** The PC's A run is
+in its LightGBM stage and its gate has not run; the Mac's branch still ends at `e5550c4`, with no result. Claude
+on David's PC; Justin has not seen it. The 16th and 17th packages on the same 28 folds. Code:
+`scripts/run_at.py`. External development matches only.
+
+**A's entry says no other variant is tried.** AT is one, and this entry does not hide that. It comes from David's
+side and from readings that saw no score of A: a code review of A's labels (a fresh reader; labels and events
+only, no model output) and an error analysis of F3's cached folds. Justin can refuse it; then AT and ATW are
+information and nothing more.
+
+**Why.**
+
+- **The review found no bug.** A second implementation written from the registration's text gives A's labels on
+  all 20 matches, frame for frame, and the table and row counts of A's entry come out exactly.
+- **It found that A's dead-ball boundaries are weaker than its owner changes.** Of 1,851 flagged stoppages, 228
+  take their start from the broadcast cutting away, a median of 6.5 to 9.1 s after the last touch, depending on
+  the kind of stoppage; 138 of them are free kicks, where the ball never leaves the pitch. Placing those starts
+  1.0 s after the last touch instead would turn 18,267 frames (2.8% of the team-labelled ones) from a team into
+  dead ball: the ball moves 3.2 m a second on them (2.6 on A's dead frames, 6.3 on its live ones), and the
+  standing label is unknown on 81.5% of them. Restarts sit 1.0 s before the reception, by a constant.
+- **F3's alive/dead is already good where it can be measured.** On the 8 IDSSE + Metrica folds F3 finds 93% of
+  the stoppages and times restarts to a median of 0.00 s (quartiles -0.12 and +0.08). The true alive/dead
+  pattern would add 0.024 spellF1 there.
+- **What F3 lacks is short possessions after an opponent's.** They are 26% of the true possessions on those
+  folds and F3 finds 11% of them; putting in the missed ones under 4 s would add 0.19. Boundary timing, the
+  decoder and the blend weight are each worth under 0.02.
+- **So A can gain through its owner labels and lose through its dead-ball labels.** In A the SkillCorner rows
+  become 66% of the alive head's rows (336,097 of 507,549), with boundaries that a constant or a cutaway sets.
+
+**The change, and nothing else.**
+
+| | Team heads | Alive/dead |
+|---|---|---|
+| **AT** | A's. The LightGBM team head is A's cached one. The TCN's team loss reads the action labels on SkillCorner rows and the standing labels elsewhere | F3's. The LightGBM alive head is F3's cached one. The TCN's alive loss reads IDSSE and Metrica sequences only |
+| **ATW** | AW's. The LightGBM team head is AW's cached one. The TCN's team loss carries AW's weights (`lenweight.inv_length` of the label each frame trains on) | As AT |
+
+No LightGBM model is fitted for either: only the two TCNs, at F3's sizes and seed. Labels, constants, T = 2,
+the folds and the decoder's priors are A's. The label rule itself is not changed: an amended rule would be one
+more variant, and with F3's alive/dead training the frames it would move train nothing but a team head.
+
+**Rules.** The two rules of A's entry, word for word, with AT or ATW in A's place, against F3. Rule 2 counts only
+with David's and Justin's names, as there (David's side: the entry below).
+
+**Which candidate stands, under whichever rule is in force.** Only candidates that pass that rule against F3
+are eligible. Two paired tests choose among them, each at `target` on that rule's folds (28 on the standing
+truth for rule 1, the 8 IDSSE + Metrica folds for rule 2), and each needs a 95% interval above 0 to leave the
+simpler choice:
+
+1. **Weights**, inside each alive/dead design: AW over A as AW's entry says, and ATW over AT the same way. If
+   only one of a pair is eligible, it stands for its design.
+2. **Alive/dead training:** the AT-side candidate replaces the A-side one only if it is ahead of it with the
+   interval above 0. If only one side has an eligible candidate, that one stands.
+
+If none is eligible, F3 stands. Adoption is David's and Justin's either way, before Nov 14, 18:00 CET.
+
+**Machines.** The Mac's and the PC's runs of A go on as registered. In addition A, AW, AT and ATW are fitted on
+GitHub's Ubuntu runners with the new `gate.yml` (PR #32): the last `repro.yml` run trained F3 on all 30 matches
+in under 6 minutes there, against about 20 on the PC. Each candidate takes 4 jobs of 7 folds; files made on a
+runner carry the tag `gha`. No score is computed on a runner: the gate stages run on the PC against F3's cached
+members there.
+
+- A LightGBM member from a runner must carry the hash of the same fold fitted on the PC. A's are being fitted
+  on the PC now, so that is checked before a score of a runner-made candidate is read.
+- A TCN from a runner differs from the PC's in its last bits. When the PC's own A is done, A is scored with each
+  machine's members and the two are reported side by side. That difference is the noise floor for reading the
+  other three, which have no second machine.
+
+**Information, decides nothing:** each member alone; A's LightGBM team head alone in F3; AT's TCN alone in F3;
+alive/dead F1, team accuracy and predicted possessions per true one; true possessions found by length; ATW
+against A and AT against AW.
+
+**What it cannot show.** The same as A's entry: that the action labels are right, or that the provided match
+follows them. And four related candidates on eight seen folds is a choice among four, which the two tests above
+are there to keep honest: each step away from A needs its own interval above 0.
+
 ### A team head that never saw a SkillCorner label, on the action truth (information; written before the read)
 
 **Written at 02:55 CET on Nov 13, before the script was run.** Claude on David's PC. It adopts nothing, no
