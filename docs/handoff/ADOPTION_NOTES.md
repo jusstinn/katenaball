@@ -1,6 +1,6 @@
 # Adoption notes for `david/adopt-docs`
 
-**Status, Nov 13, 13:45 CET.** Of the tokens in part 0, the reproduction, hash and training-time ones are filled
+**Status, Nov 13, 13:25 CET.** Of the tokens in part 0, the reproduction, hash and training-time ones are filled
 in (four machines gave one LightGBM member and one dressed CSV for AW2; `train` took 26 minutes on the PC). Only
 `PENDING_JUSTIN_NAME` is left, three places. Nothing here is adopted: the documents on this branch describe AW2
 as the submitted model so that an adoption needs no new text, and they must not reach main before both names
