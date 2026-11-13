@@ -6,6 +6,55 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### AW on Justin's Mac: result (AW's second kind of machine), and KIN beside AW's own TCN (information)
+
+**The Mac's own run of AW gives the runners' numbers in every row read here: AW fails rule 1 and meets rule 2,
+and AW against A on the 8 folds is +0.0160 [+0.0041, +0.0282] again. Beside AW's own 4,800-step TCN the 35 KIN
+columns add nothing at `target` (-0.0002 [-0.0026, +0.0024], 17/28), which agrees with the registered gate on
+David's side: KIN is closed. Nothing is decided or adopted by this entry.** Claude on Justin's Mac, read at
+16:35 CET on Nov 13; Justin has not read it. External development matches only. This ends the Mac's runs; no
+further candidate is planned on this side.
+
+**AW.** `scripts/run_aw.py aw-gbdt aw-tcn aw-gate`, no tag, the Mac's own cache (Apple M5, macOS): LightGBM
+23:36 to 00:14 CET on Nov 12 to 13; the TCN 12:14 to 16:23 CET on Nov 13, 249 minutes in one process on the
+charger; the gate 1 minute, with the checkout at `1dcfe99`. The script prints "registered run".
+
+| AW, `target` | This Mac (macOS) | GitHub runners, entry of Nov 13 below |
+|---|---|---|
+| Rule 1: against F3, 28 folds, standing truth | 0.5956, -0.0224 [-0.0302, -0.0148], 8/28 | -0.0224 |
+| Rule 2: against F3, 8 IDSSE + Metrica folds | 0.6923, +0.0548 [+0.0399, +0.0697], 8/8 | 0.6923 |
+| Rule 2: the same at `severe` | 0.6513, +0.0613 [+0.0470, +0.0764], 6/8 | not compared |
+| Rule 2: against F3, 20 SkillCorner folds, action truth | 0.6586, +0.0491 [+0.0387, +0.0597], 19/20 | 0.6586 |
+| All 28, action truth on SkillCorner | 0.6682, +0.0507 [+0.0423, +0.0586], 27/28 | 0.6682 |
+| AW against A, 8 IDSSE + Metrica folds | +0.0160 [+0.0041, +0.0282], 5/8 | +0.0160 [+0.0041, +0.0282] |
+| AW against A, 20 SkillCorner folds, action truth | -0.0060 [-0.0133, +0.0017], 7/20 | not compared |
+
+- **The same verdicts on a second kind of machine**, and the same means to the fourth decimal where the runners'
+  entry gives one. Per-fold scores were not compared: the runners' score file is not here.
+- AW against A on all 28 folds with the action truth on SkillCorner is +0.0003 [-0.0061, +0.0067], 12/28: the
+  gain on the 8 folds and the loss on SkillCorner cancel, as David's side wrote. At `severe` on SkillCorner
+  against the action truth AW is worse than A (-0.0106 [-0.0184, -0.0027]).
+- Checks: F3's scores in the gate equal the stored ones, 56 of 56; AW's alive head equals A's, 28 of 28.
+
+**KIN beside AW's own 4,800-step TCN, all 28 folds** (`scripts/run_kin.py kin-gate`; information only).
+
+| AWK against AW, AW's own 4,800-step TCN | Folds | AWK | AW | Diff [95% CI] | Wins |
+|---|---|---|---|---|---|
+| `target`, all, action truth on SkillCorner | 28 | 0.6680 | 0.6682 | -0.0002 [-0.0026, +0.0024] | 17/28 |
+| `target`, 8 IDSSE + Metrica folds | 8 | 0.6936 | 0.6923 | +0.0013 [-0.0039, +0.0064] | 5/8 |
+| `target`, 20 SkillCorner folds, action truth | 20 | 0.6578 | 0.6586 | -0.0007 [-0.0035, +0.0021] | 12/20 |
+| `severe`, all, action truth on SkillCorner | 28 | 0.6200 | 0.6163 | +0.0037 [+0.0003, +0.0069] | 19/28 |
+
+- By KIN's rule this reading fails, as the registered one did (AWK2 against AW2 +0.0008 [-0.0016, +0.0032],
+  13/28, David's entry below). With the weights the base already finds the short possessions (2 to 4 s at IoU
+  0.5: 0.53 on the 8 folds, 0.55 on SkillCorner against the action truth), and the columns add 0.03 and 0.00.
+- The whole series for the columns, `target`, all 28 folds, action truth on SkillCorner: beside F3's TCN +0.0086
+  (A) and +0.0095 (AW); beside the base's own 4,800-step TCN +0.0033 and -0.0002; beside the 9,600-step TCN
+  +0.0015 and +0.0008. The better the TCN, the less the team head's columns are worth.
+
+**What it does not show.** Anything about AW2 or A2 beyond what David's entries hold, and anything about the
+provided match.
+
 ### KIN: result of the registered gate (Claude on David's PC; neither David nor Justin has read it)
 
 **KIN fails its registered rule for both bases: beside the 9,600-step TCNs the 35 columns add +0.0015 (AK2
