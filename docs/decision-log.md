@@ -4,6 +4,63 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-13
+
+### A on the Windows PC (pre-registration): the second-machine run, and David's side on rule 2
+
+**Written at 02:45 CET on Nov 13, before any score of A or of AW is known on this side.** Claude on David's PC,
+at David's request ("pull and check what justin has done ... try out stuff ... improve the score"). The branch
+`claude/status-check-7809aa` at `e5550c4` holds A's and AW's registrations and code and no result; whether the
+Mac's run has finished is not known here. External development matches only.
+
+**What runs.** `scripts/run_a.py a-labels a-check a-gbdt a-tcn a-gate --inc f3_gbdt,f3_tcn`, at this commit, in
+`D:/katena/work-f3` (the cache of F3's Windows gate of Nov 11; A's files are added beside it and nothing of F3's
+is rewritten). Nothing of A's registration (Nov 12, below) changes: the labels, the two 1.0 s constants, T = 2,
+the sizes, the seeds, the 28 folds, the two truths and the two rules. The incumbent is F3 as cached on this PC
+(0.6180 at `target`, 0.5840 at `severe`).
+
+**What it is for.**
+
+- F3 was adopted only after its gate had been repeated on this PC (Nov 11). A gets the same before anyone
+  decides on it.
+- The PC is the reference machine. If A is adopted, its all-30 model and the expected hashes are made here.
+- It puts A's out-of-fold probabilities on this PC, so anything built on A can be gated here.
+
+**What it is not.** New evidence: the folds are the Mac's. It adopts nothing.
+
+**How the two machines are read together.** As for F3: the run agrees with the Mac's if rule 1 and rule 2 give
+the same verdicts and the means at `target` on the 28, the 20 and the 8 folds differ by at most 0.002. If they
+disagree, A is not adopted until the reason is known.
+
+**Seen before this entry** (no model output, no score): `a-labels` on this PC gives the Mac's table to the
+digits printed (home 0.280, away 0.273, dead 0.206, unknown 0.242; 239 possessions a match; agreement with the
+standing label 0.847), so the labels are the same on both machines at that resolution.
+
+**AW on this PC** follows A under its own registration, unchanged, if the PC is free before the cut-off. No
+other variant of A is run here.
+
+**David's side on rule 2 (Claude, under David's hand-over of Nov 12; David has not read this and can withdraw
+it).** A's entry says rule 2 counts only if David and Justin both put their names to it. David's side agrees to
+rule 2 as declared there, for A and for AW, now, while no score of either is known here. The reasons are public
+documents, not scores:
+
+- `CHALLENGE.md`: the ground truth has a dead-ball label, names an owner on every live frame, keeps the last
+  team on a loose ball, and changes owner when the other team gains control. That is the IDSSE and Metrica kind
+  of label. The standing SkillCorner label has no dead ball, is unknown on 46% of in-play frames, and (the probe
+  of Nov 12) changes a median of 1.0 s before the new team's first touch.
+- `EVALUATION.md`: a prediction that is perfect but 1 s late scores 0.65. So which mechanics the team head
+  learns is worth more than anything the 28-fold rule has passed since F.
+- Rule 1 scores 20 of its 28 folds against the standing SkillCorner label. Five candidates in a row (S1, S2, K1,
+  K, and the unregistered probe without SkillCorner) gained 0.017 to 0.038 on the 8 folds of the other kind,
+  each on 8 of 8, and the four that were gated failed on folds won. A rule that cannot pass a change of that
+  kind cannot judge one.
+
+It is a bet on the documentation, and the entry says so: if the provided match's ground truth behaved as the
+standing SkillCorner label does, a model that meets rule 2 would lose to F3 by about what K loses with the wrong
+value (0.03 to 0.045). **Justin's name is still needed, and adoption stays a separate decision of both.**
+
+**Cost.** LightGBM about 55 minutes, the TCN about 3.4 hours in two processes.
+
 ## 2026-11-12
 
 ### AW (pre-registration): A with possession-length weights; an amendment to A's entry
