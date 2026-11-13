@@ -170,6 +170,25 @@ the same arrays written on Linux or macOS: Python's `zipfile` records the writin
 computed on x86-64 has its sign bit set and one computed on arm64 does not. A stage whose arrays differ only
 in NaN bits is reported as `nan_payload`, not as a difference.
 
+## Gate stages on runners (gate)
+
+`gate.yml` runs the model-fitting stages of a leave-one-match-out gate on GitHub's runners, so a candidate does not
+wait for a laptop. It runs only when dispatched, never sees the competition match, and computes no score.
+
+```bash
+gh workflow run gate.yml --ref <branch> -f script=run_a.py -f stages="a-gbdt a-tcn"   -f variants="a_gbdt1200a a_tcn4800ta" -f shards=4
+```
+
+- **Register first.** The candidate's entry is in `docs/decision-log.md`, on the dispatched ref, before the run.
+- **Each job** builds the external corpus and the cache from empty as `repro.yml` does (about 20 minutes), takes
+  every `shards`-th of the 28 development folds, and runs `scripts/<script> <stages> --folds <its folds>`.
+- **It uploads** the out-of-fold probabilities of those external matches (`oof/<variant>/`), the stage log and the
+  runner's CPU and versions. Nothing of the provided match exists on a runner.
+- **The gate is run afterwards** where the incumbent's cache is: download the artifacts (`gh run download <id>`),
+  copy each `oof/<variant>/T2/*.npz` into `KATENA_WORK/oof/<variant>/T2/`, and run the script's gate stage.
+- **Read with care.** LightGBM members are byte-identical across our machines; a TCN trained on a runner differs
+  from the PC's in its last bits (see repro above), so its scores can differ in the fourth decimal.
+
 ## CD
 
 The submission cannot be built in hosted CI. CD here is two things:

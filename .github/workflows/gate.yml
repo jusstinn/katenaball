@@ -1,0 +1,215 @@
+# Leave-one-match-out gate stages on GitHub's runners. What it runs and how to read it: docs/ci.md.
+#
+# It never sees the competition match. Each job builds the public external corpus from its SHA-256-pinned sources
+# and the cache from empty, exactly as repro.yml does, then runs the chosen stages of one gate script
+# (scripts/run_*.py) on its share of the 28 external development folds, and uploads the out-of-fold probabilities
+# of those external matches. No score is computed here: the gate itself (tables and verdict) is run afterwards,
+# on a machine that holds the incumbent's cache, from the registered script.
+#
+# Runs on demand only. Every candidate must be registered in docs/decision-log.md before its stages are dispatched.
+name: Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: Gate script under scripts/ (for example run_a.py)
+        required: true
+        type: string
+      stages:
+        description: Stages to run in each job, in order (for example "a-gbdt a-tcn")
+        required: true
+        type: string
+      variants:
+        description: Folders under oof/ to upload, space separated (for example "a_gbdt1200a a_tcn4800ta")
+        required: true
+        type: string
+      shards:
+        description: Parallel jobs the 28 folds are split over
+        type: choice
+        default: "4"
+        options: ["1", "2", "4", "7"]
+      extra:
+        description: Extra arguments for the script (for example "--tag smoke --steps 20 --trees 20")
+        type: string
+        default: ""
+
+concurrency:
+  group: gate-${{ github.ref_name }}-${{ inputs.script }}-${{ inputs.stages }}-${{ inputs.extra }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  UV_VERSION: "0.13.1"
+  UV_PYTHON: "3.11.17"
+  PYTHONUNBUFFERED: "1"
+  SCRIPT: ${{ inputs.script }}
+  STAGES: ${{ inputs.stages }}
+  VARIANTS: ${{ inputs.variants }}
+  SHARDS: ${{ inputs.shards }}
+  EXTRA: ${{ inputs.extra }}
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the request and split the folds
+        id: m
+        run: |
+          # Inputs reach the shell through the environment only, and only in these shapes.
+          [[ "$SCRIPT" =~ ^run_[a-z0-9_]+\.py$ ]] || { echo "::error::script must be a scripts/run_*.py name"; exit 1; }
+          [ -f "scripts/$SCRIPT" ] || { echo "::error::scripts/$SCRIPT is not on this ref"; exit 1; }
+          [[ "$STAGES" =~ ^[a-z0-9][a-z0-9\ -]*$ ]] || { echo "::error::stages: lower-case names separated by spaces"; exit 1; }
+          [[ "$VARIANTS" =~ ^[A-Za-z0-9_][A-Za-z0-9_\ ]*$ ]] || { echo "::error::variants: folder names separated by spaces"; exit 1; }
+          [[ "$EXTRA" =~ ^[A-Za-z0-9_\ ,./=-]*$ ]] || { echo "::error::extra: plain options only"; exit 1; }
+          m=$(jq -cn --argjson n "$SHARDS" '{shard: [range(0; $n)]}')
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+          echo "scripts/$SCRIPT $STAGES $EXTRA; $SHARDS jobs; uploads: $VARIANTS; ref $GITHUB_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  gate:
+    name: folds ${{ matrix.shard }} of ${{ inputs.shards }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 345
+    env:
+      KATENA_EXTERNAL: ${{ github.workspace }}/external_data
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Free disk space; put the cache on the roomiest disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift /usr/local/share/powershell \
+            /usr/local/share/chromium /opt/microsoft /opt/google /opt/az
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          { sudo mkdir -p /mnt/katena && sudo chown "$(id -u):$(id -g)" /mnt/katena; } || true
+          best="" bestkb=0
+          for d in "$RUNNER_TEMP" /mnt/katena; do
+            [ -d "$d" ] && [ -w "$d" ] || continue
+            kb=$(df -Pk "$d" | awk 'NR==2 {print $4}')
+            echo "$d: $((kb / 1048576)) GB free"
+            if [ "${kb:-0}" -gt "$bestkb" ]; then best=$d bestkb=$kb; fi
+          done
+          out="$RUNNER_TEMP/gate"
+          mkdir -p "$out"
+          {
+            echo "PY=$GITHUB_WORKSPACE/.venv/bin/python"
+            echo "KATENA_WORK=$best/work"
+            echo "OUT=$out"
+          } >> "$GITHUB_ENV"
+          echo "cache on $best ($((bestkb / 1048576)) GB free)"
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: full
+          prune-cache: true
+
+      - name: Install the locked environment
+        run: uv sync --frozen
+
+      - name: Versions and CPU
+        run: |
+          "$PY" scripts/repro_ci.py env --out "$OUT/env-$SHARD.json"
+          echo "WORKERS=$("$PY" -c 'import os; print(os.cpu_count())')" >> "$GITHUB_ENV"
+          grep -m1 "model name" /proc/cpuinfo || true
+
+      - name: Restore the external raw downloads
+        id: raw
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            external_data/idsse/raw
+            external_data/metrica/repo
+            external_data/skillcorner/repo
+          key: external-raw-v1-${{ runner.os }}-${{ hashFiles('scripts/external_manifest.json') }}
+
+      - name: External corpus (download if not restored, verify SHA-256, build the canonical matches)
+        run: |
+          "$PY" scripts/build_external.py
+          git diff --exit-code --stat -- scripts/external_manifest.json
+
+      - name: Save the external raw downloads
+        if: steps.raw.outputs.cache-hit != 'true'
+        continue-on-error: true        # parallel jobs race for the same key; one wins
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            external_data/idsse/raw
+            external_data/metrica/repo
+            external_data/skillcorner/repo
+          key: ${{ steps.raw.outputs.cache-primary-key }}
+
+      - name: Cache (corpus and worlds, as make_submission.py builds them)
+        run: |
+          "$PY" scripts/make_submission.py corpus --workers "$WORKERS"
+          "$PY" scripts/make_submission.py worlds --workers "$WORKERS"
+
+      - name: This job's folds
+        run: |
+          folds=$("$PY" - "$SHARDS" "$SHARD" <<'EOF'
+          import sys
+          sys.path[:0] = ["src", "evaluation"]
+          from katena.eval import final as F
+          n, k = int(sys.argv[1]), int(sys.argv[2])
+          print(",".join(r.key for i, r in enumerate(F.dev_refs()) if i % n == k))
+          EOF
+          )
+          [ -n "$folds" ] || { echo "::error::no folds for shard $SHARD of $SHARDS"; exit 1; }
+          echo "FOLDS=$folds" >> "$GITHUB_ENV"
+          echo "folds: $folds" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Stages
+        run: |
+          set -o pipefail
+          # shellcheck disable=SC2086  # STAGES and EXTRA are word lists, checked in the plan job
+          "$PY" "scripts/$SCRIPT" $STAGES --folds "$FOLDS" $EXTRA 2>&1 | tee "$OUT/stages-$SHARD.log"
+
+      - name: Collect the out-of-fold files of this job's folds
+        if: ${{ !cancelled() }}
+        run: |
+          n=0
+          for v in $VARIANTS; do
+            [ -d "$KATENA_WORK/oof/$v" ] || { echo "::warning::no oof/$v in the cache"; continue; }
+            mkdir -p "$OUT/oof/$v"
+            cp -r "$KATENA_WORK/oof/$v/." "$OUT/oof/$v/"
+            k=$(find "$OUT/oof/$v" -name '*.npz' | wc -l)
+            echo "oof/$v: $k files" | tee -a "$GITHUB_STEP_SUMMARY"
+            n=$((n + k))
+          done
+          find "$OUT/oof" -name '*.claim' -delete 2>/dev/null || true
+          [ "$n" -gt 0 ] || echo "::warning::nothing to upload"
+          df -h | head -5
+
+      - name: Upload (out-of-fold probabilities of external matches, the log, the machine)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gate-${{ matrix.shard }}
+          path: |
+            ${{ env.OUT }}/oof
+            ${{ env.OUT }}/stages-${{ matrix.shard }}.log
+            ${{ env.OUT }}/env-${{ matrix.shard }}.json
+          if-no-files-found: warn
+          retention-days: 30
