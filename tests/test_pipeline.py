@@ -165,17 +165,17 @@ def test_specs_a_and_aw_train_on_action_labels(synth_corpus, monkeypatch):
     from katena.external import skillcorner_actions as SA
     from katena.models import gbdt
 
-    def fake_actions(match_dir, m):                     # the standing label with H and A swapped early in half 1
+    def fake_actions(match_dir, m):                     # the standing label with H and A swapped
         assert Path(match_dir).name == "SYN3"
-        y = m.y.copy()
-        seg = y[100:400]
-        y[100:400] = np.where(seg == 0, 1, np.where(seg == 1, 0, seg))
-        return y
+        return np.where(m.y == 0, 1, np.where(m.y == 1, 0, m.y)).astype(m.y.dtype)
 
     monkeypatch.setattr(SA, "build_labels", fake_actions)
     monkeypatch.setattr(P, "EXTERNAL", synth_corpus / "external")
-    for name, sp in (("F3", PL.Spec("F3", 20, 4800, True)), ("A", PL.Spec("A", 20, 4800, True, sc_actions=True)),
-                     ("AW", PL.Spec("AW", 20, 4800, True, sc_actions=True, len_weights=True))):
+    for name, sp in (("F3", PL.Spec("F3", 20, 4800, True)),
+                     ("A", PL.Spec("A", 20, 4800, True, sc_actions=True, sc_dead=True)),
+                     ("AW", PL.Spec("AW", 20, 4800, True, sc_actions=True, sc_dead=True, len_weights=True)),
+                     ("AT", PL.Spec("AT", 20, 4800, True, sc_actions=True)),
+                     ("ATW", PL.Spec("ATW", 20, 4800, True, sc_actions=True, len_weights=True))):
         monkeypatch.setitem(PL.SPECS, name, sp)
     refs, _, _, man3 = _train(monkeypatch, synth_corpus / "a", spec="F3")
     man_a = PL.stage_train(refs, threads=2, steps=2, spec="A")
@@ -198,6 +198,16 @@ def test_specs_a_and_aw_train_on_action_labels(synth_corpus, monkeypatch):
     assert w.gbdt_alive == a.gbdt_alive and w.gbdt_team != a.gbdt_team
     assert f3.gbdt_team != a.gbdt_team and f3.gbdt_alive != a.gbdt_alive
     assert len({man3["sha256"]["tcn"], man_a["sha256"]["tcn"], man_w["sha256"]["tcn"]}) == 3
+
+    # AT and ATW: A's and AW's team heads with F3's alive head; their TCNs are their own
+    man_t = PL.stage_train(refs, threads=2, steps=2, spec="AT")
+    man_tw = PL.stage_train(refs, threads=2, steps=2, spec="ATW")
+    at, atw = PL.load_model(spec="AT"), PL.load_model(spec="ATW")
+    assert at.gbdt_team == a.gbdt_team and at.gbdt_alive == f3.gbdt_alive
+    assert atw.gbdt_team == w.gbdt_team and atw.gbdt_alive == f3.gbdt_alive
+    assert man_t["labels"]["skillcorner_trains_alive"] is False and man_a["labels"]["skillcorner_trains_alive"] is True
+    assert man_t["labels"]["alive_rows"] == int((pools.dead_ok & (pools.y[P.T_MAIN] < 3)).sum())
+    assert len({m["sha256"]["tcn"] for m in (man3, man_a, man_w, man_t, man_tw)}) == 5
 
     # the TCN sequences: SkillCorner ones relabelled and dead_ok, the others as they were
     base, seqs = G1.tcn_seqs(refs, P.T_MAIN, PL.SEED), G1.tcn_seqs(refs, P.T_MAIN, PL.SEED)

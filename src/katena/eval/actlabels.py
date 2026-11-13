@@ -8,8 +8,9 @@ module only carries its labels to the rows the members train on. ``scripts/run_a
 them from here. External matches only.
 
 * An IDSSE or Metrica match is never touched: ``load`` returns its standing truth.
-* A SkillCorner match gets the action labels, then the sandwich merge of every other label (``labels.relabel``),
-  and counts as a source with a dead-ball label (``dead_ok``).
+* A SkillCorner match gets the action labels, then the sandwich merge of every other label (``labels.relabel``).
+  In A and AW it also counts as a source with a dead-ball label (``dead_ok``); in AT and ATW (``scripts/run_at.py``)
+  its rows train the team heads only.
 """
 
 from __future__ import annotations
@@ -100,9 +101,10 @@ def _seq_idx(r: P.Ref, world: str, n: int) -> np.ndarray:
     return idx
 
 
-def relabel_seqs(refs: list, seqs: dict, t: int = T) -> int:
+def relabel_seqs(refs: list, seqs: dict, t: int = T, dead_ok: bool = True) -> int:
     """Give the SkillCorner sequences of ``seqs`` (``final.tcn_seqs`` / ``g1.tcn_seqs``: keyed (match, world))
-    their action labels and ``dead_ok``, in place. Returns how many sequences changed."""
+    their action labels, in place. With ``dead_ok`` they also train the TCN's alive output (A, AW); without it
+    the alive loss keeps reading IDSSE and Metrica only (AT, ATW). Returns how many sequences changed."""
     by_key = {r.key: r for r in refs}
     n = 0
     for (key, world), s in seqs.items():
@@ -110,7 +112,7 @@ def relabel_seqs(refs: list, seqs: dict, t: int = T) -> int:
         if not r.is_sc:
             continue
         g = load(r, t)
-        s["y"], s["dead_ok"] = g["y"][::g["step"]][_seq_idx(r, world, len(s["y"]))], True
+        s["y"], s["dead_ok"] = g["y"][::g["step"]][_seq_idx(r, world, len(s["y"]))], bool(dead_ok)
         n += 1
     return n
 

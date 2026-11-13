@@ -68,15 +68,18 @@ class Spec:
     tcn_steps: int         # TCN training steps (the one-cycle schedule spans them)
     tcn_touch: bool        # the TCN also reads the touch columns (213 columns instead of 160)
     sc_actions: bool = False   # SkillCorner matches train on labels from their own action events (candidate A)
-    len_weights: bool = False  # 1 / possession length as the weight of both team heads (candidate AW)
+    sc_dead: bool = False      # ... and their rows also train the alive heads (A, AW); not in AT, ATW
+    len_weights: bool = False  # 1 / possession length as the weight of both team heads (AW, ATW)
 
 
 SPECS = {"F": Spec("F", 150, 1200, False),
          "F3": Spec("F3", F3.N_TREES, F3.STEPS, True),
          # Candidates of 2026-11-12 (decision log), trainable here so that an adoption needs no new code. Neither
          # is the submission model unless SUBMISSION_SPEC names it.
-         "A": Spec("A", F3.N_TREES, F3.STEPS, True, sc_actions=True),
-         "AW": Spec("AW", F3.N_TREES, F3.STEPS, True, sc_actions=True, len_weights=True)}
+         "A": Spec("A", F3.N_TREES, F3.STEPS, True, sc_actions=True, sc_dead=True),
+         "AW": Spec("AW", F3.N_TREES, F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True),
+         "AT": Spec("AT", F3.N_TREES, F3.STEPS, True, sc_actions=True),
+         "ATW": Spec("ATW", F3.N_TREES, F3.STEPS, True, sc_actions=True, len_weights=True)}
 SUBMISSION_SPEC = "F3"      # the model `make submit` trains and predicts with; changed only by an adoption
 
 
@@ -275,7 +278,9 @@ def stage_train(refs: list, threads: int | None = None, steps: int | None = None
     y, dead_ok, w, wn = pools.y[T], pools.dead_ok, None, None
     if sp.sc_actions:                 # as the gate's folds: scripts/run_a.py (a_gbdt, act_seqs)
         n_sc = AL.build_all(refs)
-        y, dead_ok = AL.pool_y(refs, pools, T), np.ones(n_rows, bool)
+        y = AL.pool_y(refs, pools, T)
+        if sp.sc_dead:
+            dead_ok = np.ones(n_rows, bool)
         log(f"action labels on {n_sc} SkillCorner matches: {int((y != pools.y[T]).sum())} of {n_rows} pool rows relabelled")
     if sp.len_weights:                # as scripts/run_aw.py (aw_gbdt, aw_tcn)
         wn = AL.native_weights(refs, T)
@@ -291,7 +296,7 @@ def stage_train(refs: list, threads: int | None = None, steps: int | None = None
         sc = G1.scaler(pools, exclude)
         seqs = G1.tcn_seqs(refs, T, SEED)
         if sp.sc_actions:
-            AL.relabel_seqs(refs, seqs, T)
+            AL.relabel_seqs(refs, seqs, T, dead_ok=sp.sc_dead)
         if sp.len_weights:
             AL.weight_seqs(refs, seqs, wn)
         net, sc = G1.fit_tcn(sc, seqs, exclude, SEED, threads, tcn_steps)
@@ -328,7 +333,7 @@ def stage_train(refs: list, threads: int | None = None, steps: int | None = None
     if sp.sc_actions:                 # only for these specs, so F's and F3's manifests keep their bytes
         manifest["labels"] = {"skillcorner": SA_SOURCE, "team_rows": int((y[used] < 2).sum()),
                               "alive_rows": int((dead_ok[used] & (y[used] < 3)).sum()),
-                              "length_weights": bool(sp.len_weights)}
+                              "skillcorner_trains_alive": bool(sp.sc_dead), "length_weights": bool(sp.len_weights)}
     if exclude:
         manifest["held_out"] = sorted(exclude)
         manifest["rows_used"] = int(used.sum())
