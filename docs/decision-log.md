@@ -6,6 +6,97 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### A, AW, AT and ATW on GitHub's runners: result (Claude on David's PC; neither David nor Justin has read it)
+
+**All four meet rule 2 and fail rule 1. By the registered tests AW stands. Nothing is adopted here.** Read on
+Nov 13 between 05:10 and 05:35 CET. External development matches only. Nothing in any registration was changed.
+
+**What ran.** `gate.yml` at `9f5b9bd`, four runs of four jobs, Ubuntu 24.04, 7 folds a job (runs 43350818678,
+43350823891, 43350828569, 43350833484). The runners were AMD EPYC 7763, 9V45 and 9V74 and Intel Xeon 6973P-C and
+Platinum 8573C; a TCN fold took about 5 minutes and a job 55 to 110 minutes with its cache. The gates ran on the
+PC against F3's cached members there: `run_a.py a-gate`, `run_aw.py aw-gate` and `run_at.py at-gate`, each with
+`--tag gha --inc f3_gbdt,f3_tcn`. Logs: `D:/katena/logs/a-win/gha_*_gate.log`.
+
+**Checks, made before a score was read.**
+
+- **A's LightGBM member from the runners equals the PC's on 27 of 28 folds**, hash and every probability. On
+  `skillcorner/2010085` the alive head is identical and the team head is not: the two machines grew different
+  trees, and its probabilities differ by 0.008 on average and by up to 0.15. So LightGBM is not byte-identical
+  between Windows and Linux for every training set, which F and F3 had not shown on any machine we tried. It bears on
+  reproduction, not on these gates: the all-30 model of whatever is adopted has to be compared across machines
+  as F3's was (`repro.yml` is running for A and for AW).
+- AW's LightGBM alive probabilities equal A's on 28 of 28 folds; every variant has its 28 folds.
+- A's LightGBM member with F3's TCN gives, on the 8 IDSSE + Metrica folds, +0.0232 [+0.0144, +0.0323], 8 of 8:
+  the Mac's interim number to the digit.
+
+**Against F3** (spellF1; `target` unless stated; SkillCorner on the action truth in rule 2).
+
+| | F3 | A | AW | AT | ATW |
+|---|---|---|---|---|---|
+| Rule 1: 28 folds, standing truth | 0.6180 | -0.0088, 10/28 | -0.0224, 8/28 | -0.0084, 10/28 | -0.0191, 8/28 |
+| Rule 2: 8 IDSSE + Metrica folds | 0.6374 | **0.6763, +0.0389 [+0.0276, +0.0498], 8/8** | **0.6923, +0.0548 [+0.0399, +0.0697], 8/8** | **0.6725, +0.0351 [+0.0253, +0.0448], 8/8** | **0.6964, +0.0590 [+0.0448, +0.0733], 8/8** |
+| Rule 2: the same at `severe` | 0.5900 | +0.0363, 8/8 | +0.0613, 6/8 | +0.0287, 7/8 | +0.0625, 6/8 |
+| Rule 2: 20 SkillCorner folds, action truth | 0.6094 | 0.6647, +0.0553 [+0.0461, +0.0641], 20/20 | 0.6586, +0.0491 [+0.0387, +0.0597], 19/20 | 0.6669, +0.0575 [+0.0490, +0.0660], 20/20 | 0.6577, +0.0483 [+0.0386, +0.0585], 19/20 |
+| All 28, action truth on SkillCorner | 0.6174 | 0.6680 | 0.6682 | 0.6685 | 0.6688 |
+| Meets rule 2 | | yes | yes | yes | yes |
+
+Rule 1 fails for all four, as A's entry expected: on the standing SkillCorner truth they lose 0.026 to 0.053.
+
+**The tests that say which one stands** (registered in AW's entry and in AT's; `target`, the 8 folds of rule 2).
+
+| Step | Test | Diff [95% CI] | Wins | Result |
+|---|---|---|---|---|
+| 1. Weights, alive/dead as A | AW minus A | +0.0160 [+0.0041, +0.0282] | 5/8 | Interval above 0: AW |
+| 1. Weights, alive/dead as F3 | ATW minus AT | +0.0239 [+0.0115, +0.0362] | 5/8 | Interval above 0: ATW |
+| 2. Alive/dead training | ATW minus AW | +0.0041 [-0.0017, +0.0099] | 6/8 | Not above 0: AW stays |
+
+**So the registered procedure names AW**, if rule 2 is in force. AT and ATW change nothing: leaving the
+SkillCorner rows out of the alive heads neither helps nor hurts (AT minus A: -0.0038 [-0.0100, +0.0023] on the 8
+folds, +0.0022 on SkillCorner against the action truth; alive/dead F1 on the 8 folds is 0.962 for F3 and for
+all four). The worry behind AT was not borne out.
+
+**By the process that made the truth** (`target`; predicted possessions per true one in brackets). This is not
+part of any registered test.
+
+| Truth | F3 | A | AW | AT | ATW |
+|---|---|---|---|---|---|
+| IDSSE (6 folds) | 0.6024 (0.68) | 0.6453 (0.73) | 0.6725 (0.90) | 0.6402 (0.73) | 0.6739 (0.90) |
+| Metrica (2 folds) | 0.7427 (0.91) | 0.7692 (0.97) | 0.7517 (1.17) | 0.7695 (0.96) | 0.7638 (1.17) |
+| SkillCorner, action truth (20 folds) | 0.6094 (0.89) | 0.6647 (1.02) | 0.6586 (1.24) | 0.6669 (1.00) | 0.6577 (1.19) |
+
+| Labels at T = 2 | Mean possession | Under 2 s | Under 4 s |
+|---|---|---|---|
+| IDSSE | 9.6 s | 15.2% | 38.2% |
+| Metrica | 12.7 s | 7.6% | 28.6% |
+| SkillCorner, action labels | 13.7 s | 9.3% | 25.0% |
+
+- **The step from F3 to any of the four is large on every truth with these mechanics:** +0.035 to +0.059 on the
+  8 folds (every fold, for every candidate), +0.048 to +0.058 on SkillCorner against the action truth, +0.009 to
+  +0.027 on the two Metrica folds. K read at kind 0 (+0.0265 there, the Mac's entry below) and the transfer
+  probe point the same way with models that never saw an action label.
+- **Among the four there is nothing to choose on all 28 folds:** 0.6680 to 0.6688.
+- **The weights move score from two kinds of truth to the third.** They gain on IDSSE (+0.027 and +0.034) and
+  lose on Metrica (-0.018 and -0.006) and on SkillCorner against the action truth (-0.006 and -0.009; at `severe`
+  AW is worse than A there, -0.0106 [-0.0185, -0.0028]). IDSSE's labels hold about twice the share of
+  possessions under 2 s. With the weights the models predict 0.90 possessions per true one on IDSSE and 1.17 to
+  1.24 on the other two.
+- **So the test that names AW rests on the six IDSSE folds.** AW minus A by fold: +0.060, +0.035, +0.033,
+  +0.027, +0.010 and -0.001 on IDSSE; -0.009 and -0.026 on Metrica.
+
+**For the two who decide (my reading; it is not a registered test).**
+
+- Leaving F3 for one of these is the decision that matters, and it rests on the documentation: the provided
+  match's ground truth has dead ball, an owner on every live frame, and a change at the first controlled touch.
+- AW or A is close to even. AW is what the registration names. A is never behind AW on the two kinds of truth
+  that are not IDSSE, one of which is Metrica's, and Metrica made the provided match's ground truth. Two Metrica
+  folds are thin evidence, and the action truth is our own construction.
+- `DATA.md` prints the public window's possession count and mean length. They are not used here: `RULES.md`
+  says the window is not a tuning set.
+
+**Not shown.** That the action labels are right; that the provided match follows them; anything about a second
+machine for AW, AT and ATW (the PC fits AW after its own A; the Mac's A and AW are still to come). The cut-off
+is Nov 14, 18:00 CET, and adoption needs Justin's name on rule 2 and both names on the candidate.
+
 ### AT and ATW (pre-registration): A's team labels with F3's alive/dead training; and the candidates on GitHub's runners
 
 **Written at 03:10 CET on Nov 13, before any score of A, AW, AT or ATW is known on this side.** The PC's A run is
