@@ -6,6 +6,106 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-13
 
+### KIN (pre-registration): 35 ball-free timing columns in the LightGBM team head of A and of AW
+
+**Written at 10:15 CET on Nov 13, before any score of it.** Claude on Justin's Mac. Justin asked on Nov 12 for
+this work to start at 01:00 his time and has not read this; David has not either. The 20th and 21st packages on
+the same 28 folds. Code: `src/katena/featurize/kin.py`, `src/katena/eval/kin_gate.py`, `scripts/run_kin.py`,
+`tests/test_kin.py`. External development matches only. It adopts nothing.
+
+**Why.** The research read of Nov 12 (entry below) put F3's loss in the team head just after the owner changes:
+team accuracy 0.988 more than 4 s from both ends of a possession, 0.49 in the first second after a direct change
+and 0.68 in the next. The columns the team head reads describe team movement with windows centred on the sample
+(displacement from 2 s before to 2 s after, and from 5 s before to 5 s after). There is no one-sided window, no
+acceleration, and no rate of the lines or of the spread. A tree reads one row at a time and cannot difference
+neighbouring rows, and a centred window says the same thing at a change as half a second either side of it. Both
+teams turn towards the same goal when the ball changes owner, with or without a ball detection, and the same
+read found the team probability slowest to turn where the ball was not in view (with S1's and S2's weights it
+crossed 0.5 within 0.4 s of a true change on 0.48 of IDSSE's changes with the ball in view and on 0.30 without).
+The TCN reads the sequence and can difference it by itself, so it is left alone.
+
+**The change, and nothing else.** `katena.featurize.kin` computes 35 columns from player positions only, in the
+focal team's frame, each half by itself:
+
+- the team's mean slot displacement along x over the second before and the second after the sample, the same
+  over 2 s, for each team; after minus before for each team and for both together (14 columns);
+- the share of a team's slots moving forward minus the share moving back, 1 s before and 1 s after (4);
+- the rate of each team's defensive line, 1 s before and after (4); the rate of each team's length and width,
+  2 s before and after (8);
+- the distance of the closest pair of opposing players, and its mean over the second before and after (3);
+- each team's mean speed in the second after minus the second before (2).
+
+A slot counts in a displacement only where it is seen at both ends and did not switch player in between. The
+constants are fixed here: positions averaged over 1 sample either side before differencing; a slot moves
+"forward" above 1.0 m/s; movement above 12.5 m/s is blanked (`build.py`'s value); a slot that lies more than 5 m
+from its previous sighting at more than 12.5 m/s has switched player; a team value needs 3 slots.
+
+The columns go into the LightGBM team head and nowhere else. Two team heads are fitted on every fold with the 213
++ 35 columns: **AK** on A's rows and labels, unweighted, and **AWK** with AW's possession-length weights. Rows,
+labels, weights, parameters, 1,200 trees and seed are the base candidate's. The alive head, the TCN and the
+decoder are the base candidate's, read from its cache. No constant, window or column is changed, dropped or added
+after a score, and no subset of the columns is tried, whatever comes out.
+
+**Rule, for each of the two against its own base** (the rule of A2 and AW2, entry below). With the base's
+9,600-step TCN: AK2 against A2 and AWK2 against AW2. On the 28 folds with the action truth on SkillCorner: at
+`target` at least 70% of folds won and the paired 95% interval above 0; not worse at `severe`. And not worse at
+`target` on the 8 IDSSE + Metrica folds, nor on the 20 SkillCorner folds. A candidate that passes must also meet
+rule 2 against F3, as its base does. AK2 can only replace A2 and AWK2 only AW2. Which of A and AW stands is not
+settled here and is not reopened by this: a pass for one base and a fail for the other gives the columns to that
+base only.
+
+**A pass is not an adoption.** Unlike the longer TCN, this adds code to the inference path: the columns would be
+computed on the provided match's player tracks. Before it could be adopted it needs the pipeline's `train` and
+`predict` to carry the columns, the same model and CSV on the three OSes and the PC, and a human's look at
+aggregates on the provided match (the share of finite values of each column, against the external worlds). The
+cut-off is Nov 14, 18:00 CET. The two who decide may leave a passing KIN out for lack of time.
+
+**Where it runs.** The registered run is the one A2 and AW2 had: the team heads fitted on GitHub's runners by
+`gate.yml` (tag `gha`), the gate on the PC, where the bases' members, the 9,600-step TCNs and F3's cache are.
+The Mac has no 9,600-step TCN. Tonight the Mac fits the same team heads on its own cache and reads them with
+F3's TCN (`AK_f` against `A_f`, `AWK_f` against `AW_f`), and with A's own 4,800-step TCN if that run finishes:
+**information only, read before the registered gate, and named here so that it counts as seen.**
+
+```
+# runners (4 jobs, 7 folds each; every job builds the columns of all 28 matches, then fits its folds)
+gh workflow run gate.yml --ref <branch> -f script=run_kin.py -f stages="kin-gbdt" \
+  -f variants="gha_ak_gbdt1200ak gha_awk_gbdt1200awk" -f shards=4 -f extra="--tag gha --workers 4"
+# the gate, on the PC, after the two folders are in oof/
+uv run python scripts/run_kin.py kin-gate --tag gha --inc f3_gbdt,f3_tcn
+# the Mac, tonight
+uv run python scripts/run_kin.py kin-build --workers 4 && uv run python scripts/run_kin.py kin-check kin-gbdt kin-gate
+```
+
+A file of `run_kin.py` holds a team head's probabilities only. The gate puts them in place of the base's team
+probabilities and takes the alive probabilities and the TCN from the base's files, so a runner needs no cache of
+the base.
+
+**Checks, none of which is a score.**
+
+- `tests/test_kin.py`, synthetic matches only: the one-sided velocities reverse at a scripted turn, and the
+  reversal peaks within a sample of it; a slot that is lost, found again, or taken over by a player 30 to 40 m
+  away is not movement; swapping the teams and rotating the pitch gives the other focal's columns; rows line up
+  with `featurize`; one half does not leak into the other; no column changes when the ball is moved or removed.
+- `kin-build`: every world's corrupted match is recovered with the corpus seeds and checked against the cached
+  features of that world (rows, M0's predictions, the degrader's statistics, the attack directions) before its
+  columns are computed. Done on the Mac at 10:08 CET: 300 worlds of the 28 matches, all
+  recovered; pool 614,802 rows by 213 + 35 columns; no column is constant. On IDSSE and Metrica every column is
+  finite on every pool row. On SkillCorner 21% of pool rows have no value in any of the 35 (fewer than 3 slots
+  of a team in view), and the columns are finite on 0.70 to 0.77 of rows, as the base columns `vx_f_2s` (0.73)
+  and `vx_f_5s` (0.66) are.
+- `kin-check` on fold `idsse/DFL-MAT-J03WMX`: done on the Mac at 10:10 CET. On F3's 213 columns the script's
+  team-head fit gives A's cached team probabilities byte for byte, and with the weights AW's, at both gate
+  worlds. So the only difference between AK and A, and between AWK and AW, is the 35 columns. The pool's rows of
+  that match equal the per-world rows they were drawn from (21,842 of 21,842).
+
+**Already seen when this was written** (so nothing below is blind to them): the three research reads of Nov 12,
+which are where the idea and the 1 s and 2 s windows come from; A's interim gate on the Mac; K at kind 0, S1 and
+S2 against the action truth; the transfer probe; and the results of A, AW, AT, ATW, A2 and AW2 in the entries
+above. No model with these columns has been fitted and no score of one exists.
+
+**Information, decides nothing:** the LightGBM member alone; the reads with F3's TCN and with the 4,800-step
+TCNs; each against F3; possessions found by true length; predicted possessions per true one.
+
 ### A2 and AW2 on four machines, and the pipeline's training against the gate's (result)
 
 **Trained on all 30 matches on this PC and on macOS, Ubuntu and Windows runners, A2 and AW2 each give one
