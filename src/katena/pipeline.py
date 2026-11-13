@@ -79,7 +79,11 @@ SPECS = {"F": Spec("F", 150, 1200, False),
          "A": Spec("A", F3.N_TREES, F3.STEPS, True, sc_actions=True, sc_dead=True),
          "AW": Spec("AW", F3.N_TREES, F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True),
          "AT": Spec("AT", F3.N_TREES, F3.STEPS, True, sc_actions=True),
-         "ATW": Spec("ATW", F3.N_TREES, F3.STEPS, True, sc_actions=True, len_weights=True)}
+         "ATW": Spec("ATW", F3.N_TREES, F3.STEPS, True, sc_actions=True, len_weights=True),
+         # A and AW with a TCN trained twice as long (decision log, 2026-11-13, "A2 and AW2"): the LightGBM
+         # member is A's or AW's, byte for byte.
+         "A2": Spec("A2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True),
+         "AW2": Spec("AW2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True)}
 SUBMISSION_SPEC = "F3"      # the model `make submit` trains and predicts with; changed only by an adoption
 
 

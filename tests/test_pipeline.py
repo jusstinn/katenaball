@@ -209,6 +209,12 @@ def test_specs_a_and_aw_train_on_action_labels(synth_corpus, monkeypatch):
     assert man_t["labels"]["alive_rows"] == int((pools.dead_ok & (pools.y[P.T_MAIN] < 3)).sum())
     assert len({m["sha256"]["tcn"] for m in (man3, man_a, man_w, man_t, man_tw)}) == 5
 
+    # A2 and AW2 are A and AW with twice the TCN steps and the same LightGBM member
+    for base, longer in (("A", "A2"), ("AW", "AW2")):
+        b, x = PL.spec_of(base), PL.SPECS[longer]
+        assert (x.gbdt_trees, x.tcn_steps, x.tcn_touch) == (1200, 9600, True)
+        assert (x.sc_actions, x.sc_dead, x.len_weights) == (b.sc_actions, b.sc_dead, b.len_weights)
+
     # the TCN sequences: SkillCorner ones relabelled and dead_ok, the others as they were
     base, seqs = G1.tcn_seqs(refs, P.T_MAIN, PL.SEED), G1.tcn_seqs(refs, P.T_MAIN, PL.SEED)
     assert AL.relabel_seqs(refs, seqs) == sum(k[0].startswith("skillcorner/") for k in seqs)
