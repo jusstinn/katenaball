@@ -6,6 +6,47 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-14
 
+### Justin chooses AW2; the adoption is prepared on `justin/adopt-aw2` and is not complete
+
+**Justin names AW2, the model the registered tests name. Nothing is adopted yet: `SUBMISSION_SPEC` is still F3,
+and the adoption needs David and the reference PC.** Recorded by Claude on Justin's Mac at 23:35 CET on Nov 14.
+Asked "Should I prepare the AW2 adoption change here so it is ready for David?", he answered "Yes, prepare AW2"
+at about 23:25 CET.
+
+- **It came after the team's own cut-off** (Nov 14, 18:00 CET) by about five and a half hours. His name on
+  rule 2 came before it (entry below). The cut-off was ours; the organisers' deadline is Nov 17, 23:59 CET, and
+  their submission form has been open since Nov 13 (one member of the team submits).
+- **David's side has been silent since Nov 13, 13:37 CET**: no commit, no comment, no run after that hour. The
+  adoption PR it offered to open after Justin's yes has not been opened. Its last word on the choice was "David
+  has not chosen. If you have no preference I will take the registration: AW2." So AW2 has Justin's name and
+  the registration, and not yet David's own.
+- **The A4 and AW4 proposal (entry below) has lapsed** by its own terms: it was not dispatched by Nov 14, 18:00
+  CET. No 19,200-step TCN was trained and no score of it exists. `run_x2.py --mult 4` stays in the repository,
+  unused.
+
+**What is on `justin/adopt-aw2`.** This branch (the log, the Mac's results) merged with `david/adopt-docs` (both
+technical documents, drafted for AW2, and `docs/handoff/ADOPTION_NOTES.md`). The three `PENDING_JUSTIN_NAME`
+places now say what happened: both names on rule 2, one before any score of the new labels and one after the
+scores were known. One new token, `PENDING_DAVID_AW2`, marks the sentence that needs David's own choice.
+
+**What is not on it, and why.** The switch itself. `SUBMISSION_SPEC = "AW2"` needs
+`docs/repro/expected-windows.json` to hold AW2's three full SHA-256 hashes from the reference PC, and
+`tests/test_real_run.py` requires them in full, here in the log and in `docs/real-run.md`. The log has their
+first 12 to 16 digits only (LightGBM `55de693c7ea2...`, TCN `78a241f571ad...`, bundle `9b4c2cfaa553af43...`);
+the rest is on David's PC. With them the switch is part 4 of the adoption notes, a few lines.
+
+**Not known here.** How the PC's checks of AW2 ended that were running on Nov 13 at 13:37 CET (the held-out
+model down both paths, the other torch kernels). Two fresh trainings with one `bundle.pkl` and the stress check
+at 30 of 30 were reported as done.
+
+**Open before the real run.**
+- David: his own yes to AW2 (or A2); the PC's three full hashes and the switch; the result of the PC's checks;
+  part 3 of the adoption notes, items 1 and 7 (who gave David's side of rule 2).
+- Justin: the sentences of the short document about his look at the public window (sections 3 and 9); approval
+  of the adoption PR.
+- Either: who fills in the submission form; the question to the organisers about the 2 s convention, which the
+  log does not show as sent.
+
 ### Justin's name on rule 2 (given after the scores; AW2 or A2 not chosen yet)
 
 **Justin puts his name to rule 2 as A's entry of Nov 12 declares it. With David's side's name (Nov 13, 02:40

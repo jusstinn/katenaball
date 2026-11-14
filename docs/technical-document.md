@@ -75,8 +75,8 @@ crowds, or cut the jitter to the level of real broadcast tracking. Both models t
   and the weights. Rule 1 scores the 20 SkillCorner folds against the per-frame label AW stops training on,
   so it cannot pass AW. Rule 2 was written down before any score of the new labels: rule 1's thresholds on
   the 8 IDSSE and Metrica folds, whose truth does not change, and not worse than F3 on the 20 SkillCorner
-  folds scored on the new labels. It is weaker evidence (section 7). Both of us put our names to it
-  (PENDING_JUSTIN_NAME); one had by then seen a first score of the new labels.
+  folds scored on the new labels. It is weaker evidence (section 7). Both of us put our names to it,
+  one before any score of the new labels and one after their scores were known.
 - **The longer TCN.** AW2 is AW with 9,600 TCN steps for 4,800, registered before its score against AW:
   rule 1's thresholds on the 28 folds with SkillCorner on the new labels, and not worse on the 8 or the 20.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader

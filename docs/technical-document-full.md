@@ -411,9 +411,10 @@ as an IDSSE fold is. An IDSSE or Metrica fold has one truth, and A does not chan
   the 8 folds, and four changes passed this kind of test before and were not adopted (S1, S2, K1, K). A
   SkillCorner score against the action truth favours a model trained on it by construction: it is a guard
   and a description, not evidence that the model is better. The registration made rule 2 count only with
-  both team members' names. Both gave them (PENDING_JUSTIN_NAME). One side agreed while no score of A or AW
-  was known to it. The other had by then seen an interim score of A (its LightGBM member blended with F3's
-  TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8).
+  both team members' names. Both gave them. One side agreed on Nov 13, while no score of A or AW
+  was known to it. The other agreed on Nov 14, after the results of the four candidates and of the longer
+  TCN were known to him; before he was first asked he had seen an interim score of A (its LightGBM member
+  blended with F3's TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8).
 
 **Four candidates.** Two more were registered on Nov 13, before any score of the four was known on the
 side that registered them. A's registration had said no other variant would be tried; the new
@@ -580,8 +581,9 @@ the same 28 folds. The registration tried no other step count and said none woul
   1.23 on SkillCorner for AW2, 0.80 and 1.02 for A2.
 
 **Adopted.** AW met rule 2 and the registered tests chose it among the four. AW2 passed its own rule
-against AW, so the longer TCN is part of it. Both team members put their names to rule 2 and to AW2 before
-the cut-off of Nov 14, 18:00 CET (PENDING_JUSTIN_NAME). AW2 is the submitted model.
+against AW, so the longer TCN is part of it. Rule 2 had both team members' names before the team's own
+cut-off of Nov 14, 18:00 CET. The choice of AW2, the model the registered tests name, was confirmed by one of
+us after that hour, on Nov 14, and by the other (PENDING_DAVID_AW2). AW2 is the submitted model.
 
 **Reproduction.** The all-30 models of A and of AW were each trained from an empty cache on macOS, Ubuntu
 and Windows runners and on the reference PC: one LightGBM member and one CSV for the dressed external

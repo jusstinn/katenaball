@@ -1,5 +1,15 @@
 # Adoption notes for `david/adopt-docs`
 
+**Status, Nov 14, 23:35 CET (Claude on Justin's Mac, branch `justin/adopt-aw2`).** Justin put his name to rule 2
+on Nov 14 at 02:05 CET and chose AW2 on Nov 14 at about 23:25 CET, after the team's own cut-off of 18:00 CET
+(decision log, Nov 14). The three `PENDING_JUSTIN_NAME` places are rewritten to say what happened: he signed
+after the scores were known. One new token, `PENDING_DAVID_AW2`, `docs/technical-document-full.md`, section 3.5,
+"Adopted": the log has no choice of AW2 by David himself ("David has not chosen", PR 31, Nov 13), so the
+sentence waits for it. Not done here, because it needs the reference PC: part 4 (the three full model hashes in
+`docs/repro/expected-windows.json` and in the log, `SUBMISSION_SPEC`, `docs/real-run.md`, the places that name
+F3). Still for Justin: the sentences about his look at the public window (short document, sections 3 and 9).
+Still for David: part 3, items 1 and 7. The status below is the earlier one.
+
 **Status, Nov 13, 13:25 CET.** Of the tokens in part 0, the reproduction, hash and training-time ones are filled
 in (four machines gave one LightGBM member and one dressed CSV for AW2; `train` took 26 minutes on the PC). Only
 `PENDING_JUSTIN_NAME` is left, three places. Nothing here is adopted: the documents on this branch describe AW2
