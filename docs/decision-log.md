@@ -6,6 +6,23 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-14
 
+### Justin's name on rule 2 (given after the scores; AW2 or A2 not chosen yet)
+
+**Justin puts his name to rule 2 as A's entry of Nov 12 declares it. With David's side's name (Nov 13, 02:40
+CET) the rule now counts.** Recorded by Claude on Justin's Mac at 02:05 CET on Nov 14. Asked "Do you give your
+name to rule 2?", he answered "Yes, sign it".
+
+- **It was not given blind, and the documents must say so.** David's side signed before any score. Justin had
+  seen A's interim score on the Mac on Nov 12 before he was first asked (entry "K at kind 0, S1 and S2 against the action truth", Nov 13),
+  and by the time he signed he had been told every result in this log up to here: A, AW, AT and ATW against both
+  rules, A2 and AW2, and KIN. He signed knowing that every candidate fails rule 1 and meets rule 2.
+- **The rule itself was fixed before any score of A** (A's entry, Nov 12) and has not been changed since.
+- **What it settles.** A candidate that meets rule 2 can be adopted by the two who decide. **What it does not
+  settle:** which one. Justin has not said AW2 or A2; the registered tests name AW2. He has not yet confirmed the
+  sentence of the drafted technical document about his look at the public window, and he has not withdrawn the
+  proposal of the entry below (A4 and AW4), which still waits for David.
+- Nothing is adopted by this entry. F3 is the submission model on `main` until the adoption PR is approved.
+
 ### A4 and AW4 (proposal, written as a pre-registration): the TCN at 19,200 steps, with its own later cut-off
 
 **Written at 01:40 CET on Nov 14, before any score of either; nothing has been trained. It is a proposal: it
