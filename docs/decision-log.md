@@ -4,6 +4,70 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-14
+
+### A4 and AW4 (proposal, written as a pre-registration): the TCN at 19,200 steps, with its own later cut-off
+
+**Written at 01:40 CET on Nov 14, before any score of either; nothing has been trained. It is a proposal: it
+becomes a registration only if David agrees, and nothing is dispatched from Justin's side.** Claude on Justin's
+Mac, at Justin's request: he asked whether more can be gained now that AW2 gained, was told what this entry
+says, and asked for it to be put to David's side. Code: `scripts/run_x2.py --mult 4` (this commit). External
+development matches only. It adopts nothing and it does not hold up the adoption of AW2 or A2.
+
+**It departs from a sentence of the A2 and AW2 registration, and both who decide should know that before they
+agree.** That entry says: "No other step count is tried, whatever comes out." This is another step count. What
+that costs: the same knob is tested a second time on the same 28 folds, so a pass here is weaker evidence than
+the first pass was, and the technical document has to say that two step counts were tried one after the other,
+each registered before its score. What it does not do: no step count is picked after seeing scores, the rule
+is the one already used, and after this one no further step count is tried, whatever comes out. If either of
+the two would rather hold the first sentence, this proposal is dropped and nothing is lost.
+
+**Why.** More fitting is the one change that has passed on both kinds of fold every time: the TCN at 4,800 steps
+for 1,200 (+0.0120, 21 of 28), then at 9,600 for 4,800 (A2 +0.0067, 23 of 28; AW2 +0.0071, 20 of 28). The gain
+shrank by about half at the second doubling. A third doubling may add +0.002 to +0.004, and it may fail the
+70% of folds: that is the likelier outcome and it is fine. Longer training changes no feature and no line of
+the inference path, so it adds no risk on the provided match; it adds about 20 minutes to `train` on the PC.
+The submission deadline is Nov 17, 23:59 CET; the cut-off of Nov 14, 18:00 CET is the team's own, and the steps
+after an adoption (the adoption PR, the real run, the second-machine check, the documents) take about a day.
+
+**The change, and nothing else.** A4 is A2, and AW4 is AW2, with 19,200 TCN steps in place of 9,600. The
+one-cycle schedule spans the steps. Sequences, labels, weights, seed and threads are the base candidate's, and
+so is the LightGBM member, read from its cache.
+
+**Rule, for each of the two against its own base (A4 against A2, AW4 against AW2).** The rule of the A2 and AW2
+entry, unchanged: on the 28 folds with the action truth on SkillCorner, at `target` at least 70% of folds won
+and the paired 95% interval above 0; not worse at `severe`; and not worse at `target` on the 8 IDSSE + Metrica
+folds, nor on the 20 SkillCorner folds. A4 can only replace A2, and AW4 only AW2; which of the two bases stands
+is not settled here. `run_x2.py --tag gha --mult 4` prints the verdict.
+
+**Order and cut-offs (proposed).**
+- **The adoption of AW2 or A2 goes ahead now, on the cut-off already agreed** (Nov 14, 18:00 CET), with its
+  checks and documents as David's side has them. That needs Justin's name on rule 2 and his choice of base;
+  at the time of writing he has given neither. This entry changes nothing about that.
+- **A4 and AW4 have their own cut-off: Nov 15, 18:00 CET.** By then the registered gate must have passed for the
+  base that was adopted, and that model must have the checks its base had (two fresh trainings with one
+  `bundle.pkl`, the all-30 model on a second machine, the stress check). If any of it is missing at that hour,
+  the adopted model stays at 9,600 steps. A pass for the base that was not adopted changes nothing.
+- **If this is not dispatched by Nov 14, 18:00 CET, it lapses.**
+
+**Information, decides nothing:** the TCN member alone; each against F3; predicted possessions per true one.
+
+**Run (David's side, if David agrees).** `gate.yml` on GitHub's runners, tag `gha4x`, as the `gha2x` runs were
+dispatched with 19,200 for 9,600:
+
+    gh workflow run gate.yml --ref claude/status-check-7809aa -f script=run_a.py -f stages="a-tcn" -f variants="gha4x_a_tcn19200ta" -f shards=7 -f extra="--tag gha4x --steps 19200"
+    gh workflow run gate.yml --ref claude/status-check-7809aa -f script=run_aw.py -f stages="aw-tcn" -f variants="gha4x_aw_tcn19200taw" -f shards=7 -f extra="--tag gha4x --steps 19200"
+
+then, on the PC, `uv run python scripts/run_x2.py --tag gha --mult 4 --inc f3_gbdt,f3_tcn`. Seven jobs, not
+four: the two `gha2x` runs took 2 h 07 and 2 h 14 from dispatch with four jobs, so four jobs at twice the steps
+would come to about 4 h, near the job limit of 345 minutes; seven should take about 2 h 30.
+
+**The script change.** `run_x2.py` takes `--mult` (2 or 4): the candidate's TCN has that many times 4,800 steps
+and is read against the one with half as many. The default is 2 and reads the files the A2 and AW2 gate read,
+under the same names (checked here on the names only: the Mac holds no 9,600-step TCN, so the gate was not run).
+Before the `--mult 4` gate is trusted, `run_x2.py --tag gha` on the PC should print the A2 and AW2 tables it
+printed before.
+
 ## 2026-11-13
 
 ### AW on Justin's Mac: result (AW's second kind of machine), and KIN beside AW's own TCN (information)
