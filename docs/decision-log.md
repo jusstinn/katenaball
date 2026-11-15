@@ -6,6 +6,49 @@ Every model, feature, or data decision: what changed, the external score, keep o
 
 ## 2026-11-15
 
+### David's side, by delegation: rule 2 kept and AW2 chosen; AW2 is adopted
+
+**AW2 is the submission model (`SUBMISSION_SPEC = "AW2"`, the switch entry below).** Recorded by Claude on David's
+PC at 20:30 CET on Nov 15. At about 19:30 CET David was given a summary that included the scores ("0.05 to 0.06
+better than F3; finalists AW2 and A2"). He then asked Claude to have expert subagents review everything blocked
+on him and to "take the best decisions". Claude commissioned three reviews from separate assistant sessions, each
+given this log and told not to open the provided data or the public window: model selection and statistics,
+football tracking data, and research integrity with the competition's rules. All three favoured AW2. Under that
+delegation:
+
+- **Rule 2.** David's side, given by Claude on Nov 13 at 02:40 CET under his hand-over and unread by him, is kept:
+  confirmed now, after the scores were known to David and after the team's cut-off. No team member put his own
+  name to rule 2 before seeing a score; the only agreement given before any score was the assistant's. The rule's
+  text is A's entry of Nov 12, unchanged.
+- **The model: AW2**, the one the registered procedure names. AW2 and A2 tie on all 28 folds (0.6753 against
+  0.6748), so following the registration costs nothing in expectation. The ground truth is read frame by frame
+  from corrected tracking ("not from event data", `CHALLENGE.md`), which is how IDSSE's labels are made; the two
+  Metrica folds and the SkillCorner action truth, where A2 leads, are labels built from events. Choosing A2 would
+  leave the registration after the scores were known. The statistics review expects a gain over F3 on the provided
+  match of about +0.01 to +0.03, not the folds' +0.06: the direction holds, the size does not.
+- **Seen before this choice and set aside:** the scores the reproduction checks print for their one external match:
+  R2's held-out fold (entry below: AW2 0.7714, A2 0.7740, at a condition the gate does not use) and R1's figure for
+  the all-30 model, which trained on that match. Apart from them, no score in this log is later than Nov 13, 16:35
+  CET.
+- **The organisers' question, pre-registered before it is sent.** The question of `label-convention.md`, section 7,
+  is drafted as: does the owning team change at the first touch by a player of the other team, or only once that
+  team is judged to have control (a minimum time on the ball, a number of passes, an operator's call)? It goes only
+  if David sends it. If an answer arrives before Nov 17, 12:00 CET: "first touch", any other answer, or none, and
+  AW2 stays; an answer that the owner changes only once control is judged, and A2 replaces AW2 if Justin agrees,
+  with the text of `docs/handoff/ADOPTION_NOTES.md` part 2 and A2's hashes (entry below). No answer changes
+  anything else: no new gate, no change of T or `tail`.
+- **Fallback.** If the real run on the reference PC has not ended, by Nov 17, 18:00 CET, with exit 0, a valid file
+  and AW2's expected LightGBM hash, F3 is submitted: the switch commit is reverted and the real run is done with F3.
+- **Not delegated, and still David's:** the AI-use statements of both documents (short section 9, long section
+  10), which say what his sessions showed an assistant, since only he can confirm them; the team name; the real run
+  (`docs/real-run.md`), the `submission-v1` tag and the form; whether to send the organisers' question.
+- **Documents.** `PENDING_DAVID_AW2` and part 3 of the adoption notes, items 1 and 7, are filled in with what
+  happened. The short document's "It saw no image and no file" was untrue (the assistant saw the public label
+  file, Nov 11) and is corrected. The Zenodo disclosure now says a research subagent of the assistant opened the
+  record and a fragment of one row was printed (compliance note in this log). Both documents say AW2's last
+  machine check ran on GitHub's three runners and the PC, without "the same four kinds of machine": AW2's Ubuntu
+  and Windows runners had other CPUs than AW's. Both are dated Nov 15.
+
 ### AW2 and A2 on the Windows PC: the reproduction checks (result; Claude on David's PC, from its logs)
 
 **R1 to R3 and the stress check pass for both. AW2's full hashes on the PC are the ones

@@ -1,6 +1,6 @@
 # Technical document, long version
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-13.
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-15.
 
 The document we submit is the short one, [`technical-document.md`](technical-document.md). This is the same
 account with every table and every change we tested. Every number comes from `docs/decision-log.md` and the
@@ -411,10 +411,15 @@ as an IDSSE fold is. An IDSSE or Metrica fold has one truth, and A does not chan
   the 8 folds, and four changes passed this kind of test before and were not adopted (S1, S2, K1, K). A
   SkillCorner score against the action truth favours a model trained on it by construction: it is a guard
   and a description, not evidence that the model is better. The registration made rule 2 count only with
-  both team members' names. Both gave them. One side agreed on Nov 13, while no score of A or AW
-  was known to it. The other agreed on Nov 14, after the results of the four candidates and of the longer
-  TCN were known to him; before he was first asked he had seen an interim score of A (its LightGBM member
-  blended with F3's TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8).
+  both team members' names. One member's name was given on Nov 13 at 02:40 CET, while no score of A or AW
+  was known on his side, by the AI assistant working on his PC under a general hand-over he had given; he
+  had not read it. On Nov 15, after he had been told the results, he delegated his open decisions to the
+  assistant, and under that delegation it confirmed his name (section 10). The other member gave his own
+  name on Nov 14 at 02:05 CET, after the results of the four candidates and of the longer TCN were known to
+  him; before he was first asked he had seen an interim score of A (its LightGBM member blended with F3's
+  TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8). So the only agreement given before any score was
+  the assistant's: no team member gave his own before seeing one. The rule's text was fixed before any score
+  of A and has not changed.
 
 **Four candidates.** Two more were registered on Nov 13, before any score of the four was known on the
 side that registered them. A's registration had said no other variant would be tried; the new
@@ -581,9 +586,16 @@ the same 28 folds. The registration tried no other step count and said none woul
   1.23 on SkillCorner for AW2, 0.80 and 1.02 for A2.
 
 **Adopted.** AW met rule 2 and the registered tests chose it among the four. AW2 passed its own rule
-against AW, so the longer TCN is part of it. Rule 2 had both team members' names before the team's own
-cut-off of Nov 14, 18:00 CET. The choice of AW2, the model the registered tests name, was confirmed by one of
-us after that hour, on Nov 14, and by the other (PENDING_DAVID_AW2). AW2 is the submitted model.
+against AW, so the longer TCN is part of it. AW's registration put the adoption before the team's own
+cut-off of Nov 14, 18:00 CET; it came after it. One of us chose AW2 on Nov 14 at about 23:25 CET. For the
+other, the AI assistant chose AW2 on Nov 15, under his explicit delegation given after he had been told the
+scores, and in the same step confirmed his side of rule 2 (above, and section 10); three reviews it
+commissioned from separate assistant sessions (statistics, football data, research integrity) each
+favoured AW2. AW2 is the model the registered procedure names; A2 was not taken, because preferring it
+would have meant leaving the registration after the scores were known (section 7). Apart from the scores
+that reproduction checks print for one external match (held out: AW2 0.7714, A2 0.7740, at a condition the
+gate does not use), no score was read after Nov 13, 16:35 CET, so the late choice rests on nothing the cut-off would have
+excluded. The cut-off was ours; the organisers' deadline is Nov 17, 23:59 CET. AW2 is the submitted model.
 
 **Reproduction.** The all-30 models of A and of AW were each trained from an empty cache on macOS, Ubuntu
 and Windows runners and on the reference PC: one LightGBM member and one CSV for the dressed external
@@ -846,8 +858,9 @@ D over the first 60 and 120 s of each half, as an aggregate.
     Ubuntu 24.04 on AMD EPYC 9V45, Windows Server 2025 on AMD EPYC 7763) and on the PC: LightGBM
     `eb1030c8ec94...` and dressed CSV `98b2919621653c99...` on all four.
 
-  AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on the
-  same four kinds of machine, and they gave one LightGBM member and one dressed CSV.
+  AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on
+  GitHub's macOS, Ubuntu and Windows runners and on the PC, and they gave one LightGBM member and one
+  dressed CSV.
   Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `55de693c7ea2...`, TCN
   `78a241f571ad...`, bundle `9b4c2cfaa553...`; the dressed match's CSV
   `4e0ab1d06ba7...`.
@@ -917,8 +930,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   | GitHub runners: Ubuntu, Windows, macOS | | 8, 13 and 37 min | under a minute | 5.7 GB peak in training (Ubuntu) |
 
   The external download (about 5 GB) is extra. The training times in the table are F3's. On the reference
-  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: `train` took 26 minutes
-  there.
+  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: `train` took 26 to 28
+  minutes there.
 - **The submitted file:** its SHA-256 and its commit are in the short document.
 - **No match data in the repository.** CI fails any commit that holds it (`docs/ci.md`).
 
@@ -948,8 +961,19 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
   5 minutes (section 3.1) described to it what he saw, in general statements and with estimated times. It
   saw the public label file, which is in the repository, and no image and no other provided file.
-- **A public file we opened and did not use.** While searching the web for external datasets, an automated
-  agent opened a public record that turned out to hold statistics about the provided game. The file was
+- **Decisions the assistant took for us.** Some decisions were the assistant's, under a team member's
+  delegation; the decision log records each one and who gave it. It wrote the registrations of AT and ATW,
+  A2 and AW2, and KIN before any score of them and before either of us had read them (section 3.5). On
+  Nov 13 at 02:40 CET, working on one member's PC under a general hand-over he had given, it gave his
+  agreement to rule 2 while no score of the new labels was known on his side; he had not read it. On
+  Nov 15, after he had been told the development scores of the two finalists, AW2 and A2, he asked it to
+  have everything waiting on him reviewed and to "take the best decisions". Under that delegation it
+  confirmed his side of rule 2 and chose AW2 for him, the model the registered tests name. The other member
+  signed rule 2 and chose AW2 himself, both after the scores were known (section 3.5). None of these
+  decisions used anything from the provided match.
+- **A public file we opened and did not use.** While searching the web for external datasets, a research
+  subagent of the assistant opened a public record (Zenodo 20185375) that turned out to hold statistics
+  about the provided game; a fragment of one row was printed in that subagent's session. The file was
   deleted. Nothing from it entered the code, the training data or any decision.
 - **StatsBomb open data.** 35 matches were downloaded to a temporary folder before we read the user
   agreement. We did not use them: they are in no training set, result or commit.

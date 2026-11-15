@@ -1,5 +1,14 @@
 # Adoption notes for `david/adopt-docs`
 
+**Status, Nov 15, 20:30 CET (Claude on David's PC, branch `justin/adopt-aw2`).** AW2 is adopted: the switch
+(part 4) is in, with the PC's full hashes, and David's side was given by Claude under his delegation of Nov 15
+(decision log, Nov 15). `PENDING_DAVID_AW2` is filled in; part 3, items 1 and 7, are written into both documents.
+Left: David's own confirmation of the AI-use statements (short section 9, long section 10), Justin's sentences
+about his look at the public window and his approval of the PR, the real run, the tag and the three
+`TODO(after the real run)` markers. Page 5 of the short document is nearly full: if the final build prints 6
+pages, cut "With another TCN seed, F's gain ... not repeated since." (section 7; the long document keeps
+it). The statuses below are earlier ones.
+
 **Status, Nov 14, 23:35 CET (Claude on Justin's Mac, branch `justin/adopt-aw2`).** Justin put his name to rule 2
 on Nov 14 at 02:05 CET and chose AW2 on Nov 14 at about 23:25 CET, after the team's own cut-off of 18:00 CET
 (decision log, Nov 14). The three `PENDING_JUSTIN_NAME` places are rewritten to say what happened: he signed

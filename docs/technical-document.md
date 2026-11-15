@@ -1,6 +1,6 @@
 # <team_name>: technical document
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-13.
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-15.
 
 This is the short version. `docs/technical-document-full.md` has every table and every change we tested, and
 every number in both comes from `docs/decision-log.md`.
@@ -75,8 +75,9 @@ crowds, or cut the jitter to the level of real broadcast tracking. Both models t
   and the weights. Rule 1 scores the 20 SkillCorner folds against the per-frame label AW stops training on,
   so it cannot pass AW. Rule 2 was written down before any score of the new labels: rule 1's thresholds on
   the 8 IDSSE and Metrica folds, whose truth does not change, and not worse than F3 on the 20 SkillCorner
-  folds scored on the new labels. It is weaker evidence (section 7). Both of us put our names to it,
-  one before any score of the new labels and one after their scores were known.
+  folds scored on the new labels. It is weaker evidence (section 7). It needed both our names: one given
+  after the scores were known, the other given before any score by the AI assistant under a general
+  hand-over, unread, and confirmed by it under delegation after the scores were known (section 9).
 - **The longer TCN.** AW2 is AW with 9,600 TCN steps for 4,800, registered before its score against AW:
   rule 1's thresholds on the 28 folds with SkillCorner on the new labels, and not worse on the 8 or the 20.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
@@ -253,9 +254,11 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
   repository's rules (`CLAUDE.md`) forbid it to open the data folder, only team members ran anything on the
   provided match, and what those runs print is pass or fail and aggregates: counts, shares and hashes, never
   a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
-  5 minutes (section 3) described to it what he saw, with estimated times. It saw no image and no file.
-- **A public file we opened and did not use.** While searching the web for external datasets, an automated
-  agent opened a public record that turned out to hold statistics about the provided game. The file was
+  5 minutes (section 3) described to it what he saw, with estimated times. Of the provided files it saw only the public 5-minute
+  labels, no image. Under delegation it wrote registrations before we read them and chose AW2 for one of
+  us after the scores were known.
+- **A public file we opened and did not use.** While searching the web for external datasets, a research
+  subagent of the assistant opened a public record that turned out to hold statistics about the provided game. The file was
   deleted. Nothing from it entered the code, the training data or any decision.
 - **StatsBomb open data.** 35 matches were downloaded to a temporary folder before we read the user
   agreement. We did not use them: they are in no training set, result or commit.
