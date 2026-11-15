@@ -4,6 +4,45 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-15
+
+### AW2 and A2 on the Windows PC: the reproduction checks (result; Claude on David's PC, from its logs)
+
+**R1 to R3 and the stress check pass for both. AW2's full hashes on the PC are the ones
+`docs/repro/expected-windows.json` now holds.** These are the checks F3 had before its adoption, run on the PC on
+Nov 13 from 09:12 to 16:38 (the PC's clock); logs in `D:/katena/logs/aw2`, `D:/katena/logs/a2`,
+`D:/katena/logs/stress` and `D:/katena/logs/pcref/adopt_checks.log`, written up on Nov 15. External matches only
+(IDSSE `DFL-MAT-J03WMX` in the provided format); nothing ran on the provided match. Nothing is adopted by it.
+
+| # | Check | AW2 | A2 |
+|---|---|---|---|
+| R1 | Same machine, two fresh trainings on all 30 | Pass. The same `bundle.pkl` both times and a byte-identical dressed CSV, 0 of 145,608 graded frames differ | Pass, the same |
+| R2 | Dressed match, held-out model, both paths | Pass. Features and all six probability arrays bitwise equal, 0 of 29,123 work-grid labels differ, 0 CSV frames differ | Pass, the same |
+| R3 | Held-out model with other torch kernels | Pass. The TCN's hash changes (`ecb99ef8...` to `e0033fcb...`); the dressed CSV is byte-identical (`a1b03f59...`) | Pass. TCN `0931f98c...` to `45cd2a14...`; CSV `07c6bd26...` both times |
+| Stress | `scripts/stress_predict.py` with the all-30 model | 30 of 30 cases pass | 30 of 30 cases pass |
+
+**The hashes on this PC** (all 30 matches, 657,133 rows x 213 columns). The PC's first fits of Nov 13 (entry "A2
+and AW2 on four machines") gave the same, so each spec has trained to one `bundle.pkl` three times here.
+
+| | AW2 | A2 |
+|---|---|---|
+| gbdt | `55de693c7ea2ae3ac03c68ba005b41d8ed7ee2386e5fa6d6c04659551ef9439c` | `eb1030c8ec94b78081b664e1bb2b8de3a5fef5aea83be6cf3a3016546beff750` |
+| tcn | `78a241f571ad21dc0d4ab88c6ab35bc6f36a17a2ddc25ca63429c30e17392178` | `0f5b9b27ea546cf7fa3c79ed64648cc4ca96e0c7ba3471dced06a2618e3979bb` |
+| bundle.pkl | `9b4c2cfaa553af431185f6c0c99932293e8db3433b68d3a5ca94fe1bc0a30a57` | `dfda7e14c88242e6d3d4cf8d938743fdfe6936d6dc8918e4f09ca97092069213` |
+| dressed CSV (`idsse/DFL-MAT-J03WMX`, all-30 model) | `4e0ab1d06ba721a05924555a765edcea84c1c88008f5e15153ffdc27d41824ef` | `edb8c25495976693c1a88d32859e23619b5bdae100a1c99cce55e7fe48510408` |
+
+`docs/repro/windows-reference-AW2.json` is this PC's AW2 reference for `repro.yml` (hashes, stage digests and
+aggregates only). A2's is in `D:/katena/logs/a2` and is not committed.
+
+- **Restarts.** The AW2 driver stopped at the end of R1 (exit 1 at 10:09) and was interrupted in R2; its last
+  pass (exit 0 at 14:45) reused R1's two trainings and ran R2 and R3 again. A2's first pass was interrupted in
+  R1; its second ended with exit 0 at 16:30.
+- **One fold score was seen in R2.** `dressed_check.py compare` prints the held-out match's score at clean
+  input, the same on both paths: AW2 0.7714, A2 0.7740. One fold at a condition the gate does not use; it
+  decides nothing.
+- **Cost.** `train` on this PC: AW2 26 minutes in its first fit and 27 to 28 in R1's two (LightGBM 3, TCN 23 to
+  24); A2 23 to 27 minutes.
+
 ## 2026-11-14
 
 ### Justin chooses AW2; the adoption is prepared on `justin/adopt-aw2` and is not complete

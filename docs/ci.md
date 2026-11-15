@@ -154,13 +154,15 @@ run) frees disk, then: `uv sync --frozen`; restores the raw external downloads f
 `scripts/external_manifest.json`); `build_external.py`, which checks every raw file against its pinned SHA-256
 (a new pin fails the step); `make_submission.py corpus`, `worlds` (workers = CPU count) and `train`;
 `cache_digests.py dump`; `dressed_check.py export` of IDSSE `DFL-MAT-J03WMX`; and `predict` of that bundle
-with the all-30 model, as the Windows references were made (`spec` chooses F or F3). `scripts/repro_ci.py report` then writes one JSON:
+with the all-30 model, as the Windows references were made (`spec` chooses the model: AW2, the submission model, by
+default, or any other spec of `katena.pipeline.SPECS`). `scripts/repro_ci.py report` then writes one JSON:
 model and part hashes, stage digests, the dressed bundle's and CSV's sha256, versions, CPU facts, stage
 timings and label aggregates (counts, one score, one hash per 1,000 frames). The CSV is never uploaded.
 
-The `compare` job (non-blocking) puts every runner beside `docs/repro/windows-reference.json` (David's PC,
-from the J2/J3 entry of the decision log) in the run summary: per item same or differs, per stage how many
-files agree, and the earliest item that differs. If two dressed CSVs differ, the block hashes say how many
+The `compare` job (non-blocking) puts every runner beside the spec's Windows reference from David's PC,
+`docs/repro/windows-reference-<spec>.json`, in the run summary. F's is `windows-reference.json` (the J2/J3 entry of
+the decision log), and a spec without a reference of its own is compared with F's. The summary gives per item same
+or differs, per stage how many files agree, and the earliest item that differs. If two dressed CSVs differ, the block hashes say how many
 1,000-frame blocks hold the difference. To compare two machines by hand, `cache_digests.py diff` works on the
 uploaded `digests-<os>.json`.
 

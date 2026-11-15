@@ -80,13 +80,13 @@ If any of them prints FAIL or `raised <SomeError>`, stop and report the line.
 ```
 
 - `corpus` and `worlds` should report everything up to date.
-- `train` takes about 20 minutes (LightGBM 3, TCN 15 to 20). On this PC it should print these model hashes
-  (checked on 2026-11-11):
-  - gbdt `056ffa8a41ea…`
-  - tcn `4ec1a79e…`
-  - bundle `0a6359f3…`
+- `train` takes about 26 minutes (LightGBM 3, TCN 23 to 24). On this PC it should print these model hashes
+  (checked on 2026-11-13):
+  - gbdt `55de693c7ea2…`
+  - tcn `78a241f5…`
+  - bundle `9b4c2cfa…`
 
-  The full hashes are in `docs/repro/expected-windows.json`. After the run, the trained model's hashes are in `model_F3\manifest.json`
+  The full hashes are in `docs/repro/expected-windows.json`. After the run, the trained model's hashes are in `model_AW2\manifest.json`
   under `KATENA_WORK`. A different gbdt hash means the training data changed: stop and report it. A different tcn or bundle hash
   alone means torch's CPU kernels changed (a new torch or CPU): report it, but it is not by itself a bug.
 - `predict` takes about a minute and ends with the official checks on the written file.

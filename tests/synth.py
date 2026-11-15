@@ -59,6 +59,12 @@ def make_match(seed: int = 0, invert_labels: bool = False) -> Match:
                  name="synthetic", source="synthetic", meta={"label_source": "synthetic"})
 
 
+def fake_sc_actions(match_dir, m: Match) -> np.ndarray:
+    """A stand-in for ``katena.external.skillcorner_actions.build_labels`` on a synthetic SkillCorner match, which
+    has no raw action events: its standing label with H and A swapped, so the action labels differ from it."""
+    return np.where(m.y == H_, A_, np.where(m.y == A_, H_, m.y)).astype(m.y.dtype)
+
+
 def tagging_xml(instances) -> str:
     """A Smart Tagging file in the documented SportsCode layout (docs/upstream/DATA.md, starter/load_smart_tagging.py).
 

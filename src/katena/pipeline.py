@@ -5,10 +5,13 @@ F is defined in ``katena.eval.final`` (docs/decision-log.md, "Final candidate F"
 mix; the two blended at w = 0.5 in logit space; Viterbi at tau = 2 with priors from the external labels.
 Nothing here is chosen on the real match: every constant comes from ``katena.eval.final`` and its imports.
 
-``SPECS`` names the models ``train`` can fit. ``F3`` is the submission model (docs/decision-log.md, 2026-11-11):
-F with a 1,200-tree LightGBM member and a 4,800-step TCN that also reads the touch columns (``katena.eval.f3``).
-``F`` is the model it replaced, kept so its checks can be re-run. Each spec has its own folder (``model/`` for F,
-``model_<spec>/`` otherwise), so one can never be taken for the other.
+``SPECS`` names the models ``train`` can fit. ``AW2`` is the submission model (docs/decision-log.md, 2026-11-12
+and 2026-11-13, "AW" and "A2 and AW2"): F3 trained on labels from SkillCorner's own action events for its 20
+matches (``katena.eval.actlabels``), with possession-length weights in both team heads (``katena.models.lenweight``)
+and a TCN trained 9,600 steps instead of 4,800. ``F3`` (2026-11-11) is F with a 1,200-tree LightGBM member and a
+4,800-step TCN that also reads the touch columns (``katena.eval.f3``). F3 and F are the earlier submission models, kept
+so their checks can be re-run. Each spec has its own folder (``model/`` for F, ``model_<spec>/`` otherwise), so one can
+never be taken for another.
 
 Stages, each cached under ``KATENA_WORK`` (``scripts/make_submission.py`` sets it to ``work/final``):
 
@@ -84,7 +87,7 @@ SPECS = {"F": Spec("F", 150, 1200, False),
          # member is A's or AW's, byte for byte.
          "A2": Spec("A2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True),
          "AW2": Spec("AW2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True)}
-SUBMISSION_SPEC = "F3"      # the model `make submit` trains and predicts with; changed only by an adoption
+SUBMISSION_SPEC = "AW2"     # the model `make submit` trains and predicts with; changed only by an adoption
 
 
 def spec_of(name: str | None = None) -> Spec:

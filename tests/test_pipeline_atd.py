@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synth import make_match
+from synth import fake_sc_actions, make_match
 
 from katena.eval import protocol as P
 from katena.target import dress
@@ -108,6 +108,7 @@ def trained(tmp_path_factory):
     pytest.importorskip("torch")
     from katena import pipeline as PL
     from katena.eval import lomo as Lm
+    from katena.external import skillcorner_actions as SA
     from katena.models import tcn
     from katena.types import save_match
     tmp = tmp_path_factory.mktemp("pipeline_atd")
@@ -117,6 +118,8 @@ def trained(tmp_path_factory):
         mp.setattr(P, "CANON", tmp / "canon")
         mp.setattr(P, "WORK", tmp / "work")
         mp.setattr(Lm, "OOF_DIR", tmp / "work" / "oof")
+        mp.setattr(SA, "build_labels", fake_sc_actions)       # no raw action events for a synthetic SkillCorner match
+        mp.setattr(P, "EXTERNAL", tmp / "external")
         for seed, (ds, mid) in enumerate((("metrica", "SYN1"), ("metrica", "SYN0"), ("idsse", "SYN7"),
                                           ("skillcorner", "SYN3"))):
             save_match(make_match(seed=seed, invert_labels=seed == 1), tmp / "canon" / ds / f"{mid}.npz")
