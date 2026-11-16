@@ -682,6 +682,12 @@ def main(argv=None) -> int:
 
     if run.csv_written and run.report["csv"]["sha256"] is None:      # a look at the public window is logged
         say(f"SHA-256  {digest(run)}  {run.csv}")                     # with the hash of the file it looked at
+    try:
+        stale = run.report["result"] != "PASS" and run.csv.is_file() and run.csv.stat().st_mtime < run.t0
+    except OSError:
+        stale = False
+    if stale:                       # an earlier run's file under the name the form asks for
+        run.report["warnings"].append(f"{run.csv} is from an earlier run, not from this one: do not upload it")
     run.report["finished"] = now()
     run.report["seconds"]["total"] = round(time.time() - run.t0, 1)
     say("\n== 5. Run report")

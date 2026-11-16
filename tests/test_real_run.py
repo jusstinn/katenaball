@@ -421,6 +421,26 @@ def test_spaces_accents_and_a_final_dot_name_a_valid_csv(name, tmp_path):
     assert [p.name for p in tmp_path.iterdir()] == [f"{name}.csv"]
 
 
+def test_a_failed_run_says_when_the_csv_there_is_an_earlier_runs(box):
+    import os
+    box.subs.mkdir(parents=True, exist_ok=True)
+    old = box.subs / f"{TEAM}.csv"
+    old.write_bytes(b"frame,label\n0,D\n")
+    past = time.time() - 3600
+    os.utime(old, (past, past))
+    box.check("check_target", ["FAIL  slot count matches the published count"], rc=1)
+    rc, out, rep = box.run()
+    assert rc == 1 and not box.ran("make_submission")
+    assert any("is from an earlier run, not from this one: do not upload it" in w for w in rep["warnings"])
+    assert "do not upload it" in out.split("== 5. Run report", 1)[1]
+
+
+def test_a_passing_run_does_not_call_its_own_csv_an_earlier_one(box):
+    rc, out, rep = box.run()
+    assert rc == 0, out
+    assert "earlier run" not in out and not any("earlier run" in w for w in rep["warnings"])
+
+
 # ---------------------------------------------------------------------------------------------
 
 def test_the_traceback_filter_keeps_only_the_type():
