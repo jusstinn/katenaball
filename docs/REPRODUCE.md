@@ -3,11 +3,13 @@
 One command, from a clone of this repository and the data bundle:
 
 ```bash
+git checkout submission-v1     # the tagged commit that produced the submitted file (technical document, section 8)
 make submit TEAM=<team_name>
 ```
 
 It writes `submissions/<team_name>.csv`, runs the official `evaluation/validate_submission.py` on that exact
-file, and prints its sha256. A team name with a space needs quotes: `make submit TEAM="My Team"`.
+file, and prints its sha256. A team name with a space needs quotes: `make submit TEAM="My Team"`. Without `make`
+(it is not on Windows by default), run the same steps by hand: see "Without `make`" below.
 
 ## Where the data bundle goes
 
@@ -111,7 +113,9 @@ uv run python evaluation/validate_submission.py submissions/<team_name>.csv
 sha256sum submissions/<team_name>.csv                         # shasum -a 256 on macOS, Get-FileHash on Windows
 ```
 
-Every step skips what is already built, so a run that stopped can be started again with the same command.
+The commands are the same in PowerShell, where `$env:MTAH_DATA_DIR = "D:\path\to\bundle"` points at the bundle.
+Every step but `train` skips what is already built, so a run that stopped can be started again with the same
+command; `train` fits the model again each time (the same bytes, about 26 minutes on a 4-core PC).
 
 ## Checking the submission path without the match
 
