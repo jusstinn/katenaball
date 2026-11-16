@@ -293,6 +293,24 @@ def test_a_kickoff_warn_line_is_shown_and_does_not_stop_the_run(box):
     assert box.ran("make_submission")
 
 
+def test_an_unreadable_tagging_file_is_a_kickoff_warn_not_a_stop(box):
+    # check_kickoff_tags.py's own wording when it cannot read the file: one WARN line, exit 0
+    box.check("check_kickoff_tags", ["Output holds no match values. Safe to paste.", "",
+                                     "WARN  reading the Smart Tagging file  (raised ParseError; the rule does not apply)",
+                                     "", "0 passed, 1 warned, 0 failed"])
+    rc, out, rep = box.run()
+    assert rc == 0, out
+    assert rep["checks"][3]["result"] == "PASS" and box.ran("make_submission")
+    assert any("reading the Smart Tagging file" in w for w in rep["warnings"])
+
+
+def test_a_check_with_warn_lines_only_still_fails_unless_its_warn_is_safe(box):
+    box.check("check_target", ["WARN  something odd"])
+    rc, out, rep = box.run()
+    assert rc == 1 and rep["failed_step"] == "checks"
+    assert rep["stop_reason"] == "check_target.py: FAIL  printed no PASS line"
+
+
 @pytest.mark.parametrize("verdict, rc_expected", [("PASS", 0), ("FAIL", 1)])
 def test_the_kickoff_check_runs_when_this_checkout_has_it(box, verdict, rc_expected):
     box.check("check_kickoff_tags", ["half 1 kickoff within 2 s of FAQ.md: " + verdict,

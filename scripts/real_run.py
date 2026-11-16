@@ -62,6 +62,10 @@ TOOLS = {
 }
 CHECKS = ("check_target", "check_target_layout", "check_touch_target", "check_kickoff_tags")
 OPTIONAL = {"check_kickoff_tags"}          # W4a adds it; a checkout without it skips it
+# Checks whose WARN lines alone are a pass. check_kickoff_tags.py prints one WARN line and exits 0 when it cannot
+# read the Smart Tagging file: the kickoff rule then leaves every frame unchanged, which is safe, and the check
+# exits 1 on a FAIL line only (its docstring). Without this, that WARN alone stopped the run as a bare FAIL.
+WARN_ONLY_PASSES = {"check_kickoff_tags"}
 WORKERS = 2
 # katena.pipeline's names (tests/test_real_run.py checks they agree); imported, it would pull in torch.
 MODEL_DIR, MANIFEST, BUNDLE = "model", "manifest.json", "bundle.pkl"
@@ -377,7 +381,8 @@ def checks(run: Run) -> None:
         lines = verdict_lines(key, rc, shown)
         n_pass = sum(x.startswith("PASS") for x in lines)
         n_fail = sum(x.startswith("FAIL") for x in lines)
-        ok = n_fail == 0 and n_pass > 0 and rc == 0
+        n_warn = sum(x.startswith("WARN") for x in lines)
+        ok = n_fail == 0 and rc == 0 and (n_pass > 0 or (key in WARN_ONLY_PASSES and n_warn > 0))
         secs = round(time.time() - t, 1)
         say(path.name)
         for x in lines:
@@ -387,7 +392,7 @@ def checks(run: Run) -> None:
                                      "fail": n_fail, "exit_status": rc, "seconds": secs, "lines": lines})
         run.report["warnings"] += [f"{path.name}: {x[6:]}" for x in lines if x.startswith("WARN")]
         if not ok:
-            first = next((x for x in lines if x.startswith("FAIL")), "FAIL")
+            first = next((x for x in lines if x.startswith("FAIL")), "FAIL  printed no PASS line")
             raise Stop(f"{path.name}: {first}")
 
 
