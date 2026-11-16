@@ -405,11 +405,20 @@ def test_the_real_validator_and_public_window_check_on_a_published_file(box):
 
 
 def test_the_team_name_must_be_a_plain_file_name(capsys):
-    for bad in ("../x", "a/b", "a\\b", "", " x", "x.", "a:b"):
+    for bad in ("../x", "a/b", "a\\b", "", " x", "x ", "a:b", "a?", "CON", "nul", "Com1.x", "lpt9"):
         with pytest.raises(SystemExit) as e:
             RR.main(["--team", bad])
         assert e.value.code == 2
     capsys.readouterr()
+
+
+@pytest.mark.parametrize("name", ["katenaball", "Barça FC", "Équipe d'Or & Co (2)", "Katena F.C.", "FC-Katena_2",
+                                  "Console", "CONx"])
+def test_spaces_accents_and_a_final_dot_name_a_valid_csv(name, tmp_path):
+    assert RR.team_name(name) == name
+    path = tmp_path / f"{name}.csv"                        # the name the form asks for, as this OS writes it
+    path.write_bytes(b"frame,label\n")
+    assert [p.name for p in tmp_path.iterdir()] == [f"{name}.csv"]
 
 
 # ---------------------------------------------------------------------------------------------

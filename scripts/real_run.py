@@ -626,11 +626,18 @@ def write_report(run: Run) -> Path:
 # ---------------------------------------------------------------------------------------------
 
 BAD_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+# Windows opens these as devices whatever the extension ("NUL.csv" is the null device). build_document.py has
+# the same rule for the PDF (tests/test_build_document.py compares the two).
+RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
 
 def team_name(value: str) -> str:
-    if not value or BAD_NAME.search(value) or value != value.strip() or value.endswith("."):
-        raise argparse.ArgumentTypeError("the team name must be a plain file name (it names the CSV)")
+    """The registered team name as given, if ``<value>.csv`` is a valid file name on Windows. Spaces, accents
+    and a final dot are fine ("Katena F.C." gives "Katena F.C..csv"); quote a name with a space."""
+    if (not value or BAD_NAME.search(value) or value != value.strip()
+            or value.split(".")[0].strip().upper() in RESERVED):
+        raise argparse.ArgumentTypeError('the team name names the CSV: none of < > : " / \\ | ? *, no space at '
+                                         "either end, and not a Windows device name such as CON or NUL")
     return value
 
 

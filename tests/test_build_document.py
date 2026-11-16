@@ -36,14 +36,31 @@ def test_the_real_document_names_its_markers():
     assert all(BD.MARKER in lines[i - 1] for i in BD.todo_lines(text))
 
 
-@pytest.mark.parametrize("name, ok", [("katenaball", True), ("FC Katena_2-b.", True), ("", False),
-                                      ("a/b", False), ("x:y", False), ("-x", False)])
+NAMES = [("katenaball", True), ("FC Katena_2-b.", True), ("Barça FC", True), ("Équipe d'Or & Co (2)", True),
+         ("Katena F.C.", True), ("Console", True), ("", False), ("a/b", False), ("x:y", False), ("a\\b", False),
+         ("a?", False), ('a"b', False), ("CON", False), ("nul.x", False), ("Lpt1", False)]
+
+
+@pytest.mark.parametrize("name, ok", NAMES)
 def test_team_name(name, ok):
     if ok:
         assert BD.team_name(f" {name} ") == name
     else:
         with pytest.raises(Exception):
             BD.team_name(name)
+
+
+@pytest.mark.parametrize("name, ok", NAMES)
+def test_the_pdf_and_the_csv_accept_the_same_team_names(name, ok):
+    import argparse
+
+    import real_run as RR
+    try:
+        RR.team_name(name)
+        csv_ok = True
+    except argparse.ArgumentTypeError:
+        csv_ok = False
+    assert csv_ok == ok
 
 
 def test_count_pages():

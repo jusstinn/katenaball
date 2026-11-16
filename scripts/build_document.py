@@ -46,7 +46,10 @@ SOURCE = REPO / "docs" / "technical-document.md"
 SUBMISSIONS = REPO / "submissions"
 PLACEHOLDER = "<team_name>"
 MARKER = "TODO("
-TEAM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]*")       # the same shape real_run.py accepts for a file name
+# The team name names the file, so it must be a valid file name on Windows. The same rule as real_run.py's
+# team_name, apart from the surrounding spaces stripped here (tests/test_build_document.py compares the two).
+BAD_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
 CSS = """
 @page { size: A4; margin: 15mm 14mm 16mm 14mm; @bottom-center { content: counter(page); font: 8pt "Segoe UI", Helvetica, Arial, sans-serif; color: #666; } }
@@ -73,8 +76,9 @@ a { color: inherit; text-decoration: none; }
 
 def team_name(value: str) -> str:
     value = value.strip()
-    if not TEAM_RE.fullmatch(value):
-        raise argparse.ArgumentTypeError("letters, digits, space, dot, underscore and hyphen only")
+    if not value or BAD_NAME.search(value) or value.split(".")[0].strip().upper() in RESERVED:
+        raise argparse.ArgumentTypeError('the team name names the PDF: none of < > : " / \\ | ? * and not a '
+                                         "Windows device name such as CON or NUL")
     return value
 
 
