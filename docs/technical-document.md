@@ -216,8 +216,9 @@ than 2 s, with the other team on both sides, is relabelled to the surrounding te
   one of the 28 LightGBM fold models grew other trees on a Linux runner than on our PC. The final models of
   A and of AW did not show that: each gave one LightGBM model and one CSV, byte for byte, for an external
   match in the provided format, on macOS, Ubuntu and Windows runners and on our PC. AW2's final model did
-  the same. So expect the same file on another machine; that was shown on an external
-  match, not on the provided one, where a near-tie could flip a label.
+  the same, there and on the MacBook (Apple M5) that made the submitted file. So expect the same file on
+  another machine; that was shown on an external match, not on the provided one, where a near-tie could
+  flip a label.
 
 ## 8. Reproduction
 

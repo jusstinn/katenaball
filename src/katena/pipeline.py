@@ -84,7 +84,7 @@ SPECS = {"F": Spec("F", 150, 1200, False),
          # member is A's or AW's, byte for byte.
          "A2": Spec("A2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True),
          "AW2": Spec("AW2", F3.N_TREES, 2 * F3.STEPS, True, sc_actions=True, sc_dead=True, len_weights=True)}
-SUBMISSION_SPEC = "F3"      # the model `make submit` trains and predicts with; changed only by an adoption
+SUBMISSION_SPEC = "AW2"     # the model `make submit` trains and predicts with; changed only by an adoption
 
 
 def spec_of(name: str | None = None) -> Spec:

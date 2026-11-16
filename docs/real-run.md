@@ -18,6 +18,29 @@ $env:KATENA_EXTERNAL = "D:\katena\external_data"   # the external corpus
 $env:KATENA_WORK     = "D:\katena\work-submit"     # the cache: corpus and worlds are already built there
 ```
 
+### On the Mac (the fallback machine)
+
+The same run from a Mac, if the PC cannot make it (`docs/decision-log.md`, 2026-11-16). The Mac needs the
+organisers' data bundle first: unpack it anywhere and point `MTAH_DATA_DIR` at the folder that holds
+`tactical/` and `broadcast/`. The command reads four of its files and stops in step 1 if one is missing:
+`tactical/BAR-ATH_tactical_atd.xml`, `tactical/BAR-ATH_tactical_atd.txt`,
+`tactical/BAR-ATH_tactical_smart_tagging.xml` and, for the layout check only,
+`broadcast/BAR-ATH_broadcast_atd.xml`. The videos are not needed. The three paths below are the Mac's own; the
+external corpus and the cache are already built there.
+
+```bash
+git checkout main && git pull
+export MTAH_DATA_DIR=/path/to/the/unpacked/bundle
+export KATENA_EXTERNAL=/path/to/external_data
+export KATENA_WORK=/path/to/work/final
+uv sync --frozen
+uv run python scripts/make_submission.py bundle        # "bundle: 3 files found" (the tactical three); it opens nothing
+uv run python scripts/real_run.py --team <team_name>
+```
+
+Everything below holds on the Mac too, with `uv run python` for `.venv\Scripts\python.exe`, `/` for `\` and
+`shasum -a 256` for `Get-FileHash`.
+
 ## Steps 1 to 3 in one command
 
 Replace `<team_name>` with the team name registered on the form (the file must be named after it).
@@ -36,7 +59,7 @@ and it stops at the first failure:
 2. **The checks on the provided files** (step 1 below). It prints only their PASS/FAIL lines, and for the touch
    check the feature shape. A FAIL or a `raised <SomeError>` line stops the run.
 3. **`make_submission.py all --workers 2`** (step 2 below), with its output streamed. Then it compares the model
-   hashes with [`docs/repro/expected-windows.json`](repro/expected-windows.json). A different gbdt hash stops
+   hashes with [`docs/repro/expected-hashes.json`](repro/expected-hashes.json). A different gbdt hash stops
    the run, before `predict` when it can. A different tcn or bundle hash alone is printed as a `WARN`.
 4. **`validate_submission.py`** on the exact file, **`check_public_window.py`** (PASS/FAIL lines only), and the
    file's SHA-256 (step 3 below).
@@ -80,15 +103,18 @@ If any of them prints FAIL or `raised <SomeError>`, stop and report the line.
 ```
 
 - `corpus` and `worlds` should report everything up to date.
-- `train` takes about 20 minutes (LightGBM 3, TCN 15 to 20). On this PC it should print these model hashes
-  (checked on 2026-11-11):
-  - gbdt `056ffa8a41ea…`
-  - tcn `4ec1a79e…`
-  - bundle `0a6359f3…`
+- `train` fits AW2 every time it runs: about 26 minutes on the PC and about 20 on the Mac (LightGBM 1, the
+  TCN 19; 30 with other work running). On the Mac it should print these model hashes (two fits on
+  2026-11-16 gave them both times):
+  - gbdt `55de693c7ea2…`
+  - tcn `caabf1d3c910…`
+  - bundle `91b8fccce91d…`
 
-  The full hashes are in `docs/repro/expected-windows.json`. After the run, the trained model's hashes are in `model_F3\manifest.json`
+  The full hashes are in `docs/repro/expected-hashes.json`. After the run, the trained model's hashes are in `model_AW2\manifest.json`
   under `KATENA_WORK`. A different gbdt hash means the training data changed: stop and report it. A different tcn or bundle hash
-  alone means torch's CPU kernels changed (a new torch or CPU): report it, but it is not by itself a bug.
+  alone means torch's CPU kernels changed (a new torch or CPU): report it, but it is not by itself a bug. On the PC
+  the gbdt hash is the same and the other two are tcn `78a241f571ad…` and bundle `9b4c2cfaa553…`, so there the
+  command prints two `WARN` lines and goes on.
 - `predict` takes about a minute and ends with the official checks on the written file.
 
 ## 3. Validate and check the pipeline (by hand)

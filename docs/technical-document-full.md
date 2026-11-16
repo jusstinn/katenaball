@@ -848,9 +848,14 @@ D over the first 60 and 120 s of each half, as an aggregate.
 
   AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on the
   same four kinds of machine, and they gave one LightGBM member and one dressed CSV.
-  Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `55de693c7ea2...`, TCN
-  `78a241f571ad...`, bundle `9b4c2cfaa553...`; the dressed match's CSV
-  `4e0ab1d06ba7...`.
+  On the reference PC: LightGBM `55de693c7ea2...`, TCN `78a241f571ad...`, bundle `9b4c2cfaa553...`; the
+  dressed match's CSV `4e0ab1d06ba7...`.
+
+  The submitted file was made on a fifth machine, a MacBook with an Apple M5 (macOS 26.5), because the
+  reference PC could not be used in the last days before the deadline. Its all-30 model of AW2 has the
+  same LightGBM member, TCN weights of its own (`caabf1d3c910...`, bundle `91b8fccce91d...`), and it gives
+  the same dressed CSV, byte for byte. `docs/repro/expected-hashes.json` holds that machine's three hashes;
+  `scripts/real_run.py` stops on another LightGBM hash and only warns on the other two.
 
   **LightGBM is not byte-identical on every machine for every training set.** In the gate of section 3.5,
   A's LightGBM member fitted on the Linux runners equals the PC's own fit on 27 of 28 folds, hash and every
@@ -904,8 +909,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   model byte for byte in 1 h 39 min, including the download. F3 changes only the training step, and F3
   trained twice there gives the same model file. AW and AW2 also change only the training step. AW's
   all-30 model gave one LightGBM member and one dressed CSV on three GitHub runners, each from an empty
-  cache, and on the reference machine. Section 7 has that check, AW2's, and the hashes expected on the
-  reference machine.
+  cache, and on the reference machine. Section 7 has that check, AW2's, the machine that made the
+  submitted file, and the expected hashes.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
   import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
 - **Cost:**

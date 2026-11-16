@@ -154,7 +154,7 @@ run) frees disk, then: `uv sync --frozen`; restores the raw external downloads f
 `scripts/external_manifest.json`); `build_external.py`, which checks every raw file against its pinned SHA-256
 (a new pin fails the step); `make_submission.py corpus`, `worlds` (workers = CPU count) and `train`;
 `cache_digests.py dump`; `dressed_check.py export` of IDSSE `DFL-MAT-J03WMX`; and `predict` of that bundle
-with the all-30 model, as the Windows references were made (`spec` chooses F or F3). `scripts/repro_ci.py report` then writes one JSON:
+with the all-30 model, as the Windows references were made (`spec` chooses the model spec). `scripts/repro_ci.py report` then writes one JSON:
 model and part hashes, stage digests, the dressed bundle's and CSV's sha256, versions, CPU facts, stage
 timings and label aggregates (counts, one score, one hash per 1,000 frames). The CSV is never uploaded.
 

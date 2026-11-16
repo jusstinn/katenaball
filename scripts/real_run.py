@@ -15,7 +15,7 @@ It runs these steps in order and stops at the first failure:
 2. The human checks: check_target.py, check_target_layout.py, check_touch_target.py, then
    check_kickoff_tags.py when this checkout has it. --skip-checks skips this step.
 3. make_submission.py all --workers 2 --out submissions/<team>.csv, its output streamed, then the trained
-   model's hashes against docs/repro/expected-windows.json. A different gbdt hash stops the run (the training
+   model's hashes against docs/repro/expected-hashes.json. A different gbdt hash stops the run (the training
    data changed), before predict when it can. A different tcn or bundle hash alone is a warning (torch's CPU
    kernels changed).
 4. evaluation/validate_submission.py on the exact file, check_public_window.py, and the file's SHA-256.
@@ -50,7 +50,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 SUBMISSIONS = REPO / "submissions"
-EXPECTED = REPO / "docs" / "repro" / "expected-windows.json"
+EXPECTED = REPO / "docs" / "repro" / "expected-hashes.json"
 TOOLS = {
     "check_target": REPO / "scripts" / "check_target.py",
     "check_target_layout": REPO / "scripts" / "check_target_layout.py",
@@ -490,7 +490,7 @@ def submission(run: Run) -> None:
         run.report["hash_check"] = {"gbdt": "differs"}
         say(f"FAIL  gbdt {watch.train_gbdt}, expected {expected.get('gbdt')}: the training data changed. "
             "Stopped make_submission.py before predict. Report it")
-        raise Stop("gbdt hash differs from docs/repro/expected-windows.json: the training data changed")
+        raise Stop("gbdt hash differs from docs/repro/expected-hashes.json: the training data changed")
     if rc != 0:
         raise Stop(f"make_submission.py exited with status {rc}")
 
@@ -500,7 +500,7 @@ def submission(run: Run) -> None:
     with open(manifest, encoding="utf-8") as fh:
         got = json.load(fh).get("sha256", {})
     run.report["model_sha256"] = {k: got.get(k) for k in HASH_KEYS}
-    say("model hashes against docs/repro/expected-windows.json")
+    say("model hashes against docs/repro/expected-hashes.json")
     kernels = []
     for key in HASH_KEYS:
         same = got.get(key) is not None and got.get(key) == expected.get(key)
@@ -511,7 +511,7 @@ def submission(run: Run) -> None:
             say(f"  {'FAIL' if key == 'gbdt' else 'WARN'}  {key:10s} {got.get(key)}, expected {expected.get(key)}")
             kernels += [] if key == "gbdt" else [key]
     if run.report["hash_check"]["gbdt"] != "same":
-        raise Stop("gbdt hash differs from docs/repro/expected-windows.json: the training data changed")
+        raise Stop("gbdt hash differs from docs/repro/expected-hashes.json: the training data changed")
     if kernels:
         run.warn(f"{' and '.join(kernels)} hash differs: torch's CPU kernels changed (a new torch or CPU). "
                  "Report it; it is not by itself a bug")
@@ -602,7 +602,7 @@ def snippet(r: dict) -> str:
         out.append("- Checks on the provided files: " + "; ".join(parts) + ".")
         out += [f"  - `{c['script']}`: {x}" for c in r["checks"] for x in c.get("lines", []) if x.startswith("FAIL")]
     if r["model_sha256"]:
-        out.append("- Model, against `docs/repro/expected-windows.json`: "
+        out.append("- Model, against `docs/repro/expected-hashes.json`: "
                    + "; ".join(f"{k} `{v}` ({r['hash_check'].get(k, '?')})" for k, v in r["model_sha256"].items())
                    + ".")
     if r["validate_submission"]:
