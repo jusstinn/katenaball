@@ -85,3 +85,19 @@ def write_tagging(root, instances):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(tagging_xml(instances).encode("utf-8"))
     return path
+
+
+def use_synthetic_action_labels(mp, external) -> None:
+    """Let a spec that trains on SkillCorner action labels (A, AW, A2, AW2) fit on the synthetic corpus.
+
+    The synthetic SkillCorner match has no event files to rebuild labels from, so ``build_labels`` is replaced by one
+    that returns the match's own labels, and ``P.EXTERNAL`` points at ``external`` so that nothing outside the test
+    is looked for. ``mp`` is a ``pytest.MonkeyPatch``. A spec without action labels never calls either."""
+    from katena.eval import protocol as P
+    from katena.external import skillcorner_actions as SA
+
+    def own_labels(match_dir, m):
+        return m.y.copy()
+
+    mp.setattr(SA, "build_labels", own_labels)
+    mp.setattr(P, "EXTERNAL", external)

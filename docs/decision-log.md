@@ -62,7 +62,7 @@ synthetic bundle in the provided format and on the competition's timeline (the g
 So the command runs on macOS from its first step to its last check. The four human checks of step 2 have not
 run on the Mac: they need the real files.
 
-**What `justin/adopt-aw2-mac` changes** (on top of `justin/adopt-aw2`; the tests pass on the Mac with it).
+**What `justin/adopt-aw2-mac` changes** (on top of `justin/adopt-aw2`).
 
 - `SUBMISSION_SPEC = "AW2"`.
 - `docs/repro/expected-windows.json` is renamed `docs/repro/expected-hashes.json` and holds AW2's three hashes
@@ -70,6 +70,14 @@ run on the Mac: they need the real files.
   far. The TCN and bundle hashes are the Mac's: on the PC they would differ, which is a warning and no stop.
 - `docs/real-run.md` has the Mac's commands and AW2's hashes; `docs/REPRODUCE.md`, `docs/ci.md` and the
   docstring of `scripts/make_submission.py` name AW2.
+- **The tests' synthetic corpus gets stand-in action labels** (`tests/synth.py`, used by the fixtures of
+  `tests/test_pipeline.py` and `tests/test_pipeline_atd.py`). Six tests train the submission model on four
+  synthetic matches, one of them a SkillCorner match with no event files, so with AW2 as the submission model
+  they failed on all three CI systems at the first push of this branch (`fd89c72`). The stand-in returns that
+  match's own labels; no model code changed. The first push went out after 333 tests passed on the Mac, but
+  that run had skipped every LightGBM test: pytest on the Mac needs `DYLD_FALLBACK_LIBRARY_PATH` set to
+  scikit-learn's libomp, as `ci.yml` sets it. With it, 358 pass and 2 skip (no `markdown_it`, no built
+  `external_data` beside the worktree).
 - Both technical documents say which machine made the file. `PENDING_DAVID_AW2` and the three `TODO(after the
   real run)` markers are still there.
 

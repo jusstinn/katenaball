@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synth import make_match
+from synth import make_match, use_synthetic_action_labels
 
 from katena.eval import protocol as P
 from katena.target import dress
@@ -117,6 +117,7 @@ def trained(tmp_path_factory):
         mp.setattr(P, "CANON", tmp / "canon")
         mp.setattr(P, "WORK", tmp / "work")
         mp.setattr(Lm, "OOF_DIR", tmp / "work" / "oof")
+        use_synthetic_action_labels(mp, tmp / "external")                # the submission model trains on them
         for seed, (ds, mid) in enumerate((("metrica", "SYN1"), ("metrica", "SYN0"), ("idsse", "SYN7"),
                                           ("skillcorner", "SYN3"))):
             save_match(make_match(seed=seed, invert_labels=seed == 1), tmp / "canon" / ds / f"{mid}.npz")

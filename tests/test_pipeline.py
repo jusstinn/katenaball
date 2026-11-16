@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synth import make_match
+from synth import make_match, use_synthetic_action_labels
 
 from katena.eval import corpus as C
 from katena.eval import protocol as P
@@ -24,6 +24,7 @@ def synth_corpus(tmp_path, monkeypatch):
     monkeypatch.setattr(tcn, "BATCH", 4)
     monkeypatch.setattr(tcn, "WIN", 64)
     monkeypatch.setattr(P, "CANON", tmp_path / "canon")
+    use_synthetic_action_labels(monkeypatch, tmp_path / "external")     # the submission model trains on them
     for seed, (ds, mid) in enumerate((("metrica", "SYN1"), ("metrica", "SYN0"), ("idsse", "SYN7"),
                                       ("skillcorner", "SYN3"))):
         save_match(make_match(seed=seed, invert_labels=seed == 1), tmp_path / "canon" / ds / f"{mid}.npz")
@@ -57,11 +58,19 @@ def test_pipeline_trains_on_every_match_and_labels_a_new_one(synth_corpus, monke
 
     model = PL.load_model()
     assert model.names[:model.n_base] == list(C.load_feat(refs[0], "target")["names"])
-    # the reloaded LightGBM member predicts exactly what the trained one did
+    # the reloaded LightGBM member predicts exactly what the gate's call fits for the submission spec
+    from katena.eval import actlabels as AL
     from katena.models import gbdt
+    sp = PL.spec_of()
     pools = F.FinalPools(refs)
-    heads = gbdt.fit_heads(pools.X, pools.o, pools.y[P.T_MAIN], pools.dead_ok, pools.cols(),
-                           n_trees=PL.spec_of().gbdt_trees)                 # the submission spec's size
+    y, dead_ok, w = pools.y[P.T_MAIN], pools.dead_ok, None
+    if sp.sc_actions:                                                       # as stage_train: the action labels,
+        y = AL.pool_y(refs, pools)
+        if sp.sc_dead:
+            dead_ok = np.ones(len(y), bool)                                 # their dead rows,
+    if sp.len_weights:
+        w = AL.pool_weights(refs, AL.native_weights(refs, P.T_MAIN))        # and the possession-length weights
+    heads = gbdt.fit_heads(pools.X, pools.o, y, dead_ok, pools.cols(), n_trees=sp.gbdt_trees, team_weight=w)
     X = pools.X[:500]
     a = heads.predict(X, X)
     b = model.heads().predict(X, X)
