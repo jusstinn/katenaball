@@ -63,6 +63,55 @@ def test_the_pdf_and_the_csv_accept_the_same_team_names(name, ok):
     assert csv_ok == ok
 
 
+def test_the_browser_runs_without_the_compat_layer(monkeypatch):
+    monkeypatch.setenv("__COMPAT_LAYER", "DetectorsAppHealth")
+    monkeypatch.setenv("KATENA_TEST_KEEP", "1")
+    env = BD.browser_env()
+    assert "__COMPAT_LAYER" not in env and env["KATENA_TEST_KEEP"] == "1"
+
+
+def test_pdf_complete_needs_the_header_and_the_end_marker(tmp_path):
+    p = tmp_path / "x.pdf"
+    assert not BD.pdf_complete(p)
+    p.write_bytes(b"%PDF-1.4\n" + b"x" * 5000)
+    assert not BD.pdf_complete(p)                                  # still being written
+    p.write_bytes(b"%PDF-1.4\n" + b"x" * 5000 + b"\n%%EOF\n")
+    assert BD.pdf_complete(p)
+    p.write_bytes(b"<html>%%EOF")
+    assert not BD.pdf_complete(p)
+
+
+PDF = b"%PDF-1.4\n<< /Type /Pages /Count 1 >> << /Type /Page >>\n%%EOF\n"
+
+
+def test_a_browser_that_returns_before_the_pdf_is_written_is_waited_for(tmp_path, monkeypatch):
+    """msedge.exe with __COMPAT_LAYER set: exit 0 at once, the file a moment later from another process."""
+    import subprocess
+    import threading
+
+    out = tmp_path / "late.pdf"
+
+    def fake_run(cmd, **kw):
+        assert "__COMPAT_LAYER" not in kw["env"]
+        threading.Timer(0.5, lambda: out.write_bytes(PDF)).start()
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setenv("__COMPAT_LAYER", "DetectorsAppHealth")
+    monkeypatch.setattr(BD.subprocess, "run", fake_run)
+    assert BD.print_pdf(tmp_path / "b.exe", tmp_path / "p.html", out, wait=10) == (0, "")
+    assert BD.pdf_complete(out)
+
+
+def test_no_wait_after_a_browser_that_failed(tmp_path, monkeypatch):
+    import subprocess
+    import time
+
+    monkeypatch.setattr(BD.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 3, "", "oops\n"))
+    t = time.monotonic()
+    assert BD.print_pdf(tmp_path / "b.exe", tmp_path / "p.html", tmp_path / "x.pdf", wait=10) == (3, "oops")
+    assert time.monotonic() - t < 5
+
+
 def test_count_pages():
     pdf = b"<< /Type /Pages /Count 2 >> << /Type /Page /Parent 1 0 R >> <</Type/Page>> << /Type /PageLabels >>"
     assert BD.count_pages(pdf) == 2 and BD.count_pages(b"%PDF") is None
@@ -106,8 +155,70 @@ def test_a_browser_that_writes_nothing_fails(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(BD, "find_browser", lambda given=None: tmp_path / "browser.exe")
     monkeypatch.setattr(BD, "to_html", lambda text, title: "<html></html>")
     monkeypatch.setattr(BD, "print_pdf", lambda browser, page, out: (7, "boom"))
+    monkeypatch.setattr(BD, "print_pdf_playwright", lambda browser, page, out: (1, "TimeoutError: no page"))
     assert BD.main(["--team", "t", "--draft", "--source", str(src), "--out", str(tmp_path / "t.pdf")]) == 1
-    assert "wrote no PDF (exit 7): boom" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "wrote no PDF (exit 7): boom; through Playwright: TimeoutError: no page" in out
+    assert "FAIL" in out and "pages" not in out
+
+
+def test_the_fallback_prints_through_playwright_and_reports_the_pages(tmp_path, monkeypatch, capsys):
+    src = tmp_path / "doc.md"
+    src.write_text(TEXT, encoding="utf-8")
+    seen = []
+
+    def fallback(browser, page, out):
+        seen.append(page.read_text(encoding="utf-8"))            # the page still exists for the fallback
+        out.write_bytes(PDF)
+        return 0, ""
+
+    monkeypatch.setattr(BD, "find_browser", lambda given=None: tmp_path / "msedge.exe")
+    monkeypatch.setattr(BD, "to_html", lambda text, title: "<html>page</html>")
+    monkeypatch.setattr(BD, "print_pdf", lambda browser, page, out: (0, ""))
+    monkeypatch.setattr(BD, "print_pdf_playwright", fallback)
+    pdf = tmp_path / "t.pdf"
+    assert BD.main(["--team", "t", "--draft", "--source", str(src), "--out", str(pdf)]) == 0
+    out = capsys.readouterr().out
+    assert seen == ["<html>page</html>"] and BD.pdf_complete(pdf)
+    assert "WARN  msedge.exe --print-to-pdf wrote no PDF (exit 0). Trying the same browser through Playwright." in out
+    assert "pages   1" in out and "browser msedge.exe through Playwright   DRAFT" in out
+
+
+def test_the_fallback_is_not_tried_when_the_command_line_worked(tmp_path, monkeypatch, capsys):
+    src = tmp_path / "doc.md"
+    src.write_text(TEXT, encoding="utf-8")
+    monkeypatch.setattr(BD, "find_browser", lambda given=None: tmp_path / "msedge.exe")
+    monkeypatch.setattr(BD, "to_html", lambda text, title: "<html></html>")
+    monkeypatch.setattr(BD, "print_pdf", lambda browser, page, out: (out.write_bytes(PDF), (0, ""))[1])
+    monkeypatch.setattr(BD, "print_pdf_playwright", lambda *a: pytest.fail("tried the fallback"))
+    assert BD.main(["--team", "t", "--draft", "--source", str(src), "--out", str(tmp_path / "t.pdf")]) == 0
+    assert "browser msedge.exe   DRAFT" in capsys.readouterr().out
+
+
+def test_the_fallback_without_playwright_says_so(tmp_path, monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def no_playwright(name, *a, **kw):
+        if name.startswith("playwright"):
+            raise ImportError(name)
+        return real_import(name, *a, **kw)
+
+    monkeypatch.setattr(builtins, "__import__", no_playwright)
+    rc, why = BD.print_pdf_playwright(tmp_path / "b.exe", tmp_path / "p.html", tmp_path / "x.pdf")
+    assert rc == 1 and "playwright is not installed" in why
+
+
+def test_the_dependency_block_names_both_pinned_dependencies():
+    import tomllib
+
+    text = (REPO / "scripts" / "build_document.py").read_text(encoding="utf-8")
+    block = text.split("# /// script\n", 1)[1].split("# ///\n", 1)[0]
+    meta = tomllib.loads("".join(line[2:] + "\n" for line in block.splitlines()))
+    assert meta["requires-python"] == ">=3.11"
+    assert sorted(d.split("==")[0] for d in meta["dependencies"]) == ["markdown-it-py", "playwright"]
+    assert all("==" in d for d in meta["dependencies"])
 
 
 def test_prints_a_pdf_when_a_browser_is_here(tmp_path, capsys):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["markdown-it-py==3.0.0"]
+# dependencies = ["markdown-it-py==3.0.0", "playwright==1.65.2"]
 # ///
 r"""The technical document as ``<team_name>.pdf``, the name the submission form asks for.
 
@@ -10,7 +10,7 @@ r"""The technical document as ``<team_name>.pdf``, the name the submission form 
 
 ``uv run`` reads the dependency block above and runs this script in its own small environment, so the locked
 project environment (``uv.lock``) is not touched. From an environment that already has ``markdown-it-py``,
-``python scripts/build_document.py`` works too.
+``python scripts/build_document.py`` works too; ``playwright`` is needed only for the fallback in step 3.
 
 What it does:
 
@@ -19,7 +19,9 @@ What it does:
    can fill in (``docs/real-run.md``, step 4).
 3. Converts the Markdown to one HTML page and prints it to A4 with a Chromium-family browser run headless
    (Edge, Chrome, Chromium or Brave; ``KATENA_BROWSER`` or ``--browser`` names another one). The browser gets
-   a temporary profile and no network is needed.
+   a temporary profile and no network is needed. If its command line (``--print-to-pdf``) leaves no PDF, the
+   same browser prints the same page again through Playwright, which drives it over a pipe (``browser_env``
+   says why the command line can fail). Playwright downloads no browser here.
 4. Prints the page count, the size and the SHA-256 of the PDF.
 
 The PDF goes to ``submissions/``, which is git-ignored: the firewall check refuses a PDF in a commit, because
@@ -39,6 +41,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -50,6 +53,7 @@ MARKER = "TODO("
 # team_name, apart from the surrounding spaces stripped here (tests/test_build_document.py compares the two).
 BAD_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+WAIT_FOR_PDF = 30.0       # seconds a browser that returned at once gets to finish writing the PDF
 
 CSS = """
 @page { size: A4; margin: 15mm 14mm 16mm 14mm; @bottom-center { content: counter(page); font: 8pt "Segoe UI", Helvetica, Arial, sans-serif; color: #666; } }
@@ -129,21 +133,84 @@ def find_browser(given: str | None = None) -> Path | None:
     return next((p for p in browser_candidates() if p.exists()), None)
 
 
-def print_pdf(browser: Path, page: Path, out: Path, timeout: float = 180.0) -> tuple[int, str]:
+def browser_env() -> dict:
+    """This process's environment for the browser, without ``__COMPAT_LAYER``.
+
+    Windows sets ``__COMPAT_LAYER`` (``DetectorsAppHealth`` was seen) on an app its compatibility detectors have
+    flagged, and every process that app starts inherits it. With it set, msedge.exe hands the work to a new
+    process and exits 0 at once: back after 0.06 s, the PDF a second later, or never once the page was deleted;
+    without the variable, back after 1.1 s with the PDF written (Edge 157 on 2026-11-16, from a shell the Claude
+    app had started). A PowerShell opened from the Start menu does not normally have it."""
+    return {k: v for k, v in os.environ.items() if k.upper() != "__COMPAT_LAYER"}
+
+
+def pdf_complete(path: Path) -> bool:
+    """True when ``path`` is a PDF written to its end (``%%EOF`` in its last kilobyte)."""
+    try:
+        size = path.stat().st_size
+        with open(path, "rb") as fh:
+            head = fh.read(5)
+            fh.seek(max(0, size - 1024))
+            tail = fh.read()
+    except OSError:
+        return False
+    return head == b"%PDF-" and b"%%EOF" in tail
+
+
+def wait_for_pdf(path: Path, seconds: float) -> bool:
+    """Waits up to ``seconds`` for ``pdf_complete(path)``."""
+    deadline = time.monotonic() + seconds
+    while not pdf_complete(path):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.2)
+    return True
+
+
+def print_pdf(browser: Path, page: Path, out: Path, timeout: float = 180.0,
+              wait: float = WAIT_FOR_PDF) -> tuple[int, str]:
     """Run the browser headless on ``page`` and print it to ``out``. Returns its exit status and last output.
 
-    The browser's helper processes can hold a file of the temporary profile for a moment after it exits (seen on
-    Windows with Edge on 2026-11-12, under load), so a profile that cannot be removed at once is left to the OS:
-    the PDF is already written by then."""
+    A browser that hands the work to another process returns before the PDF is there, so after exit status 0
+    this waits up to ``wait`` seconds for the file while ``page`` still exists (``browser_env`` says when Edge
+    does that). The browser's helper processes can hold a file of the temporary profile for a moment after it
+    exits (seen on Windows with Edge on 2026-11-12, under load), so a profile that cannot be removed at once is
+    left to the OS: the PDF is already written by then."""
     with tempfile.TemporaryDirectory(prefix="katena-doc-profile-", ignore_cleanup_errors=True) as profile:
         cmd = [str(browser), "--headless", "--disable-gpu", "--no-first-run", "--disable-extensions",
                f"--user-data-dir={profile}", "--no-pdf-header-footer", f"--print-to-pdf={out}", page.as_uri()]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout)
+            r = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout,
+                               env=browser_env())
         except subprocess.TimeoutExpired:
             return 124, f"no PDF after {timeout:.0f} s"
+        if r.returncode == 0:
+            wait_for_pdf(out, wait)
         tail = (r.stderr or r.stdout or "").strip().splitlines()[-1:] or [""]
         return r.returncode, tail[0]
+
+
+def print_pdf_playwright(browser: Path, page: Path, out: Path, timeout: float = 180.0) -> tuple[int, str]:
+    """The fallback: the same browser prints ``page`` to ``out`` through Playwright, A4 from the page's CSS and
+    no header or footer, as on the command line. Returns 0 and "", or 1 and the reason."""
+    try:
+        from playwright.sync_api import sync_playwright      # the script's own dependency (the block at the top)
+    except ImportError:
+        return 1, "playwright is not installed (uv run scripts/build_document.py installs it)"
+    try:
+        with sync_playwright() as pw:
+            b = pw.chromium.launch(executable_path=str(browser), headless=True, env=browser_env(),
+                                   timeout=timeout * 1000)
+            try:
+                tab = b.new_page()
+                tab.goto(page.as_uri(), wait_until="load", timeout=timeout * 1000)
+                tab.pdf(path=str(out), prefer_css_page_size=True, print_background=False)
+            finally:
+                b.close()
+    except Exception as e:  # noqa: BLE001  a failed fallback is reported, never raised
+        first = (str(e).strip().splitlines() or [""])[0]
+        return 1, f"{type(e).__name__}: {first}"[:300]
+    return 0, ""
 
 
 def count_pages(pdf: bytes) -> int | None:
@@ -190,8 +257,18 @@ def main(argv=None) -> int:
         if out.exists():
             out.unlink()
         rc, tail = print_pdf(browser, page, out)
-    if not out.exists() or out.stat().st_size == 0:
-        print(f"FAIL  {browser.name} wrote no PDF (exit {rc}): {tail}")
+        how, why = browser.name, ""
+        if not pdf_complete(out):
+            print(f"WARN  {browser.name} --print-to-pdf wrote no PDF (exit {rc}){': ' + tail if tail else ''}. "
+                  "Trying the same browser through Playwright.")
+            try:
+                out.unlink(missing_ok=True)
+            except OSError:
+                pass
+            _, why = print_pdf_playwright(browser, page, out)
+            how = f"{browser.name} through Playwright"
+    if not pdf_complete(out):
+        print(f"FAIL  {browser.name} wrote no PDF (exit {rc}): {tail}; through Playwright: {why or 'no file'}")
         return 1
     if a.keep_html:
         out.with_suffix(".html").write_text(page_html, encoding="utf-8", newline="\n")
@@ -201,7 +278,7 @@ def main(argv=None) -> int:
     print(f"  pages   {pages if pages is not None else 'unknown'}")
     print(f"  bytes   {out.stat().st_size}")
     print(f"  sha256  {sha256_file(out)}")
-    print(f"  browser {browser.name}" + ("   DRAFT: TODO markers left at line(s) " + ", ".join(map(str, left)) if left else ""))
+    print(f"  browser {how}" + ("   DRAFT: TODO markers left at line(s) " + ", ".join(map(str, left)) if left else ""))
     return 0
 
 
