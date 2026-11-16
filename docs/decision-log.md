@@ -4,6 +4,27 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-16
+
+### The technical documents: corrections after a reader's review (no decision)
+
+**Claude on David's PC, 07:25 CET.** A fresh reader (a subagent, given the documents, this log and
+`docs/upstream/SUBMISSION.md`, and told not to open the provided data or the public window) read both documents
+as an organiser would. Nothing about the model changes. Corrected, because they were untrue:
+
+- "Both ran with F and F3" (the both-paths and stress checks): AW2 passed both on Nov 13 (entry "AW2 and A2 on the
+  Windows PC", Nov 15). The long document's two "not repeated with AW or AW2" sentences go with it.
+- "The fold models of AW ... on the runners only": AW was also fitted and gated on Justin's Mac (entry "AW on
+  Justin's Mac", Nov 13).
+- "AW2 was not read under rule 1": this log has it, -0.0184 [-0.0264, -0.0108], 8 of 28, and -0.0505 on the 20
+  SkillCorner folds, 0 of 20 (entry "A2 and AW2: result"). The short document now quotes AW2's rule-1 result, not AW's.
+- "Nineteen" gated packages: KIN made 21.
+
+Added: the "what we would do with more time" item that `SUBMISSION.md` asks for (short section 7; the figures are
+the oracle edits of "Where F3 loses", Nov 13); definitions of F, F3, AW2 and "worlds" where a stranger meets them;
+the delegation stated once, in section 9. Shortened, to keep 5 pages: section 1, the evidence and replication
+bullets of section 3, one row of section 4, the model-bytes bullet of section 7. Both documents are dated Nov 16.
+
 ## 2026-11-15
 
 ### David's side, by delegation: rule 2 kept and AW2 chosen; AW2 is adopted

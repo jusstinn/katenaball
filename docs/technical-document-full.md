@@ -1,6 +1,6 @@
 # Technical document, long version
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-15.
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-16.
 
 The document we submit is the short one, [`technical-document.md`](technical-document.md). This is the same
 account with every table and every change we tested. Every number comes from `docs/decision-log.md` and the
@@ -202,7 +202,8 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   `make_submission.py predict`. Scored with the official scorer, the CSV gives spellF1 0.650611 and
   macroF1 0.930641, exactly what the evaluation code gives for the same model. Every probability and graded
   label is bit-identical on both paths. The same check with F3 gives 0.722130 and 0.941533 on both paths.
-  It was not repeated with AW or AW2, which change the training and no line of either path.
+  AW2's held-out model passed the same check on the PC (R2, Nov 13): features, probabilities and CSV
+  identical on both paths.
   A SkillCorner match (10 Hz) also agrees, once the evaluation's
   "predicted D counts as X" rule for SkillCorner is applied (`scripts/dressed_check.py`). A synthetic
   bundle on the provided match's own timeline (199,319 frames, the graded halves of `games.py`) runs
@@ -213,7 +214,7 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   worlds do not produce: no ball at all, nothing tracked for five minutes, one team missing, positions far
   off the pitch, infinite values, slots that change team. In every case, with F and with F3, labelling
   finished and the file passed the official checks. This shows the path does not crash, not that the labels
-  are good. It was not repeated with AW or AW2, whose inference code is F3's.
+  are good. AW2's all-30 model passed all 30 cases too (Nov 13).
 
 ### 3.2 Bake-off (2026-11-06)
 
@@ -460,8 +461,9 @@ a registered limit of 0.002:
 
 27 of the 28 folds score the same on the two machines to the last digit, at both severities and on both
 truths. The one that differs is the fold whose LightGBM team head grew other trees (section 7). This is a
-replication, not new evidence: the folds are the same. AW, AT, ATW and the two 9,600-step candidates
-below were fitted on the runners only. The results that follow are the runners'.
+replication, not new evidence: the folds are the same. AT, ATW and the two 9,600-step candidates
+below were fitted on the runners only; AW was also fitted and gated on a teammate's Mac, with the
+runners' verdicts and means. The results that follow are the runners'.
 
 | spellF1 at target-like noise unless stated | F3 | A | AW | AT | ATW |
 |---|---|---|---|---|---|
@@ -576,8 +578,9 @@ the same 28 folds. The registration tried no other step count and said none woul
   the first change since the longer TCN of F3 to win folds of both kinds, and it is the same kind of change.
 - **Against F3, AW2 stands at** +0.0618 on the 8 folds (8 of 8) and +0.0563 on SkillCorner against the
   action truth (18 of 20). A2 stands at +0.0464 (8 of 8) and +0.0617 (20 of 20).
-- **Rule 1 was read for AW, not for AW2.** AW is -0.0224 against F3 on the 28 folds with the frame truth
-  on SkillCorner (8 of 28). The longer TCN's rule does not read the frame truth.
+- **Rule 1, read for information.** The longer TCN's rule does not use the frame truth, but the log has it:
+  AW2 is -0.0184 [-0.0264, -0.0108] against F3 on the 28 folds (8 of 28) and -0.0505 on the 20 SkillCorner
+  folds (0 of 20); AW was -0.0224 (8 of 28).
 - **The weights read the same at 9,600 steps** (information; the registered test was at 4,800). AW2 minus
   A2 is +0.0155 [+0.0032, +0.0275] on the 8 folds (6 of 8), -0.0055 [-0.0131, +0.0024] on SkillCorner
   against the action truth, and -0.0103 [-0.0183, -0.0025] there at severe noise. They gain on IDSSE and
@@ -741,9 +744,9 @@ D over the first 60 and 120 s of each half, as an aggregate.
   changes. That is the IDSSE and Metrica kind of label, and the action labels are built to have it;
   SkillCorner's frame label is the one that does not. But no document says how the corrected tracking
   behind the ground truth times a change to the frame. If the provided match's ground truth behaves as
-  SkillCorner's frame label does, the bet loses. Under rule 1 AW, at 4,800 TCN steps, is -0.0224 against
-  F3 on the 28 folds with 8 folds won, and on the frame truth of SkillCorner the four candidates lose 0.026
-  to 0.053. AW2 was not read under rule 1: the longer TCN's rule does not use the frame truth.
+  SkillCorner's frame label does, the bet loses. Under rule 1 AW2 is -0.0184 [-0.0264, -0.0108] against
+  F3 on the 28 folds with 8 folds won, and -0.0505 on the 20 SkillCorner folds (0 of 20); at 4,800 steps
+  the four candidates lose 0.026 to 0.053 there.
 - **The action labels are our construction, and their dead-ball ends are approximate.** SkillCorner makes
   its events automatically from the same broadcast tracking; no person labelled them. Of 1,851 flagged
   stoppages, 228 take their start from the broadcast cutting away, a median of 6.5 to 9.1 s after the last
@@ -776,9 +779,10 @@ D over the first 60 and 120 s of each half, as an aggregate.
   tests are there to keep that choice honest. The two reads of section 3.5 on real broadcast tracking
   support the label mechanics, not AW itself: neither model in them trained on an action label. And AW2
   passed its own rule with exactly the 20 of 28 folds it asks for.
-- **AW and AW2 were fitted on one kind of machine.** The fold models of AW, AT, ATW, A2 and AW2 were
+- **AW2 was fitted on one kind of machine.** The fold models of AT, ATW, A2 and AW2 were
   fitted on GitHub's Ubuntu runners only, and gated on the Windows PC against F3's cached members. F3's
-  gate was repeated on a second machine before its adoption; theirs were not. A's was (section 3.5): the
+  gate was repeated on a second machine before its adoption; theirs were not. AW's was, on a teammate's
+  Mac (the same verdicts and means), and so was A's, on the Mac and on the PC (section 3.5): the
   PC gives the runners' verdicts and every mean within 0.0002, and 27 of 28 folds score the same to the
   last digit. The one fold whose LightGBM team head differs (below) moves by 0.0018 at target-like noise
   on the frame truth and by 0.0036 on the action truth. So we read the runners' numbers as stable to the
@@ -806,8 +810,9 @@ D over the first 60 and 120 s of each half, as an aggregate.
   Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, nine more packages
   were gated on the same folds (sections 3.4 and 4), each registered before its score: thirteen in all, besides
   the bake-off's models and the six label-convention variants of section 4, which were scored on these folds
-  too. A, AW, AT and ATW were the 14th to 17th packages on them, and A2 and AW2 the 18th and 19th
-  (section 3.5): nineteen gated packages in all. The two
+  too. A, AW, AT and ATW were the 14th to 17th packages on them, A2 and AW2 the 18th and 19th
+  (section 3.5), and KIN (35 ball-free timing columns in the LightGBM team heads of A2 and AW2; failed,
+  +0.0015 and +0.0008, intervals through 0) the 20th and 21st: twenty-one gated packages in all. The two
   locked benches are the only matches no choice was made on. F's one read there gains about as much as on
   the development folds (section 3.1). With two matches, that read is a sanity check, not a second
   estimate, and nothing after F was read on them.
@@ -871,8 +876,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
   head is not: the two machines grew different trees, and its probabilities differ by 0.008 on average and
   by up to 0.15. That moves the fold's score by 0.0018 at target-like noise on the frame truth and by
   0.0036 on the action truth, which is the size to keep in mind for a reproduction of the final file on
-  another machine. F and F3 had not shown this on any machine we tried. The fold models of AW and AW2 were
-  fitted on the runners only, so they have no such comparison. The all-30 models of A and of AW did not
+  another machine. F and F3 had not shown this on any machine we tried. The fold models of AW2 were
+  fitted on the runners only and AW's on the runners and a Mac, so neither has this comparison with the PC. The all-30 models of A and of AW did not
   show it on the four machines each was trained on.
 
   So expect the same file on another machine. That has been shown on an external match in the provided format,

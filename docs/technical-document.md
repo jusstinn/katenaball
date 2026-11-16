@@ -1,9 +1,9 @@
 # <team_name>: technical document
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-15.
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-16.
 
 This is the short version. `docs/technical-document-full.md` has every table and every change we tested, and
-every number in both comes from `docs/decision-log.md`.
+every number in both comes from `docs/decision-log.md` or the evidence pages it links.
 `TODO(after the real run)` marks what only the final run on the provided match can fill in.
 
 ## 1. Summary
@@ -15,15 +15,16 @@ every number in both comes from `docs/decision-log.md`.
   for development, and all 30 for the final model. A degrader corrupts their tracking to look like
   automatic tracking. No model was trained, tuned or selected on the provided match. Nobody labelled any
   frame by hand, and nobody compared our output with the video.
-- Every change was adopted under a rule written down before its score. On 28 leave-one-match-out folds at
-  target-like noise, spellF1 rose from 0.280 (the starter algorithm) to 0.586 (LightGBM and Viterbi), 0.602
-  (model F) and 0.618 (model F3). These are development estimates, not a prediction of the hidden score.
-- The submitted model, AW2, is F3 trained on other labels for the 20 SkillCorner matches, with weights by
-  possession length and a TCN trained twice as long. The old rule scores 20 of its 28 folds against the
-  labels AW2 no longer learns, so the new labels were judged under a second rule, declared before any
-  score. On the 8 folds whose truth they leave alone AW2 scores 0.6993 against F3's 0.6374; on the old
-  SkillCorner labels the relabelled model loses. It is a bet on how the organisers describe the ground
-  truth (sections 3 and 7).
+- Every change was adopted under a rule written down before its score. On 28 leave-one-match-out folds of
+  external matches, with simulated noise like the provided tracking's, spellF1 rose from 0.280 (the starter
+  algorithm) and 0.432 (fixed rules) to 0.586 (LightGBM and Viterbi), 0.602 (F: adds touch features, a noise
+  mix and a TCN) and 0.618 (F3: more trees, longer TCN training). These are development estimates, not a forecast.
+- The submitted model, AW2, is F3 with three training changes: the 20 SkillCorner matches relabelled from
+  SkillCorner's own on-ball events (with dead ball, and a change of owner at the new team's first touch),
+  weights by possession length, and a TCN trained twice as long. Our standing rule cannot judge new labels,
+  so a second rule, written before any score, judged them: on the 8 IDSSE and Metrica folds, whose labels
+  are unchanged, AW2 scores 0.6993 against F3's 0.6374. On SkillCorner's old label it loses (-0.018 on the
+  28 folds). It is a bet on how the organisers describe the ground truth (sections 3 and 7).
 
 ## 2. Approach
 
@@ -59,8 +60,8 @@ The columns are times since and until each team's touches, who touched last, tur
 on 41% of graded frames (DATA.md). A degrader makes the cleaner external tracking look like that: it tops
 up the ball loss, cuts players into anonymous fragments in 23 slots per team, and adds gaps, ghosts,
 duplicates, jitter, false ball detections and wrong-team slots, at three severities: mild (20% of the ball
-missing), target-like (41%) and severe (55%). Variants tie ball loss to stoppages, add identity switches in
-crowds, or cut the jitter to the level of real broadcast tracking. Both models train on an even mix.
+missing), target-like (41%) and severe (55%). Variants ("worlds") tie ball loss to stoppages, add identity switches
+in crowds, or cut the jitter to the level of real broadcast tracking. Both models train on an even mix.
 
 ## 3. Why this design
 
@@ -72,12 +73,11 @@ crowds, or cut the jitter to the level of real broadcast tracking. Both models t
   70% of the folds and the paired 95% bootstrap interval of the mean difference lies above 0. From F on, it
   must also not be worse at severe noise. M2, F and F3 passed it.
 - **Rule 2, a change of protocol for the new labels.** AW is F3 with the new SkillCorner labels (section 6)
-  and the weights. Rule 1 scores the 20 SkillCorner folds against the per-frame label AW stops training on,
-  so it cannot pass AW. Rule 2 was written down before any score of the new labels: rule 1's thresholds on
-  the 8 IDSSE and Metrica folds, whose truth does not change, and not worse than F3 on the 20 SkillCorner
-  folds scored on the new labels. It is weaker evidence (section 7). It needed both our names: one given
-  after the scores were known, the other given before any score by the AI assistant under a general
-  hand-over, unread, and confirmed by it under delegation after the scores were known (section 9).
+  and the weights. Rule 1 scores the 20 SkillCorner folds against the old label, which AW no longer learns,
+  so it cannot pass AW. Rule 2, written before any score of the new labels, applies rule 1's thresholds to
+  the 8 IDSSE and Metrica folds, whose truth does not change, and asks for no loss against F3 on the 20
+  SkillCorner folds scored on the new labels. It is weaker evidence (section 7). Its text was fixed before
+  any score, but no team member accepted it before seeing scores (section 9).
 - **The longer TCN.** AW2 is AW with 9,600 TCN steps for 4,800, registered before its score against AW:
   rule 1's thresholds on the 28 folds with SkillCorner on the new labels, and not worse on the 8 or the 20.
 - **The provided match is inference only.** No training, tuning, self-training or fitting of the degrader
@@ -90,10 +90,10 @@ crowds, or cut the jitter to the level of real broadcast tracking. Both models t
   no score, and changed nothing: we counted its possessions and their lengths, and one team member watched
   its tactical video beside the public labels, as the organisers' clarification of Nov 3 allows.
 - **The submission path equals the evaluation path, and does not break on damaged tracking.** An external
-  match exported in the provided ATD format and labelled by the submission code gets, from the official
-  scorer, exactly the score the evaluation code gives the same model. Damaged in 27 ways the training
-  worlds do not produce, it was labelled every time and passed the official checks: a crash test, not a
-  test of the labels. Both ran with F and F3; AW2 changes training only.
+  match exported in the provided ATD format gets, through the submission code and the official scorer,
+  exactly the evaluation code's score. Damaged in 27 ways our noise simulation does not produce, it was
+  labelled every time and passed the official checks: a crash test, not a test of the labels. Both checks
+  passed with F, F3 and AW2.
 
 **Results** at target-like noise, each model against the one before it (F against M2, LightGBM heads and
 Viterbi, at 0.586). "Old label" and "new labels" say how the SkillCorner folds are scored (section 6):
@@ -112,14 +112,12 @@ Viterbi, at 0.586). "Old label" and "new labels" say how the SkillCorner folds a
 - **Against F3, AW2 is +0.0618 on the 8 folds (8 of 8)** and +0.0563 on the 20 SkillCorner folds on the new
   labels (18 of 20), where F3 scores 0.6374 and 0.6094. Neither step is worse at severe noise. AW2 passed
   its rule with exactly the 20 folds it asks for; that rule does not read the old label.
-- **How they were run.** The fold models of AW and AW2 were fitted on GitHub's Ubuntu runners only, and
-  scored on our PC against F3's cached fold models. The gate of A, AW without the weights, was repeated on
-  our PC: the same verdicts, every mean within 0.0002, 27 of 28 folds identical to the last digit.
-- **Evidence that does not rest on AW's labels.** On the 20 SkillCorner folds scored on the new labels, two
-  models that never trained on them also beat F3: one with a column naming each training row's dataset,
-  read as IDSSE and Metrica (+0.0265 [+0.0178, +0.0349], 18 of 20; it had failed rule 1), and F3 with a
-  LightGBM team head that saw no SkillCorner match (+0.0115 [+0.0037, +0.0193], 15 of 20). On the old label
-  both lose: on SkillCorner the truth decides the verdict.
+- **Replication.** AW's gate gave the runners' verdicts and means again on a Mac, and A's (AW without the
+  weights) on a Mac and on our PC. AW2's fold models were fitted on GitHub's Ubuntu runners only.
+- **Evidence that does not rest on AW's labels.** Two models never trained on the new labels also beat F3 on
+  the 20 SkillCorner folds scored on them: one with a column marking each row's dataset, read as IDSSE and
+  Metrica (+0.0265, 18 of 20), and F3 with no SkillCorner match in its LightGBM team head (+0.0115, 15 of
+  20). Both lose on the old label.
 
 ## 4. Assets, and what we tried and dropped
 
@@ -137,7 +135,7 @@ Viterbi, at 0.586). "Old label" and "new labels" say how the SkillCorner folds a
 | Six other training-label conventions | 28 folds: -0.008 to +0.003 | None adopted (section 6) |
 | Set-piece features from Smart Tagging, with imitation tags built from external events | 28 folds: +0.0046, 16/28 | Failed: the gain is all on the 8 folds that have events |
 | Weights by possession length, in either model, on the old SkillCorner label | 28 folds: +0.005 and +0.011, 17/28 each | Failed rule 1 on folds won. Adopted with the new labels (AW) |
-| A: AW without the weights. AT, ATW: A and AW with F3's alive/dead training | 8 folds: A 0.6763, +0.0389 [+0.0276, +0.0498], 8/8; AT 0.6725; ATW 0.6964 | All met rule 2 and failed rule 1. The registered tests chose AW: ahead of A by +0.0160 [+0.0041, +0.0282], 5/8; ATW not ahead of AW, +0.0041 [-0.0017, +0.0099] |
+| A: AW without the weights. AT, ATW: A and AW with F3's alive/dead training | 8 folds: A 0.6763, AT 0.6725, ATW 0.6964 (AW 0.6923) | All met rule 2, failed rule 1. The registered tests chose AW: over A +0.0160 [+0.0041, +0.0282]; ATW not ahead of AW |
 
 ## 5. Training data
 
@@ -164,7 +162,7 @@ than 2 s, with the other team on both sides, is relabelled to the surrounding te
 | Situation | CHALLENGE.md | Our labels |
 |---|---|---|
 | Brief opponent touch, deflection, block or duel; the ball returns to the owner | Not a change | Merged if under 2 s; a change if 2 s or longer |
-| Brief opponent touch, then the ball goes straight out | Not a change | Kept as a change. Merging it was tested and missed the gate by a little |
+| Brief opponent touch, then the ball goes straight out | Not a change | Kept as a change. Merging it narrowly missed rule 1 |
 | Pass in flight, loose ball | Stays with the last team | The last team, in all three sources |
 | Restart | There is a clear possessor | The restart possession is never merged, however short |
 | Ball out of play | D | D, from `BallStatus` (IDSSE), events (Metrica) or interruption flags (SkillCorner); never merged |
@@ -191,8 +189,8 @@ than 2 s, with the other team on both sides, is relabelled to the surrounding te
 ## 7. Limitations
 
 - **The new labels are a bet on the documentation.** They follow CHALLENGE.md's description; SkillCorner's
-  per-frame label does not. If the hidden truth behaves like that label after all, the bet loses: under
-  rule 1 AW, at 4,800 TCN steps, is -0.0224 against F3 on the 28 folds, with 8 folds won.
+  per-frame label does not. If the hidden truth behaves like that label after all, the bet loses: scored
+  that way (rule 1), AW2 is -0.0184 [-0.0264, -0.0108] against F3 on the 28 folds and wins 8.
 - **The new SkillCorner labels are our construction.** SkillCorner makes its events automatically from the
   same tracking. In 228 of 1,851 stoppages the dead ball starts late, only when the broadcast cuts away, and
   a restart sits a fixed 1.0 s before its reception. A score against these labels favours a model trained
@@ -205,20 +203,22 @@ than 2 s, with the other team on both sides, is relabelled to the surrounding te
   every degraded world with AUC 1.00, mostly on jitter, which the degrader makes 10 to 30 times rougher;
   one world in five of the training mix has realistic jitter. At inference the touch features read the
   real 25 Hz ball, which no development world reproduces.
-- **The development estimate is optimistic.** Nineteen changes were gated one after another on the same 28
+- **The development estimate is optimistic.** Twenty-one changes were gated one after another on the same 28
   folds, besides the first comparison of models and the label conventions. Rule 2 reads 8 folds that all
   of them saw, and four earlier changes passed a test like it and were not adopted. Two locked bench
   matches (one IDSSE, one Metrica) are the only ones no choice was made on. Only F was read on them, once,
   after its adoption: it beat the model before it on both (+0.013 to +0.057).
 - **Other unknowns.** The unknown label convention moves the absolute score by about 0.15. With another TCN
   seed, F's gain on 8 folds was about a quarter smaller; seed 0 was kept, and the test was not repeated since.
-- **Model bytes differ across machines; the labels did not.** The TCN's weights differ in their last bits
-  with the OS and the CPU vendor. LightGBM was byte-identical on every machine for F and F3; in A's gate,
-  one of the 28 LightGBM fold models grew other trees on a Linux runner than on our PC. The final models of
-  A and of AW did not show that: each gave one LightGBM model and one CSV, byte for byte, for an external
-  match in the provided format, on macOS, Ubuntu and Windows runners and on our PC. AW2's final model did
-  the same. So expect the same file on another machine; that was shown on an external
-  match, not on the provided one, where a near-tie could flip a label.
+- **Model bytes differ across machines; the labels did not.** The TCN's last bits vary with the OS and CPU
+  vendor, and one of A's 28 LightGBM fold models grew other trees on Linux than on our PC. AW2's final model
+  gave one LightGBM model and one CSV, byte for byte, for an external match in the provided format, on
+  macOS, Ubuntu and Windows runners and on our PC. Expect the same file elsewhere; on the provided match a
+  near-tie could still flip a label.
+- **Where it fails, and what we would do with more time.** Most lost points are short possessions: in F3's
+  error analysis, recovering the missed ones under 4 s is worth +0.19 on the 8 IDSSE and Metrica folds, the
+  true alive/dead pattern +0.02. Next: check the new labels' dead-ball starts against a second source,
+  repeat AW2's gate on a second machine, and calibrate the noise simulation inside each fold.
 
 ## 8. Reproduction
 
@@ -254,11 +254,13 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
   repository's rules (`CLAUDE.md`) forbid it to open the data folder, only team members ran anything on the
   provided match, and what those runs print is pass or fail and aggregates: counts, shares and hashes, never
   a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
-  5 minutes (section 3) described to it what he saw, with estimated times. Of the provided files it saw only the public 5-minute
-  labels, no image. Under delegation it wrote registrations before we read them and chose AW2 for one of
-  us after the scores were known.
+  5 minutes (section 3) described to it in general statements what he saw, with estimated times. Of the provided files it saw only the public 5-minute
+  labels, no image. Under delegation it wrote registrations before we read them, entered one member's
+  acceptance of rule 2 before any score (unread by him), and, once he had seen the scores, confirmed it and
+  chose AW2 for him, the model the registered tests name.
 - **A public file we opened and did not use.** While searching the web for external datasets, a research
-  subagent of the assistant opened a public record that turned out to hold statistics about the provided game. The file was
-  deleted. Nothing from it entered the code, the training data or any decision.
+  subagent of the assistant opened a public record (Zenodo 20185375) that turned out to hold statistics
+  about the provided game, and printed a fragment of one row in its session. The file was deleted. Nothing
+  from it entered the code, the training data or any decision.
 - **StatsBomb open data.** 35 matches were downloaded to a temporary folder before we read the user
   agreement. We did not use them: they are in no training set, result or commit.
