@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synth import make_match
+from synth import fake_sc_actions, make_match
 
 from katena.eval import corpus as C
 from katena.eval import protocol as P
@@ -15,6 +15,7 @@ from katena.eval import protocol as P
 
 @pytest.fixture
 def synth_corpus(tmp_path, monkeypatch):
+    from katena.external import skillcorner_actions as SA
     from katena.models import gbdt
     from katena.types import save_match
     if gbdt.lgb is None:
@@ -24,6 +25,9 @@ def synth_corpus(tmp_path, monkeypatch):
     monkeypatch.setattr(tcn, "BATCH", 4)
     monkeypatch.setattr(tcn, "WIN", 64)
     monkeypatch.setattr(P, "CANON", tmp_path / "canon")
+    # The submission spec trains SkillCorner matches on their action events, which a synthetic match has none of.
+    monkeypatch.setattr(SA, "build_labels", fake_sc_actions)
+    monkeypatch.setattr(P, "EXTERNAL", tmp_path / "external")
     for seed, (ds, mid) in enumerate((("metrica", "SYN1"), ("metrica", "SYN0"), ("idsse", "SYN7"),
                                       ("skillcorner", "SYN3"))):
         save_match(make_match(seed=seed, invert_labels=seed == 1), tmp_path / "canon" / ds / f"{mid}.npz")
@@ -57,11 +61,16 @@ def test_pipeline_trains_on_every_match_and_labels_a_new_one(synth_corpus, monke
 
     model = PL.load_model()
     assert model.names[:model.n_base] == list(C.load_feat(refs[0], "target")["names"])
-    # the reloaded LightGBM member predicts exactly what the trained one did
+    # the reloaded LightGBM member predicts exactly what the trained one did, refitted on the submission spec's
+    # labels, alive rows, team weights and size
+    from katena.eval import actlabels as AL
     from katena.models import gbdt
     pools = F.FinalPools(refs)
-    heads = gbdt.fit_heads(pools.X, pools.o, pools.y[P.T_MAIN], pools.dead_ok, pools.cols(),
-                           n_trees=PL.spec_of().gbdt_trees)                 # the submission spec's size
+    sp = PL.spec_of()
+    y = AL.pool_y(refs, pools) if sp.sc_actions else pools.y[P.T_MAIN]
+    dead_ok = np.ones(len(y), bool) if sp.sc_dead else pools.dead_ok
+    w = AL.pool_weights(refs, AL.native_weights(refs)) if sp.len_weights else None
+    heads = gbdt.fit_heads(pools.X, pools.o, y, dead_ok, pools.cols(), n_trees=sp.gbdt_trees, team_weight=w)
     X = pools.X[:500]
     a = heads.predict(X, X)
     b = model.heads().predict(X, X)
@@ -152,3 +161,76 @@ def test_spec_f3_trains_beside_f_with_the_gate_code(synth_corpus, monkeypatch):
     model.tcn_n_in = 7
     with pytest.raises(RuntimeError):
         PL.label_match(model, target, threads=2)
+
+
+def test_specs_a_and_aw_train_on_action_labels(synth_corpus, monkeypatch):
+    """A gives the SkillCorner rows their action labels and lets them train the alive head; AW adds the
+    possession-length weights to both team heads. No other match's labels change, F3's training is untouched, and
+    the LightGBM member is what the gate's call fits on those labels."""
+    from katena import pipeline as PL
+    from katena.eval import actlabels as AL
+    from katena.eval import final as F
+    from katena.eval import g1 as G1
+    from katena.external import skillcorner_actions as SA
+    from katena.models import gbdt
+
+    def fake_actions(match_dir, m):                     # the standing label with H and A swapped
+        assert Path(match_dir).name == "SYN3"
+        return np.where(m.y == 0, 1, np.where(m.y == 1, 0, m.y)).astype(m.y.dtype)
+
+    monkeypatch.setattr(SA, "build_labels", fake_actions)
+    monkeypatch.setattr(P, "EXTERNAL", synth_corpus / "external")
+    for name, sp in (("F3", PL.Spec("F3", 20, 4800, True)),
+                     ("A", PL.Spec("A", 20, 4800, True, sc_actions=True, sc_dead=True)),
+                     ("AW", PL.Spec("AW", 20, 4800, True, sc_actions=True, sc_dead=True, len_weights=True)),
+                     ("AT", PL.Spec("AT", 20, 4800, True, sc_actions=True)),
+                     ("ATW", PL.Spec("ATW", 20, 4800, True, sc_actions=True, len_weights=True))):
+        monkeypatch.setitem(PL.SPECS, name, sp)
+    refs, _, _, man3 = _train(monkeypatch, synth_corpus / "a", spec="F3")
+    man_a = PL.stage_train(refs, threads=2, steps=2, spec="A")
+    man_w = PL.stage_train(refs, threads=2, steps=2, spec="AW")
+    assert [PL.model_dir((), s).name for s in ("F3", "A", "AW")] == ["model_F3", "model_A", "model_AW"]
+    assert "labels" not in man3 and man_a["labels"]["length_weights"] is False and man_w["labels"]["length_weights"] is True
+
+    pools = F.FinalPools(refs)
+    y = AL.pool_y(refs, pools)
+    sc_rows = np.char.startswith(pools.keys.astype(str), "skillcorner/")
+    changed = y != pools.y[P.T_MAIN]
+    assert changed[sc_rows].any() and not changed[~sc_rows].any()
+    assert man_a["labels"]["alive_rows"] == int((y < 3).sum()) > int((pools.dead_ok & (pools.y[P.T_MAIN] < 3)).sum())
+    assert man_a["labels"]["team_rows"] == int((y < 2).sum())
+
+    # A's LightGBM member is the gate's call on the relabelled rows; AW changes the team head only
+    heads = gbdt.fit_heads(pools.X, pools.o, y, np.ones(len(y), bool), pools.cols(), n_trees=20)
+    a, w, f3 = (PL.load_model(spec=s) for s in ("A", "AW", "F3"))
+    assert a.gbdt_team == heads.team.model_to_string() and a.gbdt_alive == heads.alive.model_to_string()
+    assert w.gbdt_alive == a.gbdt_alive and w.gbdt_team != a.gbdt_team
+    assert f3.gbdt_team != a.gbdt_team and f3.gbdt_alive != a.gbdt_alive
+    assert len({man3["sha256"]["tcn"], man_a["sha256"]["tcn"], man_w["sha256"]["tcn"]}) == 3
+
+    # AT and ATW: A's and AW's team heads with F3's alive head; their TCNs are their own
+    man_t = PL.stage_train(refs, threads=2, steps=2, spec="AT")
+    man_tw = PL.stage_train(refs, threads=2, steps=2, spec="ATW")
+    at, atw = PL.load_model(spec="AT"), PL.load_model(spec="ATW")
+    assert at.gbdt_team == a.gbdt_team and at.gbdt_alive == f3.gbdt_alive
+    assert atw.gbdt_team == w.gbdt_team and atw.gbdt_alive == f3.gbdt_alive
+    assert man_t["labels"]["skillcorner_trains_alive"] is False and man_a["labels"]["skillcorner_trains_alive"] is True
+    assert man_t["labels"]["alive_rows"] == int((pools.dead_ok & (pools.y[P.T_MAIN] < 3)).sum())
+    assert len({m["sha256"]["tcn"] for m in (man3, man_a, man_w, man_t, man_tw)}) == 5
+
+    # A2 and AW2 are A and AW with twice the TCN steps and the same LightGBM member
+    for base, longer in (("A", "A2"), ("AW", "AW2")):
+        b, x = PL.spec_of(base), PL.SPECS[longer]
+        assert (x.gbdt_trees, x.tcn_steps, x.tcn_touch) == (1200, 9600, True)
+        assert (x.sc_actions, x.sc_dead, x.len_weights) == (b.sc_actions, b.sc_dead, b.len_weights)
+
+    # the TCN sequences: SkillCorner ones relabelled and dead_ok, the others as they were
+    base, seqs = G1.tcn_seqs(refs, P.T_MAIN, PL.SEED), G1.tcn_seqs(refs, P.T_MAIN, PL.SEED)
+    assert AL.relabel_seqs(refs, seqs) == sum(k[0].startswith("skillcorner/") for k in seqs)
+    for k, s in seqs.items():
+        if k[0].startswith("skillcorner/"):
+            assert s["dead_ok"] and not base[k]["dead_ok"] and (s["y"] != base[k]["y"]).any()
+        else:
+            assert s["dead_ok"] == base[k]["dead_ok"] and np.array_equal(s["y"], base[k]["y"])
+    AL.weight_seqs(refs, seqs, AL.native_weights(refs))
+    assert all(s["w"].dtype == np.float32 and len(s["w"]) == len(s["y"]) and (s["w"] > 0).all() for s in seqs.values())
