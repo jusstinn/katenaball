@@ -1,6 +1,8 @@
 # The real run: checklist for the person with the data
 
-Only a team member runs anything on the provided match, never an AI assistant (`CLAUDE.md`). Every script
+Only a team member runs anything on the provided match, never an AI assistant (`CLAUDE.md`), with one
+exception set on Nov 17 (`CLAUDE.md`, data firewall): an assistant may start `real_run.py` with all of its
+output redirected to a local file it never reads, and read only `scripts/run_summary.py`'s verdicts and hashes. Every script
 below prints aggregates or pass/fail only. **Share only the PASS/FAIL lines, "Valid", and the hashes**
 outside the team. Keep label shares, D shares, touch rates and jitter numbers to yourself. If something
 looks wrong, describe the symptom in words.

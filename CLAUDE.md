@@ -17,6 +17,13 @@ Claude Code is a hosted LLM. So:
   `docs/upstream/DATA.md` and `starter/`, so there is no need to look at the real file.
 - **A human checks the real data** with local tools. If a real-data bug needs diagnosing, ask the human
   to describe the symptom. Do not ask them to paste rows.
+- **One exception, the real run (David's instruction of 2026-11-17, given while he could reach the PC only
+  through Claude Code).** An assistant may start `scripts/real_run.py` on the PC, on a clean committed tree, with
+  all of its console output redirected to a local file under `D:\katena\logsealrun\` that the assistant never
+  opens, prints, tails or greps. Of the run it reads only `python scripts/run_summary.py
+  submissions/<team>.run.json`: verdicts, FAIL lines, hashes, the validator's OK/Valid lines and the public
+  window's PASS/FAIL lines. It runs nothing else on the provided match, and it diagnoses a failure from those
+  lines alone. The technical document's disclosures must say that the final run was started this way.
 - Never send match data to a hosted service: no hosted LLMs, vision APIs, Supabase, Vercel, or public
   buckets. Whether a rented GPU is acceptable is an open question for the organisers.
 - `evaluation/gt/*_public*` and the docs are public, so reading them is fine.
