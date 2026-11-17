@@ -961,9 +961,11 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 
 - **AI assistance.** Most of the code and of this document was written with a hosted AI coding assistant
   (Claude Code), working under the team's direction. The competition's data was kept away from it. The
-  repository's rules (`CLAUDE.md`) forbid it to open the data folder, only team members ran anything on the
-  provided match, and what those runs print is pass or fail and aggregates: counts, shares and hashes, never
-  a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
+  repository's rules (`CLAUDE.md`) forbid it to open the data folder. Team members ran everything on the
+  provided match but the final run, which the assistant started at the request of one of us, then away from
+  the PC, with its output going to a local file it never read; of that run it read only verdicts and hashes.
+  What the runs print is pass or fail and aggregates: counts, shares and hashes, never a file, a frame or a
+  per-frame value. One exception in words only: the team member who watched the public
   5 minutes (section 3.1) described to it what he saw, in general statements and with estimated times. It
   saw the public label file, which is in the repository, and no image and no other provided file.
 - **Decisions the assistant took for us.** Some decisions were the assistant's, under a team member's
