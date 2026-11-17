@@ -1,6 +1,6 @@
 # Technical document, long version
 
-More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-13.
+More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaball. Version of 2026-11-16.
 
 The document we submit is the short one, [`technical-document.md`](technical-document.md). This is the same
 account with every table and every change we tested. Every number comes from `docs/decision-log.md` and the
@@ -202,7 +202,8 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   `make_submission.py predict`. Scored with the official scorer, the CSV gives spellF1 0.650611 and
   macroF1 0.930641, exactly what the evaluation code gives for the same model. Every probability and graded
   label is bit-identical on both paths. The same check with F3 gives 0.722130 and 0.941533 on both paths.
-  It was not repeated with AW or AW2, which change the training and no line of either path.
+  AW2's held-out model passed the same check on the PC (R2, Nov 13): features, probabilities and CSV
+  identical on both paths.
   A SkillCorner match (10 Hz) also agrees, once the evaluation's
   "predicted D counts as X" rule for SkillCorner is applied (`scripts/dressed_check.py`). A synthetic
   bundle on the provided match's own timeline (199,319 frames, the graded halves of `games.py`) runs
@@ -213,7 +214,7 @@ corruption is carried over to the native frames (`touch.lift_ball`), consistentl
   worlds do not produce: no ball at all, nothing tracked for five minutes, one team missing, positions far
   off the pitch, infinite values, slots that change team. In every case, with F and with F3, labelling
   finished and the file passed the official checks. This shows the path does not crash, not that the labels
-  are good. It was not repeated with AW or AW2, whose inference code is F3's.
+  are good. AW2's all-30 model passed all 30 cases too (Nov 13).
 
 ### 3.2 Bake-off (2026-11-06)
 
@@ -411,10 +412,15 @@ as an IDSSE fold is. An IDSSE or Metrica fold has one truth, and A does not chan
   the 8 folds, and four changes passed this kind of test before and were not adopted (S1, S2, K1, K). A
   SkillCorner score against the action truth favours a model trained on it by construction: it is a guard
   and a description, not evidence that the model is better. The registration made rule 2 count only with
-  both team members' names. Both gave them. One side agreed on Nov 13, while no score of A or AW
-  was known to it. The other agreed on Nov 14, after the results of the four candidates and of the longer
-  TCN were known to him; before he was first asked he had seen an interim score of A (its LightGBM member
-  blended with F3's TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8).
+  both team members' names. One member's name was given on Nov 13 at 02:40 CET, while no score of A or AW
+  was known on his side, by the AI assistant working on his PC under a general hand-over he had given; he
+  had not read it. On Nov 15, after he had been told the results, he delegated his open decisions to the
+  assistant, and under that delegation it confirmed his name (section 10). The other member gave his own
+  name on Nov 14 at 02:05 CET, after the results of the four candidates and of the longer TCN were known to
+  him; before he was first asked he had seen an interim score of A (its LightGBM member blended with F3's
+  TCN: +0.0232 [+0.0144, +0.0323] on the 8 folds, 8 of 8). So the only agreement given before any score was
+  the assistant's: no team member gave his own before seeing one. The rule's text was fixed before any score
+  of A and has not changed.
 
 **Four candidates.** Two more were registered on Nov 13, before any score of the four was known on the
 side that registered them. A's registration had said no other variant would be tried; the new
@@ -455,8 +461,9 @@ a registered limit of 0.002:
 
 27 of the 28 folds score the same on the two machines to the last digit, at both severities and on both
 truths. The one that differs is the fold whose LightGBM team head grew other trees (section 7). This is a
-replication, not new evidence: the folds are the same. AW, AT, ATW and the two 9,600-step candidates
-below were fitted on the runners only. The results that follow are the runners'.
+replication, not new evidence: the folds are the same. AT, ATW and the two 9,600-step candidates
+below were fitted on the runners only; AW was also fitted and gated on a teammate's Mac, with the
+runners' verdicts and means. The results that follow are the runners'.
 
 | spellF1 at target-like noise unless stated | F3 | A | AW | AT | ATW |
 |---|---|---|---|---|---|
@@ -571,8 +578,9 @@ the same 28 folds. The registration tried no other step count and said none woul
   the first change since the longer TCN of F3 to win folds of both kinds, and it is the same kind of change.
 - **Against F3, AW2 stands at** +0.0618 on the 8 folds (8 of 8) and +0.0563 on SkillCorner against the
   action truth (18 of 20). A2 stands at +0.0464 (8 of 8) and +0.0617 (20 of 20).
-- **Rule 1 was read for AW, not for AW2.** AW is -0.0224 against F3 on the 28 folds with the frame truth
-  on SkillCorner (8 of 28). The longer TCN's rule does not read the frame truth.
+- **Rule 1, read for information.** The longer TCN's rule does not use the frame truth, but the log has it:
+  AW2 is -0.0184 [-0.0264, -0.0108] against F3 on the 28 folds (8 of 28) and -0.0505 on the 20 SkillCorner
+  folds (0 of 20); AW was -0.0224 (8 of 28).
 - **The weights read the same at 9,600 steps** (information; the registered test was at 4,800). AW2 minus
   A2 is +0.0155 [+0.0032, +0.0275] on the 8 folds (6 of 8), -0.0055 [-0.0131, +0.0024] on SkillCorner
   against the action truth, and -0.0103 [-0.0183, -0.0025] there at severe noise. They gain on IDSSE and
@@ -581,9 +589,16 @@ the same 28 folds. The registration tried no other step count and said none woul
   1.23 on SkillCorner for AW2, 0.80 and 1.02 for A2.
 
 **Adopted.** AW met rule 2 and the registered tests chose it among the four. AW2 passed its own rule
-against AW, so the longer TCN is part of it. Rule 2 had both team members' names before the team's own
-cut-off of Nov 14, 18:00 CET. The choice of AW2, the model the registered tests name, was confirmed by one of
-us after that hour, on Nov 14, and by the other (PENDING_DAVID_AW2). AW2 is the submitted model.
+against AW, so the longer TCN is part of it. AW's registration put the adoption before the team's own
+cut-off of Nov 14, 18:00 CET; it came after it. One of us chose AW2 on Nov 14 at about 23:25 CET. For the
+other, the AI assistant chose AW2 on Nov 15, under his explicit delegation given after he had been told the
+scores, and in the same step confirmed his side of rule 2 (above, and section 10); three reviews it
+commissioned from separate assistant sessions (statistics, football data, research integrity) each
+favoured AW2. AW2 is the model the registered procedure names; A2 was not taken, because preferring it
+would have meant leaving the registration after the scores were known (section 7). Apart from the scores
+that reproduction checks print for one external match (held out: AW2 0.7714, A2 0.7740, at a condition the
+gate does not use), no score was read after Nov 13, 16:35 CET, so the late choice rests on nothing the cut-off would have
+excluded. The cut-off was ours; the organisers' deadline is Nov 17, 23:59 CET. AW2 is the submitted model.
 
 **Reproduction.** The all-30 models of A and of AW were each trained from an empty cache on macOS, Ubuntu
 and Windows runners and on the reference PC: one LightGBM member and one CSV for the dressed external
@@ -729,9 +744,9 @@ D over the first 60 and 120 s of each half, as an aggregate.
   changes. That is the IDSSE and Metrica kind of label, and the action labels are built to have it;
   SkillCorner's frame label is the one that does not. But no document says how the corrected tracking
   behind the ground truth times a change to the frame. If the provided match's ground truth behaves as
-  SkillCorner's frame label does, the bet loses. Under rule 1 AW, at 4,800 TCN steps, is -0.0224 against
-  F3 on the 28 folds with 8 folds won, and on the frame truth of SkillCorner the four candidates lose 0.026
-  to 0.053. AW2 was not read under rule 1: the longer TCN's rule does not use the frame truth.
+  SkillCorner's frame label does, the bet loses. Under rule 1 AW2 is -0.0184 [-0.0264, -0.0108] against
+  F3 on the 28 folds with 8 folds won, and -0.0505 on the 20 SkillCorner folds (0 of 20); at 4,800 steps
+  the four candidates lose 0.026 to 0.053 there.
 - **The action labels are our construction, and their dead-ball ends are approximate.** SkillCorner makes
   its events automatically from the same broadcast tracking; no person labelled them. Of 1,851 flagged
   stoppages, 228 take their start from the broadcast cutting away, a median of 6.5 to 9.1 s after the last
@@ -764,9 +779,10 @@ D over the first 60 and 120 s of each half, as an aggregate.
   tests are there to keep that choice honest. The two reads of section 3.5 on real broadcast tracking
   support the label mechanics, not AW itself: neither model in them trained on an action label. And AW2
   passed its own rule with exactly the 20 of 28 folds it asks for.
-- **AW and AW2 were fitted on one kind of machine.** The fold models of AW, AT, ATW, A2 and AW2 were
+- **AW2 was fitted on one kind of machine.** The fold models of AT, ATW, A2 and AW2 were
   fitted on GitHub's Ubuntu runners only, and gated on the Windows PC against F3's cached members. F3's
-  gate was repeated on a second machine before its adoption; theirs were not. A's was (section 3.5): the
+  gate was repeated on a second machine before its adoption; theirs were not. AW's was, on a teammate's
+  Mac (the same verdicts and means), and so was A's, on the Mac and on the PC (section 3.5): the
   PC gives the runners' verdicts and every mean within 0.0002, and 27 of 28 folds score the same to the
   last digit. The one fold whose LightGBM team head differs (below) moves by 0.0018 at target-like noise
   on the frame truth and by 0.0036 on the action truth. So we read the runners' numbers as stable to the
@@ -794,8 +810,9 @@ D over the first 60 and 120 s of each half, as an aggregate.
   Their gains (+0.0069, +0.0065, +0.0019) sum to +0.0153, against F's +0.0158. After F, nine more packages
   were gated on the same folds (sections 3.4 and 4), each registered before its score: thirteen in all, besides
   the bake-off's models and the six label-convention variants of section 4, which were scored on these folds
-  too. A, AW, AT and ATW were the 14th to 17th packages on them, and A2 and AW2 the 18th and 19th
-  (section 3.5): nineteen gated packages in all. The two
+  too. A, AW, AT and ATW were the 14th to 17th packages on them, A2 and AW2 the 18th and 19th
+  (section 3.5), and KIN (35 ball-free timing columns in the LightGBM team heads of A2 and AW2; failed,
+  +0.0015 and +0.0008, intervals through 0) the 20th and 21st: twenty-one gated packages in all. The two
   locked benches are the only matches no choice was made on. F's one read there gains about as much as on
   the development folds (section 3.1). With two matches, that read is a sanity check, not a second
   estimate, and nothing after F was read on them.
@@ -846,16 +863,12 @@ D over the first 60 and 120 s of each half, as an aggregate.
     Ubuntu 24.04 on AMD EPYC 9V45, Windows Server 2025 on AMD EPYC 7763) and on the PC: LightGBM
     `eb1030c8ec94...` and dressed CSV `98b2919621653c99...` on all four.
 
-  AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on the
-  same four kinds of machine, and they gave one LightGBM member and one dressed CSV.
-  On the reference PC: LightGBM `55de693c7ea2...`, TCN `78a241f571ad...`, bundle `9b4c2cfaa553...`; the
-  dressed match's CSV `4e0ab1d06ba7...`.
-
-  The submitted file was made on a fifth machine, a MacBook with an Apple M5 (macOS 26.5), because the
-  reference PC could not be used in the last days before the deadline. Its all-30 model of AW2 has the
-  same LightGBM member, TCN weights of its own (`caabf1d3c910...`, bundle `91b8fccce91d...`), and it gives
-  the same dressed CSV, byte for byte. `docs/repro/expected-hashes.json` holds that machine's three hashes;
-  `scripts/real_run.py` stops on another LightGBM hash and only warns on the other two.
+  AW2, the submitted model, differs from AW in the TCN's steps only. Its all-30 model was checked on
+  GitHub's macOS, Ubuntu and Windows runners and on the PC, and they gave one LightGBM member and one
+  dressed CSV.
+  Expected on the reference PC (`docs/repro/expected-windows.json`): LightGBM `55de693c7ea2...`, TCN
+  `78a241f571ad...`, bundle `9b4c2cfaa553...`; the dressed match's CSV
+  `4e0ab1d06ba7...`.
 
   **LightGBM is not byte-identical on every machine for every training set.** In the gate of section 3.5,
   A's LightGBM member fitted on the Linux runners equals the PC's own fit on 27 of 28 folds, hash and every
@@ -863,8 +876,8 @@ D over the first 60 and 120 s of each half, as an aggregate.
   head is not: the two machines grew different trees, and its probabilities differ by 0.008 on average and
   by up to 0.15. That moves the fold's score by 0.0018 at target-like noise on the frame truth and by
   0.0036 on the action truth, which is the size to keep in mind for a reproduction of the final file on
-  another machine. F and F3 had not shown this on any machine we tried. The fold models of AW and AW2 were
-  fitted on the runners only, so they have no such comparison. The all-30 models of A and of AW did not
+  another machine. F and F3 had not shown this on any machine we tried. The fold models of AW2 were
+  fitted on the runners only and AW's on the runners and a Mac, so neither has this comparison with the PC. The all-30 models of A and of AW did not
   show it on the four machines each was trained on.
 
   So expect the same file on another machine. That has been shown on an external match in the provided format,
@@ -882,7 +895,7 @@ One command, from a clone and the data bundle (`docs/REPRODUCE.md` has the detai
 
 ```bash
 git clone https://github.com/jusstinn/katenaball && cd katenaball
-git checkout <submission_tag>                    # the tag named in the short document
+git checkout submission-v1                       # the submitted commit, 4f9e40b
 uv sync --frozen                                 # Python 3.11, dependencies pinned in uv.lock
 export MTAH_DATA_DIR=/path/to/data/bundle        # the unpacked competition bundle (default: data/)
 make submit TEAM=<team_name>                     # writes submissions/<team_name>.csv, validates it, prints its sha256
@@ -909,8 +922,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   model byte for byte in 1 h 39 min, including the download. F3 changes only the training step, and F3
   trained twice there gives the same model file. AW and AW2 also change only the training step. AW's
   all-30 model gave one LightGBM member and one dressed CSV on three GitHub runners, each from an empty
-  cache, and on the reference machine. Section 7 has that check, AW2's, the machine that made the
-  submitted file, and the expected hashes.
+  cache, and on the reference machine. Section 7 has that check, AW2's, and the hashes expected on the
+  reference machine.
 - **Determinism:** fixed seeds, 8 LightGBM threads, 4 torch threads, and torch's CPU kernels pinned before
   import (`ensemble.pin_cpu_env`). The CSV is built as bytes with LF line ends on every OS.
 - **Cost:**
@@ -922,8 +935,8 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
   | GitHub runners: Ubuntu, Windows, macOS | | 8, 13 and 37 min | under a minute | 5.7 GB peak in training (Ubuntu) |
 
   The external download (about 5 GB) is extra. The training times in the table are F3's. On the reference
-  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: `train` took 26 minutes
-  there.
+  PC `train` took 15 minutes for AW, at 4,800 TCN steps. AW2's TCN trains twice as long: `train` took 26 to 28
+  minutes there.
 - **The submitted file:** its SHA-256 and its commit are in the short document.
 - **No match data in the repository.** CI fails any commit that holds it (`docs/ci.md`).
 
@@ -948,13 +961,26 @@ Without `make` (the team's Windows PC), run the same steps one by one; `docs/REP
 
 - **AI assistance.** Most of the code and of this document was written with a hosted AI coding assistant
   (Claude Code), working under the team's direction. The competition's data was kept away from it. The
-  repository's rules (`CLAUDE.md`) forbid it to open the data folder, only team members ran anything on the
-  provided match, and what those runs print is pass or fail and aggregates: counts, shares and hashes, never
-  a file, a frame or a per-frame value. One exception in words only: the team member who watched the public
+  repository's rules (`CLAUDE.md`) forbid it to open the data folder. Team members ran everything on the
+  provided match but the final run, which the assistant started at the request of one of us, then away from
+  the PC, with its output going to a local file it never read; of that run it read only verdicts and hashes.
+  What the runs print is pass or fail and aggregates: counts, shares and hashes, never a file, a frame or a
+  per-frame value. One exception in words only: the team member who watched the public
   5 minutes (section 3.1) described to it what he saw, in general statements and with estimated times. It
   saw the public label file, which is in the repository, and no image and no other provided file.
-- **A public file we opened and did not use.** While searching the web for external datasets, an automated
-  agent opened a public record that turned out to hold statistics about the provided game. The file was
+- **Decisions the assistant took for us.** Some decisions were the assistant's, under a team member's
+  delegation; the decision log records each one and who gave it. It wrote the registrations of AT and ATW,
+  A2 and AW2, and KIN before any score of them and before either of us had read them (section 3.5). On
+  Nov 13 at 02:40 CET, working on one member's PC under a general hand-over he had given, it gave his
+  agreement to rule 2 while no score of the new labels was known on his side; he had not read it. On
+  Nov 15, after he had been told the development scores of the two finalists, AW2 and A2, he asked it to
+  have everything waiting on him reviewed and to "take the best decisions". Under that delegation it
+  confirmed his side of rule 2 and chose AW2 for him, the model the registered tests name. The other member
+  signed rule 2 and chose AW2 himself, both after the scores were known (section 3.5). None of these
+  decisions used anything from the provided match.
+- **A public file we opened and did not use.** While searching the web for external datasets, a research
+  subagent of the assistant opened a public record (Zenodo 20185375) that turned out to hold statistics
+  about the provided game; a fragment of one row was printed in that subagent's session. The file was
   deleted. Nothing from it entered the code, the training data or any decision.
 - **StatsBomb open data.** 35 matches were downloaded to a temporary folder before we read the user
   agreement. We did not use them: they are in no training set, result or commit.

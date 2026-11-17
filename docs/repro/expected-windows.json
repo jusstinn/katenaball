@@ -1,0 +1,12 @@
+{
+ "about": "Model hashes of the submission model (spec AW2) as scripts/make_submission.py trains it on the team's Windows PC. scripts/real_run.py compares the trained model's manifest.json with these: a different gbdt hash stops the run (the training data changed); a different tcn or bundle.pkl hash alone is a warning (torch's CPU kernels changed). Update these only together with a change to the model (W6), never to make a run pass.",
+ "spec": "AW2",
+ "machine": "the team's Windows PC (x86-64), with the locked environment of uv.lock",
+ "recorded": "2026-11-13",
+ "source": "docs/decision-log.md (2026-11-15, AW2 and A2 on the Windows PC: the reproduction checks); docs/real-run.md, step 2",
+ "sha256": {
+  "gbdt": "55de693c7ea2ae3ac03c68ba005b41d8ed7ee2386e5fa6d6c04659551ef9439c",
+  "tcn": "78a241f571ad21dc0d4ab88c6ab35bc6f36a17a2ddc25ca63429c30e17392178",
+  "bundle.pkl": "9b4c2cfaa553af431185f6c0c99932293e8db3433b68d3a5ca94fe1bc0a30a57"
+ }
+}

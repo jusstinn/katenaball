@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from synth import make_match, use_synthetic_action_labels
+from synth import fake_sc_actions, make_match
 
 from katena.eval import corpus as C
 from katena.eval import protocol as P
@@ -15,6 +15,7 @@ from katena.eval import protocol as P
 
 @pytest.fixture
 def synth_corpus(tmp_path, monkeypatch):
+    from katena.external import skillcorner_actions as SA
     from katena.models import gbdt
     from katena.types import save_match
     if gbdt.lgb is None:
@@ -24,7 +25,9 @@ def synth_corpus(tmp_path, monkeypatch):
     monkeypatch.setattr(tcn, "BATCH", 4)
     monkeypatch.setattr(tcn, "WIN", 64)
     monkeypatch.setattr(P, "CANON", tmp_path / "canon")
-    use_synthetic_action_labels(monkeypatch, tmp_path / "external")     # the submission model trains on them
+    # The submission spec trains SkillCorner matches on their action events, which a synthetic match has none of.
+    monkeypatch.setattr(SA, "build_labels", fake_sc_actions)
+    monkeypatch.setattr(P, "EXTERNAL", tmp_path / "external")
     for seed, (ds, mid) in enumerate((("metrica", "SYN1"), ("metrica", "SYN0"), ("idsse", "SYN7"),
                                       ("skillcorner", "SYN3"))):
         save_match(make_match(seed=seed, invert_labels=seed == 1), tmp_path / "canon" / ds / f"{mid}.npz")
@@ -58,18 +61,15 @@ def test_pipeline_trains_on_every_match_and_labels_a_new_one(synth_corpus, monke
 
     model = PL.load_model()
     assert model.names[:model.n_base] == list(C.load_feat(refs[0], "target")["names"])
-    # the reloaded LightGBM member predicts exactly what the gate's call fits for the submission spec
+    # the reloaded LightGBM member predicts exactly what the trained one did, refitted on the submission spec's
+    # labels, alive rows, team weights and size
     from katena.eval import actlabels as AL
     from katena.models import gbdt
-    sp = PL.spec_of()
     pools = F.FinalPools(refs)
-    y, dead_ok, w = pools.y[P.T_MAIN], pools.dead_ok, None
-    if sp.sc_actions:                                                       # as stage_train: the action labels,
-        y = AL.pool_y(refs, pools)
-        if sp.sc_dead:
-            dead_ok = np.ones(len(y), bool)                                 # their dead rows,
-    if sp.len_weights:
-        w = AL.pool_weights(refs, AL.native_weights(refs, P.T_MAIN))        # and the possession-length weights
+    sp = PL.spec_of()
+    y = AL.pool_y(refs, pools) if sp.sc_actions else pools.y[P.T_MAIN]
+    dead_ok = np.ones(len(y), bool) if sp.sc_dead else pools.dead_ok
+    w = AL.pool_weights(refs, AL.native_weights(refs)) if sp.len_weights else None
     heads = gbdt.fit_heads(pools.X, pools.o, y, dead_ok, pools.cols(), n_trees=sp.gbdt_trees, team_weight=w)
     X = pools.X[:500]
     a = heads.predict(X, X)

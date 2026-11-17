@@ -1,13 +1,13 @@
 # Adoption notes for `david/adopt-docs`
 
-**Status, Nov 16 (Claude on Justin's Mac, branch `justin/adopt-aw2-mac`, the fallback).** This branch does part
-4 with the Mac in the PC's place, for the case that David's side stays silent until the deadline (decision log,
-Nov 16). `SUBMISSION_SPEC` is `AW2`; `docs/repro/expected-windows.json` is renamed `expected-hashes.json` and
-holds the Mac's three hashes (the LightGBM hash is the one all five machines share); `docs/real-run.md`,
-`docs/REPRODUCE.md`, `docs/ci.md` and the docstring of `scripts/make_submission.py` name AW2; both documents say
-that a MacBook made the submitted file. Still open on it: `PENDING_DAVID_AW2`, the three `TODO(after the real
-run)` markers, part 3 items 1 and 7, and the adoption entry in the log. If the PC returns, complete
-`justin/adopt-aw2` instead and drop this branch.
+**Status, Nov 15, 20:30 CET (Claude on David's PC, branch `justin/adopt-aw2`).** AW2 is adopted: the switch
+(part 4) is in, with the PC's full hashes, and David's side was given by Claude under his delegation of Nov 15
+(decision log, Nov 15). `PENDING_DAVID_AW2` is filled in; part 3, items 1 and 7, are written into both documents.
+Left: David's own confirmation of the AI-use statements (short section 9, long section 10), Justin's sentences
+about his look at the public window and his approval of the PR, the real run, the tag and the three
+`TODO(after the real run)` markers. Page 5 of the short document is nearly full: if the final build prints 6
+pages, cut "With another TCN seed, F's gain ... not repeated since." (section 7; the long document keeps
+it). The statuses below are earlier ones.
 
 **Status, Nov 14, 23:35 CET (Claude on Justin's Mac, branch `justin/adopt-aw2`).** Justin put his name to rule 2
 on Nov 14 at 02:05 CET and chose AW2 on Nov 14 at about 23:25 CET, after the team's own cut-off of 18:00 CET

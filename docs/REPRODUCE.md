@@ -3,11 +3,13 @@
 One command, from a clone of this repository and the data bundle:
 
 ```bash
+git checkout submission-v1     # the tagged commit that produced the submitted file (technical document, section 8)
 make submit TEAM=<team_name>
 ```
 
 It writes `submissions/<team_name>.csv`, runs the official `evaluation/validate_submission.py` on that exact
-file, and prints its sha256. A team name with a space needs quotes: `make submit TEAM="My Team"`.
+file, and prints its sha256. A team name with a space needs quotes: `make submit TEAM="My Team"`. Without `make`
+(it is not on Windows by default), run the same steps by hand: see "Without `make`" below.
 
 ## Where the data bundle goes
 
@@ -36,10 +38,11 @@ check opens nothing.
 | Model | `make_submission.py train` | The same | `work/final/model_AW2/bundle.pkl`, `manifest.json` (hashes) |
 | Labels | `make_submission.py predict` | The bundle: ATD metadata and raw tracking, and the Smart Tagging file for the kickoff rule | `submissions/<team>.csv` |
 
-The model is AW2 (`docs/decision-log.md`, 2026-11-13 and the adoption entry): F3's two members, a 1,200-tree
-LightGBM and a TCN that also reads the touch columns, trained on labels for the 20 SkillCorner matches that are
-rebuilt from their action events, with weights by possession length, and with 9,600 TCN steps for F3's 4,800.
-It trains on all 30 external matches, and nothing from the provided match. The provided match is read only by `predict`, which prints aggregates only (counts, shares,
+The model is AW2 (`docs/decision-log.md`, 2026-11-12 and 2026-11-13): F3 (candidate F with a 1,200-tree
+LightGBM member and a TCN that also reads the touch columns) trained on labels from SkillCorner's own action
+events for its 20 matches, with both team heads weighing a frame by the inverse length of its possession, and
+with the TCN trained 9,600 steps instead of 4,800. It trains on all 30 external matches, and nothing from the
+provided match. The provided match is read only by `predict`, which prints aggregates only (counts, shares,
 shapes, hashes, run times).
 
 ## Requirements
@@ -56,9 +59,10 @@ shapes, hashes, run times).
   about 6 GB, because torch's Linux wheels bring the CUDA libraries. Nothing runs on a GPU: both models train
   and predict on the CPU, on every OS.
 - 16 GB of RAM is enough.
-- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus and worlds take about 14 minutes (corpus
-  4.5, worlds 9.5) and training AW2 about 20 (LightGBM 1, TCN 19). On the team's Windows PC (4 cores)
-  training AW2 takes about 26 minutes. Labelling the match takes well under a minute. The external download is extra.
+- On an Apple-silicon laptop with 10 cores and `WORKERS=3`, corpus to trained model took about 23 minutes for
+  F3: corpus 4.5, worlds 9.5, LightGBM 0.5, TCN 8. AW2's TCN trains twice as many steps. On the team's Windows
+  PC (4 cores) training AW2 takes about 26 minutes (LightGBM 3, TCN 23 to 24). Labelling the match takes well
+  under a minute. The external download is extra.
 - On macOS without Homebrew's libomp, the scripts load LightGBM through scikit-learn's bundled copy and
   re-execute themselves once (`gbdt.ensure_openmp`).
 
@@ -109,7 +113,9 @@ uv run python evaluation/validate_submission.py submissions/<team_name>.csv
 sha256sum submissions/<team_name>.csv                         # shasum -a 256 on macOS, Get-FileHash on Windows
 ```
 
-Every step skips what is already built, so a run that stopped can be started again with the same command.
+The commands are the same in PowerShell, where `$env:MTAH_DATA_DIR = "D:\path\to\bundle"` points at the bundle.
+Every step but `train` skips what is already built, so a run that stopped can be started again with the same
+command; `train` fits the model again each time (the same bytes, about 26 minutes on a 4-core PC).
 
 ## Checking the submission path without the match
 

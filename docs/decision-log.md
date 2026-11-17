@@ -4,9 +4,59 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-17
+
+### Real run: `scripts/real_run.py --team katenaball` (2026-11-17)
+
+- Commit `4f9e40b7e4bb5008984b4f0ee322fb6f08b7751e` (tree clean). Result: **PASS**.
+- Checks on the provided files: `check_target.py` 17 PASS, 0 FAIL; `check_target_layout.py` 2 PASS, 0 FAIL; `check_touch_target.py` 1 PASS, 0 FAIL; `check_kickoff_tags.py` 2 PASS, 0 FAIL.
+- Model, against `docs/repro/expected-windows.json`: bundle.pkl `9b4c2cfaa553af431185f6c0c99932293e8db3433b68d3a5ca94fe1bc0a30a57` (same); gbdt `55de693c7ea2ae3ac03c68ba005b41d8ed7ee2386e5fa6d6c04659551ef9439c` (same); tcn `78a241f571ad21dc0d4ab88c6ab35bc6f36a17a2ddc25ca63429c30e17392178` (same).
+- `validate_submission.py`: Valid.
+- `check_public_window.py`: valid_submission: PASS, home_away_orientation: PASS, frame_alignment: PASS, beats_published_baseline: PASS.
+- `submissions/katenaball.csv` SHA-256 `478211821e25e71c8e3ce93ae5587d2ef89bb5279c4c1b36e9d747a8b164d109`.
+
+- **How it was run.** Started by Claude on David's PC under the exception `CLAUDE.md` gained this morning
+  (`4f9e40b`; David, who could reach the PC only through Claude Code, asked for it). Every line of its console
+  output went to `D:\katena\logs\realrun\console-20261117.log`, which Claude did not open; it read only
+  `scripts/run_summary.py` on the run report and this snippet. The provided match was not otherwise touched.
+- **This is the look at the public window that the plan logs**: `check_public_window.py`'s PASS/FAIL lines
+  above, nothing else. Nothing was changed because of it.
+- **The team name** in the command, `katenaball`, was provisional. The file is uploaded under the registered
+  name, byte for byte the same (the SHA-256 above). The tag `submission-v1` is on `4f9e40b7e4bb`, the commit
+  that made the file.
+- **Warnings.** `check_kickoff_tags.py` printed two WARN lines beside its two PASS lines (allowed: only a FAIL
+  stops the run). Claude did not read their text; a team member should, in the console log above. The other
+  warning: the commit was not yet on `main`. Until #35 is merged, the release workflow on the tag fails by
+  design; re-run it after the merge.
+
 ## 2026-11-16
 
+### The technical documents: corrections after a reader's review (no decision)
+
+**Claude on David's PC, 07:25 CET.** A fresh reader (a subagent, given the documents, this log and
+`docs/upstream/SUBMISSION.md`, and told not to open the provided data or the public window) read both documents
+as an organiser would. Nothing about the model changes. Corrected, because they were untrue:
+
+- "Both ran with F and F3" (the both-paths and stress checks): AW2 passed both on Nov 13 (entry "AW2 and A2 on the
+  Windows PC", Nov 15). The long document's two "not repeated with AW or AW2" sentences go with it.
+- "The fold models of AW ... on the runners only": AW was also fitted and gated on Justin's Mac (entry "AW on
+  Justin's Mac", Nov 13).
+- "AW2 was not read under rule 1": this log has it, -0.0184 [-0.0264, -0.0108], 8 of 28, and -0.0505 on the 20
+  SkillCorner folds, 0 of 20 (entry "A2 and AW2: result"). The short document now quotes AW2's rule-1 result, not AW's.
+- "Nineteen" gated packages: KIN made 21.
+
+Added: the "what we would do with more time" item that `SUBMISSION.md` asks for (short section 7; the figures are
+the oracle edits of "Where F3 loses", Nov 13); definitions of F, F3, AW2 and "worlds" where a stranger meets them;
+the delegation stated once, in section 9. Shortened, to keep 5 pages: section 1, the evidence and replication
+bullets of section 3, one row of section 4, the model-bytes bullet of section 7. Both documents are dated Nov 16.
+
 ### Fallback prepared: AW2 from Justin's Mac, if David's side stays silent (not triggered; nothing adopted)
+
+**Outcome (2026-11-17): not used.** David's side returned. The real run was made on the PC on Nov 17 (entry
+above), from `justin/adopt-aw2`, which is merged (#35). None of this branch's file changes are on `main`: the
+expected hashes stay the PC's, in `docs/repro/expected-windows.json`, and `docs/repro/expected-hashes.json`
+does not exist there. The entry is kept as the record of the Mac as a fifth machine: the same LightGBM member
+and the same labels on an external match in the provided format.
 
 **The Mac can train AW2 and label a match in the provided format exactly as the four machines of Nov 13 did. It
 cannot make the submission yet: the organisers' data bundle is not on it.** Recorded by Claude on Justin's Mac,
@@ -93,6 +143,88 @@ run on the Mac: they need the real files.
 **What only Justin can do:** download the bundle; run the command himself (`CLAUDE.md`: no assistant runs
 anything on the match) and share only its snippet; merge to main, tag `submission-v1`, fill the markers, build
 the PDF and send the form.
+
+## 2026-11-15
+
+### David's side, by delegation: rule 2 kept and AW2 chosen; AW2 is adopted
+
+**AW2 is the submission model (`SUBMISSION_SPEC = "AW2"`, the switch entry below).** Recorded by Claude on David's
+PC at 20:30 CET on Nov 15. At about 19:30 CET David was given a summary that included the scores ("0.05 to 0.06
+better than F3; finalists AW2 and A2"). He then asked Claude to have expert subagents review everything blocked
+on him and to "take the best decisions". Claude commissioned three reviews from separate assistant sessions, each
+given this log and told not to open the provided data or the public window: model selection and statistics,
+football tracking data, and research integrity with the competition's rules. All three favoured AW2. Under that
+delegation:
+
+- **Rule 2.** David's side, given by Claude on Nov 13 at 02:40 CET under his hand-over and unread by him, is kept:
+  confirmed now, after the scores were known to David and after the team's cut-off. No team member put his own
+  name to rule 2 before seeing a score; the only agreement given before any score was the assistant's. The rule's
+  text is A's entry of Nov 12, unchanged.
+- **The model: AW2**, the one the registered procedure names. AW2 and A2 tie on all 28 folds (0.6753 against
+  0.6748), so following the registration costs nothing in expectation. The ground truth is read frame by frame
+  from corrected tracking ("not from event data", `CHALLENGE.md`), which is how IDSSE's labels are made; the two
+  Metrica folds and the SkillCorner action truth, where A2 leads, are labels built from events. Choosing A2 would
+  leave the registration after the scores were known. The statistics review expects a gain over F3 on the provided
+  match of about +0.01 to +0.03, not the folds' +0.06: the direction holds, the size does not.
+- **Seen before this choice and set aside:** the scores the reproduction checks print for their one external match:
+  R2's held-out fold (entry below: AW2 0.7714, A2 0.7740, at a condition the gate does not use) and R1's figure for
+  the all-30 model, which trained on that match. Apart from them, no score in this log is later than Nov 13, 16:35
+  CET.
+- **The organisers' question, pre-registered before it is sent.** The question of `label-convention.md`, section 7,
+  is drafted as: does the owning team change at the first touch by a player of the other team, or only once that
+  team is judged to have control (a minimum time on the ball, a number of passes, an operator's call)? It goes only
+  if David sends it. If an answer arrives before Nov 17, 12:00 CET: "first touch", any other answer, or none, and
+  AW2 stays; an answer that the owner changes only once control is judged, and A2 replaces AW2 if Justin agrees,
+  with the text of `docs/handoff/ADOPTION_NOTES.md` part 2 and A2's hashes (entry below). No answer changes
+  anything else: no new gate, no change of T or `tail`.
+- **Fallback.** If the real run on the reference PC has not ended, by Nov 17, 18:00 CET, with exit 0, a valid file
+  and AW2's expected LightGBM hash, F3 is submitted: the switch commit is reverted and the real run is done with F3.
+- **Not delegated, and still David's:** the AI-use statements of both documents (short section 9, long section
+  10), which say what his sessions showed an assistant, since only he can confirm them; the team name; the real run
+  (`docs/real-run.md`), the `submission-v1` tag and the form; whether to send the organisers' question.
+- **Documents.** `PENDING_DAVID_AW2` and part 3 of the adoption notes, items 1 and 7, are filled in with what
+  happened. The short document's "It saw no image and no file" was untrue (the assistant saw the public label
+  file, Nov 11) and is corrected. The Zenodo disclosure now says a research subagent of the assistant opened the
+  record and a fragment of one row was printed (compliance note in this log). Both documents say AW2's last
+  machine check ran on GitHub's three runners and the PC, without "the same four kinds of machine": AW2's Ubuntu
+  and Windows runners had other CPUs than AW's. Both are dated Nov 15.
+
+### AW2 and A2 on the Windows PC: the reproduction checks (result; Claude on David's PC, from its logs)
+
+**R1 to R3 and the stress check pass for both. AW2's full hashes on the PC are the ones
+`docs/repro/expected-windows.json` now holds.** These are the checks F3 had before its adoption, run on the PC on
+Nov 13 from 09:12 to 16:38 (the PC's clock); logs in `D:/katena/logs/aw2`, `D:/katena/logs/a2`,
+`D:/katena/logs/stress` and `D:/katena/logs/pcref/adopt_checks.log`, written up on Nov 15. External matches only
+(IDSSE `DFL-MAT-J03WMX` in the provided format); nothing ran on the provided match. Nothing is adopted by it.
+
+| # | Check | AW2 | A2 |
+|---|---|---|---|
+| R1 | Same machine, two fresh trainings on all 30 | Pass. The same `bundle.pkl` both times and a byte-identical dressed CSV, 0 of 145,608 graded frames differ | Pass, the same |
+| R2 | Dressed match, held-out model, both paths | Pass. Features and all six probability arrays bitwise equal, 0 of 29,123 work-grid labels differ, 0 CSV frames differ | Pass, the same |
+| R3 | Held-out model with other torch kernels | Pass. The TCN's hash changes (`ecb99ef8...` to `e0033fcb...`); the dressed CSV is byte-identical (`a1b03f59...`) | Pass. TCN `0931f98c...` to `45cd2a14...`; CSV `07c6bd26...` both times |
+| Stress | `scripts/stress_predict.py` with the all-30 model | 30 of 30 cases pass | 30 of 30 cases pass |
+
+**The hashes on this PC** (all 30 matches, 657,133 rows x 213 columns). The PC's first fits of Nov 13 (entry "A2
+and AW2 on four machines") gave the same, so each spec has trained to one `bundle.pkl` three times here.
+
+| | AW2 | A2 |
+|---|---|---|
+| gbdt | `55de693c7ea2ae3ac03c68ba005b41d8ed7ee2386e5fa6d6c04659551ef9439c` | `eb1030c8ec94b78081b664e1bb2b8de3a5fef5aea83be6cf3a3016546beff750` |
+| tcn | `78a241f571ad21dc0d4ab88c6ab35bc6f36a17a2ddc25ca63429c30e17392178` | `0f5b9b27ea546cf7fa3c79ed64648cc4ca96e0c7ba3471dced06a2618e3979bb` |
+| bundle.pkl | `9b4c2cfaa553af431185f6c0c99932293e8db3433b68d3a5ca94fe1bc0a30a57` | `dfda7e14c88242e6d3d4cf8d938743fdfe6936d6dc8918e4f09ca97092069213` |
+| dressed CSV (`idsse/DFL-MAT-J03WMX`, all-30 model) | `4e0ab1d06ba721a05924555a765edcea84c1c88008f5e15153ffdc27d41824ef` | `edb8c25495976693c1a88d32859e23619b5bdae100a1c99cce55e7fe48510408` |
+
+`docs/repro/windows-reference-AW2.json` is this PC's AW2 reference for `repro.yml` (hashes, stage digests and
+aggregates only). A2's is in `D:/katena/logs/a2` and is not committed.
+
+- **Restarts.** The AW2 driver stopped at the end of R1 (exit 1 at 10:09) and was interrupted in R2; its last
+  pass (exit 0 at 14:45) reused R1's two trainings and ran R2 and R3 again. A2's first pass was interrupted in
+  R1; its second ended with exit 0 at 16:30.
+- **One fold score was seen in R2.** `dressed_check.py compare` prints the held-out match's score at clean
+  input, the same on both paths: AW2 0.7714, A2 0.7740. One fold at a condition the gate does not use; it
+  decides nothing.
+- **Cost.** `train` on this PC: AW2 26 minutes in its first fit and 27 to 28 in R1's two (LightGBM 3, TCN 23 to
+  24); A2 23 to 27 minutes.
 
 ## 2026-11-14
 

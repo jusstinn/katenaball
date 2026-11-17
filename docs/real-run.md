@@ -1,6 +1,8 @@
 # The real run: checklist for the person with the data
 
-Only a team member runs anything on the provided match, never an AI assistant (`CLAUDE.md`). Every script
+Only a team member runs anything on the provided match, never an AI assistant (`CLAUDE.md`), with one
+exception set on Nov 17 (`CLAUDE.md`, data firewall): an assistant may start `real_run.py` with all of its
+output redirected to a local file it never reads, and read only `scripts/run_summary.py`'s verdicts and hashes. Every script
 below prints aggregates or pass/fail only. **Share only the PASS/FAIL lines, "Valid", and the hashes**
 outside the team. Keep label shares, D shares, touch rates and jitter numbers to yourself. If something
 looks wrong, describe the symptom in words.
@@ -18,32 +20,14 @@ $env:KATENA_EXTERNAL = "D:\katena\external_data"   # the external corpus
 $env:KATENA_WORK     = "D:\katena\work-submit"     # the cache: corpus and worlds are already built there
 ```
 
-### On the Mac (the fallback machine)
-
-The same run from a Mac, if the PC cannot make it (`docs/decision-log.md`, 2026-11-16). The Mac needs the
-organisers' data bundle first: unpack it anywhere and point `MTAH_DATA_DIR` at the folder that holds
-`tactical/` and `broadcast/`. The command reads four of its files and stops in step 1 if one is missing:
-`tactical/BAR-ATH_tactical_atd.xml`, `tactical/BAR-ATH_tactical_atd.txt`,
-`tactical/BAR-ATH_tactical_smart_tagging.xml` and, for the layout check only,
-`broadcast/BAR-ATH_broadcast_atd.xml`. The videos are not needed. The three paths below are the Mac's own; the
-external corpus and the cache are already built there.
-
-```bash
-git checkout main && git pull
-export MTAH_DATA_DIR=/path/to/the/unpacked/bundle
-export KATENA_EXTERNAL=/path/to/external_data
-export KATENA_WORK=/path/to/work/final
-uv sync --frozen
-uv run python scripts/make_submission.py bundle        # "bundle: 3 files found" (the tactical three); it opens nothing
-uv run python scripts/real_run.py --team <team_name>
-```
-
-Everything below holds on the Mac too, with `uv run python` for `.venv\Scripts\python.exe`, `/` for `\` and
-`shasum -a 256` for `Get-FileHash`.
-
 ## Steps 1 to 3 in one command
 
-Replace `<team_name>` with the team name registered on the form (the file must be named after it).
+Replace `<team_name>` with the team name registered on the form (the file must be named after it). Quote a name
+with a space or an apostrophe (`--team "Katena FC"`). Accents and a final dot are fine; the script refuses only
+a name Windows cannot use as a file name (`< > : " / \ | ? *`, or a device name such as `CON` or `NUL`), and
+`build_document.py` takes the same names. Run it a day before the deadline, not on it: `check_target_layout.py`
+has never run on the match, the direction test added to `check_target.py` on Nov 13 has no logged run on it, and
+a FAIL stops the run.
 
 ```powershell
 .venv\Scripts\python.exe scripts\real_run.py --team <team_name>
@@ -59,7 +43,7 @@ and it stops at the first failure:
 2. **The checks on the provided files** (step 1 below). It prints only their PASS/FAIL lines, and for the touch
    check the feature shape. A FAIL or a `raised <SomeError>` line stops the run.
 3. **`make_submission.py all --workers 2`** (step 2 below), with its output streamed. Then it compares the model
-   hashes with [`docs/repro/expected-hashes.json`](repro/expected-hashes.json). A different gbdt hash stops
+   hashes with [`docs/repro/expected-windows.json`](repro/expected-windows.json). A different gbdt hash stops
    the run, before `predict` when it can. A different tcn or bundle hash alone is printed as a `WARN`.
 4. **`validate_submission.py`** on the exact file, **`check_public_window.py`** (PASS/FAIL lines only), and the
    file's SHA-256 (step 3 below).
@@ -103,18 +87,15 @@ If any of them prints FAIL or `raised <SomeError>`, stop and report the line.
 ```
 
 - `corpus` and `worlds` should report everything up to date.
-- `train` fits AW2 every time it runs: about 26 minutes on the PC and about 20 on the Mac (LightGBM 1, the
-  TCN 19; 30 with other work running). On the Mac it should print these model hashes (two fits on
-  2026-11-16 gave them both times):
+- `train` takes about 26 minutes (LightGBM 3, TCN 23 to 24). On this PC it should print these model hashes
+  (checked on 2026-11-13):
   - gbdt `55de693c7ea2…`
-  - tcn `caabf1d3c910…`
-  - bundle `91b8fccce91d…`
+  - tcn `78a241f5…`
+  - bundle `9b4c2cfa…`
 
-  The full hashes are in `docs/repro/expected-hashes.json`. After the run, the trained model's hashes are in `model_AW2\manifest.json`
+  The full hashes are in `docs/repro/expected-windows.json`. After the run, the trained model's hashes are in `model_AW2\manifest.json`
   under `KATENA_WORK`. A different gbdt hash means the training data changed: stop and report it. A different tcn or bundle hash
-  alone means torch's CPU kernels changed (a new torch or CPU): report it, but it is not by itself a bug. On the PC
-  the gbdt hash is the same and the other two are tcn `78a241f571ad…` and bundle `9b4c2cfaa553…`, so there the
-  command prints two `WARN` lines and goes on.
+  alone means torch's CPU kernels changed (a new torch or CPU): report it, but it is not by itself a bug.
 - `predict` takes about a minute and ends with the official checks on the written file.
 
 ## 3. Validate and check the pipeline (by hand)
@@ -135,10 +116,16 @@ Get-FileHash -Algorithm SHA256 submissions\<team_name>.csv
 
 ## 4. Freeze and submit
 
-1. Tag the exact commit that produced the file: `git tag submission-v1` then `git push origin submission-v1`.
-   The release workflow refuses a tag whose commit is not on `main`.
-2. Fill the hash, tag and public-window result into `docs/technical-document.md` (the `TODO(after the real
-   run)` markers) and commit it. Then build the PDF the form asks for:
+1. Tag the exact commit that produced the file, the one the snippet names (not a later commit, such as the one
+   that adds the snippet to the log): `git tag submission-v1 <commit>` then `git push origin submission-v1`.
+   Pushing the tag starts the release workflow. It checks that the commit is on `main`; if not, it fails and
+   publishes no release note, but the tag stays on GitHub. Delete a wrong tag with
+   `git push --delete origin submission-v1` and `git tag -d submission-v1`.
+2. Fill the hash, tag and public-window result into `docs/technical-document.md`, at its three
+   `TODO(after the real run)` markers: the PASS/FAIL lines of `check_public_window.py` (section 3); in the
+   section 8 command, `submission-v1` in place of `<submission_tag>`, without the comment; the CSV's SHA-256
+   and the commit (section 8). Leave `<team_name>`: the build fills it in. Commit it and push it to `main`, so
+   the public repository shows the same text as the PDF. Then build the PDF the form asks for:
 
    ```powershell
    uv run scripts\build_document.py --team <team_name>
@@ -146,7 +133,11 @@ Get-FileHash -Algorithm SHA256 submissions\<team_name>.csv
 
    It writes `submissions\<team_name>.pdf` (A4, 5 pages on 2026-11-12) with the team name in the title, and
    prints its page count and SHA-256. It refuses to build while a marker is left; `--draft` builds anyway. It
-   needs Edge or Chrome, which it runs headless, and no network. The form also accepts the `.md`.
+   needs Edge or Chrome, which it runs headless. The first `uv run` of it downloads markdown-it-py and
+   Playwright once, then uses uv's cache. If the browser's command line leaves no PDF, it prints a `WARN` and
+   prints the page again through Playwright with the same browser (no browser download); the last line says
+   which one wrote the file. Open the PDF before uploading it. The form also accepts a `.md`, but
+   `docs/technical-document.md` still says `<team_name>`: upload the PDF.
 3. Submit through the organisers' Google Form (link by email by 2026-11-14; deadline 2026-11-17 23:59 CET):
    - the team name;
    - `submissions\<team_name>.csv`, after validating that exact file;
@@ -155,4 +146,8 @@ Get-FileHash -Algorithm SHA256 submissions\<team_name>.csv
 4. Never commit the CSV. `submissions/` is git-ignored, and the firewall check blocks it anyway.
 
 If the model or the code changes after this, run the one command again. Add `--skip-checks` if the loader code
-has not changed. By hand, start again at step 2. The form keeps the last response before the deadline.
+has not changed. By hand, start again at step 2. Tag the new commit `submission-v2` (never move a pushed tag) and
+fill the new hash and tag into the document. The form keeps the last response before the deadline.
+
+Upload only a CSV from a run that ended in `PASS  every step passed`. When a run stops with a FAIL and an
+earlier run's `submissions\<team_name>.csv` is still there, the run report says so.

@@ -15,7 +15,7 @@ It runs these steps in order and stops at the first failure:
 2. The human checks: check_target.py, check_target_layout.py, check_touch_target.py, then
    check_kickoff_tags.py when this checkout has it. --skip-checks skips this step.
 3. make_submission.py all --workers 2 --out submissions/<team>.csv, its output streamed, then the trained
-   model's hashes against docs/repro/expected-hashes.json. A different gbdt hash stops the run (the training
+   model's hashes against docs/repro/expected-windows.json. A different gbdt hash stops the run (the training
    data changed), before predict when it can. A different tcn or bundle hash alone is a warning (torch's CPU
    kernels changed).
 4. evaluation/validate_submission.py on the exact file, check_public_window.py, and the file's SHA-256.
@@ -50,7 +50,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 SUBMISSIONS = REPO / "submissions"
-EXPECTED = REPO / "docs" / "repro" / "expected-hashes.json"
+EXPECTED = REPO / "docs" / "repro" / "expected-windows.json"
 TOOLS = {
     "check_target": REPO / "scripts" / "check_target.py",
     "check_target_layout": REPO / "scripts" / "check_target_layout.py",
@@ -62,6 +62,10 @@ TOOLS = {
 }
 CHECKS = ("check_target", "check_target_layout", "check_touch_target", "check_kickoff_tags")
 OPTIONAL = {"check_kickoff_tags"}          # W4a adds it; a checkout without it skips it
+# Checks whose WARN lines alone are a pass. check_kickoff_tags.py prints one WARN line and exits 0 when it cannot
+# read the Smart Tagging file: the kickoff rule then leaves every frame unchanged, which is safe, and the check
+# exits 1 on a FAIL line only (its docstring). Without this, that WARN alone stopped the run as a bare FAIL.
+WARN_ONLY_PASSES = {"check_kickoff_tags"}
 WORKERS = 2
 # katena.pipeline's names (tests/test_real_run.py checks they agree); imported, it would pull in torch.
 MODEL_DIR, MANIFEST, BUNDLE = "model", "manifest.json", "bundle.pkl"
@@ -377,7 +381,8 @@ def checks(run: Run) -> None:
         lines = verdict_lines(key, rc, shown)
         n_pass = sum(x.startswith("PASS") for x in lines)
         n_fail = sum(x.startswith("FAIL") for x in lines)
-        ok = n_fail == 0 and n_pass > 0 and rc == 0
+        n_warn = sum(x.startswith("WARN") for x in lines)
+        ok = n_fail == 0 and rc == 0 and (n_pass > 0 or (key in WARN_ONLY_PASSES and n_warn > 0))
         secs = round(time.time() - t, 1)
         say(path.name)
         for x in lines:
@@ -387,7 +392,7 @@ def checks(run: Run) -> None:
                                      "fail": n_fail, "exit_status": rc, "seconds": secs, "lines": lines})
         run.report["warnings"] += [f"{path.name}: {x[6:]}" for x in lines if x.startswith("WARN")]
         if not ok:
-            first = next((x for x in lines if x.startswith("FAIL")), "FAIL")
+            first = next((x for x in lines if x.startswith("FAIL")), "FAIL  printed no PASS line")
             raise Stop(f"{path.name}: {first}")
 
 
@@ -490,7 +495,7 @@ def submission(run: Run) -> None:
         run.report["hash_check"] = {"gbdt": "differs"}
         say(f"FAIL  gbdt {watch.train_gbdt}, expected {expected.get('gbdt')}: the training data changed. "
             "Stopped make_submission.py before predict. Report it")
-        raise Stop("gbdt hash differs from docs/repro/expected-hashes.json: the training data changed")
+        raise Stop("gbdt hash differs from docs/repro/expected-windows.json: the training data changed")
     if rc != 0:
         raise Stop(f"make_submission.py exited with status {rc}")
 
@@ -500,7 +505,7 @@ def submission(run: Run) -> None:
     with open(manifest, encoding="utf-8") as fh:
         got = json.load(fh).get("sha256", {})
     run.report["model_sha256"] = {k: got.get(k) for k in HASH_KEYS}
-    say("model hashes against docs/repro/expected-hashes.json")
+    say("model hashes against docs/repro/expected-windows.json")
     kernels = []
     for key in HASH_KEYS:
         same = got.get(key) is not None and got.get(key) == expected.get(key)
@@ -511,7 +516,7 @@ def submission(run: Run) -> None:
             say(f"  {'FAIL' if key == 'gbdt' else 'WARN'}  {key:10s} {got.get(key)}, expected {expected.get(key)}")
             kernels += [] if key == "gbdt" else [key]
     if run.report["hash_check"]["gbdt"] != "same":
-        raise Stop("gbdt hash differs from docs/repro/expected-hashes.json: the training data changed")
+        raise Stop("gbdt hash differs from docs/repro/expected-windows.json: the training data changed")
     if kernels:
         run.warn(f"{' and '.join(kernels)} hash differs: torch's CPU kernels changed (a new torch or CPU). "
                  "Report it; it is not by itself a bug")
@@ -602,7 +607,7 @@ def snippet(r: dict) -> str:
         out.append("- Checks on the provided files: " + "; ".join(parts) + ".")
         out += [f"  - `{c['script']}`: {x}" for c in r["checks"] for x in c.get("lines", []) if x.startswith("FAIL")]
     if r["model_sha256"]:
-        out.append("- Model, against `docs/repro/expected-hashes.json`: "
+        out.append("- Model, against `docs/repro/expected-windows.json`: "
                    + "; ".join(f"{k} `{v}` ({r['hash_check'].get(k, '?')})" for k, v in r["model_sha256"].items())
                    + ".")
     if r["validate_submission"]:
@@ -626,11 +631,18 @@ def write_report(run: Run) -> Path:
 # ---------------------------------------------------------------------------------------------
 
 BAD_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+# Windows opens these as devices whatever the extension ("NUL.csv" is the null device). build_document.py has
+# the same rule for the PDF (tests/test_build_document.py compares the two).
+RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
 
 def team_name(value: str) -> str:
-    if not value or BAD_NAME.search(value) or value != value.strip() or value.endswith("."):
-        raise argparse.ArgumentTypeError("the team name must be a plain file name (it names the CSV)")
+    """The registered team name as given, if ``<value>.csv`` is a valid file name on Windows. Spaces, accents
+    and a final dot are fine ("Katena F.C." gives "Katena F.C..csv"); quote a name with a space."""
+    if (not value or BAD_NAME.search(value) or value != value.strip()
+            or value.split(".")[0].strip().upper() in RESERVED):
+        raise argparse.ArgumentTypeError('the team name names the CSV: none of < > : " / \\ | ? *, no space at '
+                                         "either end, and not a Windows device name such as CON or NUL")
     return value
 
 
@@ -675,6 +687,12 @@ def main(argv=None) -> int:
 
     if run.csv_written and run.report["csv"]["sha256"] is None:      # a look at the public window is logged
         say(f"SHA-256  {digest(run)}  {run.csv}")                     # with the hash of the file it looked at
+    try:
+        stale = run.report["result"] != "PASS" and run.csv.is_file() and run.csv.stat().st_mtime < run.t0
+    except OSError:
+        stale = False
+    if stale:                       # an earlier run's file under the name the form asks for
+        run.report["warnings"].append(f"{run.csv} is from an earlier run, not from this one: do not upload it")
     run.report["finished"] = now()
     run.report["seconds"]["total"] = round(time.time() - run.t0, 1)
     say("\n== 5. Run report")
