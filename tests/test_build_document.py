@@ -31,7 +31,9 @@ def test_todo_lines_skip_the_line_that_explains_the_marker():
 def test_the_real_document_names_its_markers():
     text = BD.SOURCE.read_text(encoding="utf-8")
     assert BD.PLACEHOLDER in text                                  # the title is filled in from --team
-    assert "marks what only the final run" in text                 # the explaining line todo_lines skips
+    # The explaining line (todo_lines skips it) is there exactly while markers are: after the real run fills
+    # them in, both are gone.
+    assert ("marks what only the final run" in text) == bool(BD.todo_lines(text))
     lines = text.splitlines()
     assert all(BD.MARKER in lines[i - 1] for i in BD.todo_lines(text))
 

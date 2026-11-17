@@ -4,6 +4,31 @@ Every model, feature, or data decision: what changed, the external score, keep o
 `spellF1` at target-like noise on leave-one-match-out development folds, unless stated. Log every look at the public
 5 minutes here too.
 
+## 2026-11-17
+
+### Real run: `scripts/real_run.py --team katenaball` (2026-11-17)
+
+- Commit `4f9e40b7e4bb5008984b4f0ee322fb6f08b7751e` (tree clean). Result: **PASS**.
+- Checks on the provided files: `check_target.py` 17 PASS, 0 FAIL; `check_target_layout.py` 2 PASS, 0 FAIL; `check_touch_target.py` 1 PASS, 0 FAIL; `check_kickoff_tags.py` 2 PASS, 0 FAIL.
+- Model, against `docs/repro/expected-windows.json`: bundle.pkl `9b4c2cfaa553af431185f6c0c99932293e8db3433b68d3a5ca94fe1bc0a30a57` (same); gbdt `55de693c7ea2ae3ac03c68ba005b41d8ed7ee2386e5fa6d6c04659551ef9439c` (same); tcn `78a241f571ad21dc0d4ab88c6ab35bc6f36a17a2ddc25ca63429c30e17392178` (same).
+- `validate_submission.py`: Valid.
+- `check_public_window.py`: valid_submission: PASS, home_away_orientation: PASS, frame_alignment: PASS, beats_published_baseline: PASS.
+- `submissions/katenaball.csv` SHA-256 `478211821e25e71c8e3ce93ae5587d2ef89bb5279c4c1b36e9d747a8b164d109`.
+
+- **How it was run.** Started by Claude on David's PC under the exception `CLAUDE.md` gained this morning
+  (`4f9e40b`; David, who could reach the PC only through Claude Code, asked for it). Every line of its console
+  output went to `D:\katena\logs\realrun\console-20261117.log`, which Claude did not open; it read only
+  `scripts/run_summary.py` on the run report and this snippet. The provided match was not otherwise touched.
+- **This is the look at the public window that the plan logs**: `check_public_window.py`'s PASS/FAIL lines
+  above, nothing else. Nothing was changed because of it.
+- **The team name** in the command, `katenaball`, was provisional. The file is uploaded under the registered
+  name, byte for byte the same (the SHA-256 above). The tag `submission-v1` is on `4f9e40b7e4bb`, the commit
+  that made the file.
+- **Warnings.** `check_kickoff_tags.py` printed two WARN lines beside its two PASS lines (allowed: only a FAIL
+  stops the run). Claude did not read their text; a team member should, in the console log above. The other
+  warning: the commit was not yet on `main`. Until #35 is merged, the release workflow on the tag fails by
+  design; re-run it after the merge.
+
 ## 2026-11-16
 
 ### The technical documents: corrections after a reader's review (no decision)

@@ -895,7 +895,7 @@ One command, from a clone and the data bundle (`docs/REPRODUCE.md` has the detai
 
 ```bash
 git clone https://github.com/jusstinn/katenaball && cd katenaball
-git checkout <submission_tag>                    # the tag named in the short document
+git checkout submission-v1                       # the submitted commit, 4f9e40b
 uv sync --frozen                                 # Python 3.11, dependencies pinned in uv.lock
 export MTAH_DATA_DIR=/path/to/data/bundle        # the unpacked competition bundle (default: data/)
 make submit TEAM=<team_name>                     # writes submissions/<team_name>.csv, validates it, prints its sha256

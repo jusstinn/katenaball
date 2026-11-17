@@ -4,7 +4,6 @@ More than a Hack 2027, Phase 1. Repository: https://github.com/jusstinn/katenaba
 
 This is the short version. `docs/technical-document-full.md` has every table and every change we tested, and
 every number in both comes from `docs/decision-log.md` or the evidence pages it links.
-`TODO(after the real run)` marks what only the final run on the provided match can fill in.
 
 ## 1. Summary
 
@@ -86,7 +85,8 @@ in crowds, or cut the jitter to the level of real broadcast tracking. Both model
 - **The public 5 minutes are a pipeline check only.** `scripts/check_public_window.py` prints pass or fail,
   never a score: the official file checks pass, home and away are the right way round, the frames line up,
   and the file beats the published smooth50 baseline. A fail means a bug to find, not something to tune.
-  `TODO(after the real run)`: the result of that run. Twice we looked at the window with no prediction and
+  On the submitted file it printed 4 of 4 PASS (valid_submission, home_away_orientation, frame_alignment, beats_published_baseline).
+  Twice we looked at the window with no prediction and
   no score, and changed nothing: we counted its possessions and their lengths, and one team member watched
   its tactical video beside the public labels, as the organisers' clarification of Nov 3 allows.
 - **The submission path equals the evaluation path, and does not break on damaged tracking.** An external
@@ -226,7 +226,7 @@ One command, from a clone and the data bundle (`docs/REPRODUCE.md` has the detai
 
 ```bash
 git clone https://github.com/jusstinn/katenaball && cd katenaball
-git checkout <submission_tag>                    # TODO(after the real run): the tagged commit
+git checkout submission-v1
 uv sync --frozen                                 # Python 3.11, dependencies pinned in uv.lock
 export MTAH_DATA_DIR=/path/to/data/bundle        # the unpacked competition bundle (default: data/)
 make submit TEAM=<team_name>                     # writes submissions/<team_name>.csv, validates it, prints its sha256
@@ -244,7 +244,8 @@ make submit TEAM=<team_name>                     # writes submissions/<team_name
   import. The CSV is built as bytes with LF line ends on every OS. Section 7 has the cross-machine checks.
 - **Cost.** On a 4-core PC from 2017: about an hour to build the features and worlds, about 26 minutes to
   train, a minute to label. The external download is about 5 GB.
-- **The submitted file.** `TODO(after the real run)`: SHA-256 of `<team_name>.csv` and its commit.
+- **The submitted file.** `<team_name>.csv`, SHA-256 `478211821e25e71c8e3ce93ae5587d2ef89bb5279c4c1b36e9d747a8b164d109`, made by commit
+  `4f9e40b7e4bb` (tag `submission-v1`).
 - **No match data in the repository.** CI fails any commit that holds it.
 
 ## 9. Disclosures
