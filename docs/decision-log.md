@@ -50,6 +50,100 @@ the oracle edits of "Where F3 loses", Nov 13); definitions of F, F3, AW2 and "wo
 the delegation stated once, in section 9. Shortened, to keep 5 pages: section 1, the evidence and replication
 bullets of section 3, one row of section 4, the model-bytes bullet of section 7. Both documents are dated Nov 16.
 
+### Fallback prepared: AW2 from Justin's Mac, if David's side stays silent (not triggered; nothing adopted)
+
+**Outcome (2026-11-17): not used.** David's side returned. The real run was made on the PC on Nov 17 (entry
+above), from `justin/adopt-aw2`, which is merged (#35). None of this branch's file changes are on `main`: the
+expected hashes stay the PC's, in `docs/repro/expected-windows.json`, and `docs/repro/expected-hashes.json`
+does not exist there. The entry is kept as the record of the Mac as a fifth machine: the same LightGBM member
+and the same labels on an external match in the provided format.
+
+**The Mac can train AW2 and label a match in the provided format exactly as the four machines of Nov 13 did. It
+cannot make the submission yet: the organisers' data bundle is not on it.** Recorded by Claude on Justin's Mac,
+Nov 16, 02:20 to 03:25 CET. External matches and a synthetic bundle only. Nothing is adopted: main still trains
+F3, and this entry and its changes are on `justin/adopt-aw2-mac` only.
+
+**Why.** David's side has been silent since Nov 13, 13:37 CET: no commit, no comment and no run by Nov 16, 02:30
+CET. The switch on `justin/adopt-aw2` waits for the PC's three full hashes and for David's own yes to AW2. The
+deadline is Nov 17, 23:59 CET. Asked "Should I prepare a Mac-only fallback in case David stays silent?", Justin
+answered "Yes, prepare it" (Nov 16, about 02:20 CET).
+
+**What the Mac has, and what it lacks.**
+
+- It has the external corpus, the cache (`corpus` and `worlds` built) and F3's all-30 model. That model's LightGBM
+  member is the PC's, `056ffa8a41ea...`, byte for byte; its TCN and bundle are the Mac's own, as on every machine.
+- **It does not have the data bundle.** `make_submission.py bundle`, which checks that the three files exist and
+  opens nothing, names all three as missing. The Mac's `data/` holds one small file. Justin was told on Nov 15
+  that the match data was there; that was wrong, only the folder was. He has to download the bundle with the
+  link the organisers sent to enrolled participants before anything can run on the match.
+
+**AW2's all-30 model on the Mac** (Apple M5, macOS 26.5, the locked environment; `make_submission.py train
+--spec AW2`, started 02:25 CET; LightGBM 97 s, TCN 1,692 s).
+
+| | The Mac | The four machines of Nov 13 |
+|---|---|---|
+| LightGBM member | `55de693c7ea2ae3ac03c68ba005b41d8ed7ee2386e5fa6d6c04659551ef9439c` | `55de693c7ea2...` on all four: the same |
+| TCN weights | `caabf1d3c9102f416a667a893a9edd3f24690fd27cad7b682a4e21263cd84cd2` | four sets (the PC's: `78a241f571ad...`): a fifth set |
+| `bundle.pkl` | `91b8fccce91df0890bebeebbad41570c127f7a75c42a8583a5e06df10447931d` | the PC's: `9b4c2cfaa553af43...` |
+| Dressed CSV (`idsse/DFL-MAT-J03WMX` in the provided format, labelled by `predict`) | `4e0ab1d06ba721a05924555a765edcea84c1c88008f5e15153ffdc27d41824ef` | `4e0ab1d06ba721a0...` on all four: the same |
+
+So the Mac is a fifth machine with the same LightGBM member and the same labels on an external match in the
+provided format, and its TCN bytes are its own, as each machine's are. The prefixes of Nov 13 are all the log
+has of the four machines' hashes, so "the same" means the first 12 and 16 digits. As always, this is shown on
+an external match, not on the provided one.
+
+**The real-run command on the Mac, on a synthetic bundle.** `scripts/real_run.py` had never run on macOS outside
+the tests. Run with `MTAH_DATA_DIR` on a
+synthetic bundle in the provided format and on the competition's timeline (the generator of
+`tests/test_pipeline_atd.py`, with a synthetic Smart Tagging file), as `real_run.py --team dryrun-synthetic`:
+
+- Without `--skip-checks` it stopped in step 1: `bundle files missing: broadcast atd_meta`. The layout check
+  reads the broadcast source's ATD metadata, so **the command needs four files of the bundle, not three**; the
+  synthetic bundle has only the tactical three. `docs/real-run.md` now says so.
+- With `--skip-checks`, step 1 passed (30 external matches, libraries as pinned), and step 3 fitted AW2 a second
+  time in 20 minutes (LightGBM 52 s, TCN 1,138 s; the first fit ran beside the test suite): **the same three
+  hashes as the first fit**, each printed `PASS` against `docs/repro/expected-hashes.json`. `predict` wrote
+  199,319 rows and the official validator said `Valid`.
+- Step 4 then ran `check_public_window.py` on that file and stopped there, as it must: the labels are of a
+  synthetic match, so orientation, alignment and the baseline line all read FAIL. That compares random play
+  with the public labels and says nothing about any model; it is noted here because every use of the public
+  window is. The run report and the snippet were written, and the synthetic CSV and report were deleted.
+
+So the command runs on macOS from its first step to its last check. The four human checks of step 2 have not
+run on the Mac: they need the real files.
+
+**What `justin/adopt-aw2-mac` changes** (on top of `justin/adopt-aw2`).
+
+- `SUBMISSION_SPEC = "AW2"`.
+- `docs/repro/expected-windows.json` is renamed `docs/repro/expected-hashes.json` and holds AW2's three hashes
+  as the Mac trains them. The LightGBM hash is the one that stops a run, and it is the same on every machine so
+  far. The TCN and bundle hashes are the Mac's: on the PC they would differ, which is a warning and no stop.
+- `docs/real-run.md` has the Mac's commands and AW2's hashes; `docs/REPRODUCE.md`, `docs/ci.md` and the
+  docstring of `scripts/make_submission.py` name AW2.
+- **The tests' synthetic corpus gets stand-in action labels** (`tests/synth.py`, used by the fixtures of
+  `tests/test_pipeline.py` and `tests/test_pipeline_atd.py`). Six tests train the submission model on four
+  synthetic matches, one of them a SkillCorner match with no event files, so with AW2 as the submission model
+  they failed on all three CI systems at the first push of this branch (`fd89c72`). The stand-in returns that
+  match's own labels; no model code changed. The first push went out after 333 tests passed on the Mac, but
+  that run had skipped every LightGBM test: pytest on the Mac needs `DYLD_FALLBACK_LIBRARY_PATH` set to
+  scikit-learn's libomp, as `ci.yml` sets it. With it, 358 pass and 2 skip (no `markdown_it`, no built
+  `external_data` beside the worktree).
+- Both technical documents say which machine made the file. `PENDING_DAVID_AW2` and the three `TODO(after the
+  real run)` markers are still there.
+
+**Not decided here.**
+
+- **Whether and when the fallback is used.** That is Justin's to say. If David's side returns with the PC's
+  hashes, `justin/adopt-aw2` is completed as planned and this branch is dropped.
+- **The sentence about David** (`PENDING_DAVID_AW2`, long document, section 3.5). If the fallback is used, it has
+  to say what happened: that he agreed to rule 2 and did not himself confirm the choice of AW2. Justin words it.
+- **The human checks on the provided files.** `check_target.py` passed 16 of 16 on Nov 7, not on the Mac. On
+  the Mac the four checks run as step 2 of the command, on Justin's own download, for the first time there.
+
+**What only Justin can do:** download the bundle; run the command himself (`CLAUDE.md`: no assistant runs
+anything on the match) and share only its snippet; merge to main, tag `submission-v1`, fill the markers, build
+the PDF and send the form.
+
 ## 2026-11-15
 
 ### David's side, by delegation: rule 2 kept and AW2 chosen; AW2 is adopted
